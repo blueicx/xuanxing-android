@@ -1,5 +1,7 @@
 # 玄星 · XuanXing（Android）
 
+[![Build Debug APK](https://github.com/blueicx/xuanxing-android/actions/workflows/build.yml/badge.svg)](https://github.com/blueicx/xuanxing-android/actions/workflows/build.yml)
+
 一款**离线优先**的玄学与自我探索 App，涵盖东方命理、西方占星、世界多元占卜与性格测试。
 所有推算与解读均在**设备本地完成，无需联网**，也不收集任何个人数据。
 
@@ -47,6 +49,10 @@
 5. 点击 ▶ Run，或执行 `./gradlew assembleDebug`（Windows 用 `gradlew.bat`）。
 
 > 应用完全离线运行，无需任何 API Key 或后端服务。
+
+## 自动构建（CI）
+
+每次 push 到 `main` 或发起 PR 时，[GitHub Actions](https://github.com/blueicx/xuanxing-android/actions) 会自动执行 `.github/workflows/build.yml`：安装 JDK 17 + Android SDK 34、构建并上传 debug APK。构建产物 `xuanxing-debug-apk` 可在对应 Actions 任务页下载（保留 30 天）。
 
 ## 目录结构
 
