@@ -1,0 +1,19 @@
+<resources>
+    <!-- 窗口级主题：Compose 的 MaterialTheme 独立于它，仅用于去行动栏 + 深色背景 -->
+    <style name="Theme.Xuanji" parent="android:Theme.Material.NoActionBar">
+        <!-- 沉浸式外观：targetSdk<35 不走 edge-to-edge，状态栏/导航栏用 app 深色实底 + 浅色图标，
+             与 Compose 深色背景融为一体，避免透明系统栏露出默认浅色背景造成白边 -->
+        <item name="android:windowBackground">@color/splash_bg</item>
+        <item name="android:statusBarColor">@color/splash_bg</item>
+        <item name="android:navigationBarColor">@color/splash_bg</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+    </style>
+
+    <!-- Android 12+ 开屏（core-splashscreen 兼容库，向下兼容到 minSdk 26） -->
+    <style name="Theme.Xuanji.Splash" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/splash_bg</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_launcher_foreground</item>
+        <item name="postSplashScreenTheme">@style/Theme.Xuanji</item>
+    </style>
+</resources>

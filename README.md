@@ -1,0 +1,69 @@
+# 玄星 · XuanXing（Android）
+
+一款**离线优先**的玄学与自我探索 App，涵盖东方命理、西方占星、世界多元占卜与性格测试。
+所有推算与解读均在**设备本地完成，无需联网**，也不收集任何个人数据。
+
+> 项目早期曾用名「玄机」，包名保留为 `com.xuanji.app`。
+
+## 功能概览
+
+- **综合 / 东方（五行八字）**
+  - 由出生时间推算完整八字命盘（年 / 月 / 日 / 时四柱）
+  - 五行分布可视化（金木水火土，缺项高亮）、日主、生肖、喜用神
+  - 每日运势：综合 / 事业 / 财运 / 感情 / 健康 五维评分 + 今日干支 + 幸运色 / 方位 + 建议
+- **西方（星座）**
+  - 由出生月日判定星座、属性、日期范围、性格特质
+  - 每日运势：五维评分 + 幸运数字 / 颜色 / 方位 + 当日寄语
+- **占卜（世界多元体系）**
+  - 顶级板块：亚洲 / 非洲 / 欧洲 / 美洲 / 近现代新兴 / 常用占卜
+  - 含紫微斗数（中州 / 北 / 闽三派合一）、奇门、风水、六爻、易经、塔罗、水晶球、灵签抽签等数十个体系
+  - 全手绘专属图标 + 摇签 / 翻书 / 贝壳旋转等动态效果
+- **测试（性格 · 职业 · 趣味）**
+  - MBTI、大五人格、卡特尔 16PF、MMPI、霍兰德 RIASEC、霍格沃兹学院
+  - 趣味合集：九型人格 / DISC / 性格色彩 / 菲尔人格 / 颜色心理 / 瑞文智力 / 动物 · 美食 · 影视 · 颜色等
+  - 确定性计分，本地保存测试记录
+- **历史 · 同月同日生**：按你的出生日期精确匹配历史上的今天诞生的名人
+- **我的 · 命盘设置**：出生日期 / 时间 / 地点编辑并保存（DataStore 本地存储）
+- **每日提醒**：WorkManager 每日推送「今日运势已更新」通知
+- 深色神秘主题（紫 + 流金），Material 3，沉浸式状态栏 / 导航栏
+
+## 技术栈
+
+- Kotlin + Jetpack Compose（Material 3）
+- MVVM（ViewModel + StateFlow）+ 单向数据流
+- DataStore（Preferences）做离线存储与每日运势缓存（按日期 + 命盘指纹缓存，结果稳定）
+- WorkManager 每日提醒
+- 最低 SDK 26（Android 8.0），目标 / 编译 SDK 34
+- Compose BOM 2024.02.00，Kotlin 1.9.22，Compose 编译器 1.5.8
+
+## 如何运行
+
+需要用 **Android Studio（Hedgehog 或更新版本）** 打开本项目并运行。
+
+1. 安装 [Android Studio](https://developer.android.com/studio) 与 Android SDK（API 34）。
+2. 打开 Android Studio → `File / Open` → 选择 `xuanji-android` 目录。
+3. 首次打开会触发 Gradle 同步（已内置 Gradle Wrapper，无需本机预装 Gradle）。
+4. 连接安卓设备或启动模拟器（API 26+）。
+5. 点击 ▶ Run，或执行 `./gradlew assembleDebug`（Windows 用 `gradlew.bat`）。
+
+> 应用完全离线运行，无需任何 API Key 或后端服务。
+
+## 目录结构
+
+```
+app/src/main/java/com/xuanji/app/
+├── domain/          # 八字 / 星座 / 占卜 / 测试 推算（纯 Kotlin，可单测）
+├── data/            # model / DataStore / Repository
+├── ui/              # theme / 导航 / 各板块 / 公共组件 / 图标
+├── daily/           # WorkManager 每日提醒
+├── XuanjiApplication.kt
+└── MainActivity.kt
+```
+
+## 隐私
+
+本应用**不联网、不上传、不收集**任何用户数据。所有命盘、运势、占卜与测试结果均在本地计算并仅存储于本机 DataStore。
+
+## 许可证
+
+[MIT License](LICENSE) © 2026 吴家希（WJX）

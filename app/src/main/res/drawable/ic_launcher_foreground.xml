@@ -1,0 +1,47 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- 星空透明感五芒星（玄星）：
+         半透明白点散布的星空 + 金色描边五芒星（外接圆 r=30，内接圆 r=11.3），
+         内部保持透明（fillColor 透明），营造悬浮通透的星象感。 -->
+
+    <!-- 五芒星外圈（描边，金色，透出星空） -->
+    <path
+        android:pathData="M54,24 L61.76,45.71 L85.03,46.27 L66.93,60.79 L72.95,83.08 L54,70.5 L35.05,83.08 L41.07,60.79 L22.97,46.27 L46.24,45.71 Z"
+        android:strokeColor="#E9D8A6"
+        android:strokeWidth="1.6"
+        android:fillColor="#00000000" />
+
+    <!-- 内接五角（反向线条，增强五芒星结构通透感） -->
+    <path
+        android:pathData="M54,45.5 L60.5,52.5 L54,62 L47.5,52.5 Z"
+        android:strokeColor="#E9D8A6"
+        android:strokeAlpha="0.55"
+        android:strokeWidth="0.9"
+        android:fillColor="#00000000" />
+
+    <!-- 中央一点金星 -->
+    <path
+        android:pathData="M54,50 m-2,0 a2,2 0 1,1 4,0 a2,2 0 1,1 -4,0"
+        android:fillColor="#E9D8A6"
+        android:fillAlpha="0.9" />
+
+    <!-- 散布的星空小点（半透明白） -->
+    <path android:pathData="M18,22 m-1,0 a1,1 0 1,1 2,0 a1,1 0 1,1 -2,0" android:fillColor="#FFFFFF" android:fillAlpha="0.5" />
+    <path android:pathData="M30,14 m-0.8,0 a0.8,0.8 0 1,1 1.6,0 a0.8,0.8 0 1,1 -1.6,0" android:fillColor="#FFFFFF" android:fillAlpha="0.4" />
+    <path android:pathData="M78,18 m-1,0 a1,1 0 1,1 2,0 a1,1 0 1,1 -2,0" android:fillColor="#FFFFFF" android:fillAlpha="0.5" />
+    <path android:pathData="M90,32 m-0.8,0 a0.8,0.8 0 1,1 1.6,0 a0.8,0.8 0 1,1 -1.6,0" android:fillColor="#FFFFFF" android:fillAlpha="0.4" />
+    <path android:pathData="M24,40 m-0.7,0 a0.7,0.7 0 1,1 1.4,0 a0.7,0.7 0 1,1 -1.4,0" android:fillColor="#FFFFFF" android:fillAlpha="0.45" />
+    <path android:pathData="M14,56 m-0.9,0 a0.9,0.9 0 1,1 1.8,0 a0.9,0.9 0 1,1 -1.8,0" android:fillColor="#FFFFFF" android:fillAlpha="0.4" />
+    <path android:pathData="M92,54 m-1,0 a1,1 0 1,1 2,0 a1,1 0 1,1 -2,0" android:fillColor="#FFFFFF" android:fillAlpha="0.5" />
+    <path android:pathData="M86,74 m-0.8,0 a0.8,0.8 0 1,1 1.6,0 a0.8,0.8 0 1,1 -1.6,0" android:fillColor="#FFFFFF" android:fillAlpha="0.4" />
+    <path android:pathData="M24,84 m-0.9,0 a0.9,0.9 0 1,1 1.8,0 a0.9,0.9 0 1,1 -1.8,0" android:fillColor="#FFFFFF" android:fillAlpha="0.45" />
+    <path android:pathData="M44,92 m-0.7,0 a0.7,0.7 0 1,1 1.4,0 a0.7,0.7 0 1,1 -1.4,0" android:fillColor="#FFFFFF" android:fillAlpha="0.4" />
+    <path android:pathData="M66,94 m-0.8,0 a0.8,0.8 0 1,1 1.6,0 a0.8,0.8 0 1,1 -1.6,0" android:fillColor="#FFFFFF" android:fillAlpha="0.4" />
+    <path android:pathData="M82,88 m-0.7,0 a0.7,0.7 0 1,1 1.4,0 a0.7,0.7 0 1,1 -1.4,0" android:fillColor="#FFFFFF" android:fillAlpha="0.45" />
+    <path android:pathData="M12,36 m-0.7,0 a0.7,0.7 0 1,1 1.4,0 a0.7,0.7 0 1,1 -1.4,0" android:fillColor="#FFFFFF" android:fillAlpha="0.4" />
+    <path android:pathData="M36,10 m-0.8,0 a0.8,0.8 0 1,1 1.6,0 a0.8,0.8 0 1,1 -1.6,0" android:fillColor="#FFFFFF" android:fillAlpha="0.4" />
+    <path android:pathData="M70,10 m-0.7,0 a0.7,0.7 0 1,1 1.4,0 a0.7,0.7 0 1,1 -1.4,0" android:fillColor="#FFFFFF" android:fillAlpha="0.45" />
+</vector>

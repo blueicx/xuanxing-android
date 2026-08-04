@@ -1,0 +1,642 @@
+[
+ {
+  "name": "乾",
+  "binary": "111111",
+  "lower": "QIAN",
+  "upper": "QIAN",
+  "palace": "金",
+  "world": 6,
+  "judgment": "元亨利贞，刚健中正，自强不息",
+  "kingWen": 1
+ },
+ {
+  "name": "坤",
+  "binary": "000000",
+  "lower": "KUN",
+  "upper": "KUN",
+  "palace": "土",
+  "world": 6,
+  "judgment": "元亨，利牝马之贞，柔顺承载",
+  "kingWen": 2
+ },
+ {
+  "name": "屯",
+  "binary": "100010",
+  "lower": "ZHEN",
+  "upper": "KAN",
+  "palace": "水",
+  "world": 2,
+  "judgment": "元亨，利建侯，初生艰难",
+  "kingWen": 3
+ },
+ {
+  "name": "蒙",
+  "binary": "010001",
+  "lower": "KAN",
+  "upper": "GEN",
+  "palace": "火",
+  "world": 4,
+  "judgment": "亨，童蒙求我，启蒙养正",
+  "kingWen": 4
+ },
+ {
+  "name": "需",
+  "binary": "111010",
+  "lower": "QIAN",
+  "upper": "KAN",
+  "palace": "土",
+  "world": 4,
+  "judgment": "有孚光亨，贞吉，待时而动",
+  "kingWen": 5
+ },
+ {
+  "name": "讼",
+  "binary": "010111",
+  "lower": "KAN",
+  "upper": "QIAN",
+  "palace": "火",
+  "world": 4,
+  "judgment": "有孚窒惕，争讼终凶",
+  "kingWen": 6
+ },
+ {
+  "name": "师",
+  "binary": "010000",
+  "lower": "KAN",
+  "upper": "KUN",
+  "palace": "水",
+  "world": 3,
+  "judgment": "贞，丈人吉，兵众之道",
+  "kingWen": 7
+ },
+ {
+  "name": "比",
+  "binary": "000010",
+  "lower": "KUN",
+  "upper": "KAN",
+  "palace": "土",
+  "world": 3,
+  "judgment": "吉，亲辅相依",
+  "kingWen": 8
+ },
+ {
+  "name": "小畜",
+  "binary": "111011",
+  "lower": "QIAN",
+  "upper": "XUN",
+  "palace": "木",
+  "world": 1,
+  "judgment": "亨，密云不雨，小有蓄积",
+  "kingWen": 9
+ },
+ {
+  "name": "履",
+  "binary": "110111",
+  "lower": "DUI",
+  "upper": "QIAN",
+  "palace": "土",
+  "world": 5,
+  "judgment": "履虎尾不咥人，慎行则亨",
+  "kingWen": 10
+ },
+ {
+  "name": "泰",
+  "binary": "111000",
+  "lower": "QIAN",
+  "upper": "KUN",
+  "palace": "土",
+  "world": 3,
+  "judgment": "小往大来，通泰吉祥",
+  "kingWen": 11
+ },
+ {
+  "name": "否",
+  "binary": "000111",
+  "lower": "KUN",
+  "upper": "QIAN",
+  "palace": "金",
+  "world": 3,
+  "judgment": "大往小来，闭塞之时",
+  "kingWen": 12
+ },
+ {
+  "name": "同人",
+  "binary": "101111",
+  "lower": "LI",
+  "upper": "QIAN",
+  "palace": "火",
+  "world": 3,
+  "judgment": "同人于野，和同协力",
+  "kingWen": 13
+ },
+ {
+  "name": "大有",
+  "binary": "111101",
+  "lower": "QIAN",
+  "upper": "LI",
+  "palace": "金",
+  "world": 3,
+  "judgment": "元亨，富有盛大",
+  "kingWen": 14
+ },
+ {
+  "name": "谦",
+  "binary": "001000",
+  "lower": "GEN",
+  "upper": "KUN",
+  "palace": "金",
+  "world": 5,
+  "judgment": "亨，君子有终，谦尊而光",
+  "kingWen": 15
+ },
+ {
+  "name": "豫",
+  "binary": "000100",
+  "lower": "KUN",
+  "upper": "ZHEN",
+  "palace": "木",
+  "world": 1,
+  "judgment": "利建侯行师，欢悦而动",
+  "kingWen": 16
+ },
+ {
+  "name": "随",
+  "binary": "100110",
+  "lower": "ZHEN",
+  "upper": "DUI",
+  "palace": "木",
+  "world": 3,
+  "judgment": "元亨利贞，随顺时机",
+  "kingWen": 17
+ },
+ {
+  "name": "蛊",
+  "binary": "011001",
+  "lower": "XUN",
+  "upper": "GEN",
+  "palace": "木",
+  "world": 3,
+  "judgment": "整治积弊，先甲后甲",
+  "kingWen": 18
+ },
+ {
+  "name": "临",
+  "binary": "110000",
+  "lower": "DUI",
+  "upper": "KUN",
+  "palace": "土",
+  "world": 2,
+  "judgment": "元亨利贞，临下教化",
+  "kingWen": 19
+ },
+ {
+  "name": "观",
+  "binary": "000011",
+  "lower": "KUN",
+  "upper": "XUN",
+  "palace": "金",
+  "world": 4,
+  "judgment": "观瞻民风，盥而不荐",
+  "kingWen": 20
+ },
+ {
+  "name": "噬嗑",
+  "binary": "100101",
+  "lower": "ZHEN",
+  "upper": "LI",
+  "palace": "木",
+  "world": 5,
+  "judgment": "亨，利用狱，咬合去间",
+  "kingWen": 21
+ },
+ {
+  "name": "贲",
+  "binary": "101001",
+  "lower": "LI",
+  "upper": "GEN",
+  "palace": "土",
+  "world": 1,
+  "judgment": "亨，文饰适度",
+  "kingWen": 22
+ },
+ {
+  "name": "剥",
+  "binary": "000001",
+  "lower": "KUN",
+  "upper": "GEN",
+  "palace": "金",
+  "world": 5,
+  "judgment": "不利有攸往，剥落消损",
+  "kingWen": 23
+ },
+ {
+  "name": "复",
+  "binary": "100000",
+  "lower": "ZHEN",
+  "upper": "KUN",
+  "palace": "土",
+  "world": 1,
+  "judgment": "亨，一阳来复，生生不息",
+  "kingWen": 24
+ },
+ {
+  "name": "无妄",
+  "binary": "100111",
+  "lower": "ZHEN",
+  "upper": "QIAN",
+  "palace": "木",
+  "world": 4,
+  "judgment": "其匪正有眚，不妄为",
+  "kingWen": 25
+ },
+ {
+  "name": "大畜",
+  "binary": "111001",
+  "lower": "QIAN",
+  "upper": "GEN",
+  "palace": "土",
+  "world": 2,
+  "judgment": "利贞，大蓄待发",
+  "kingWen": 26
+ },
+ {
+  "name": "颐",
+  "binary": "100001",
+  "lower": "ZHEN",
+  "upper": "GEN",
+  "palace": "木",
+  "world": 4,
+  "judgment": "贞吉，养正育德",
+  "kingWen": 27
+ },
+ {
+  "name": "大过",
+  "binary": "011110",
+  "lower": "XUN",
+  "upper": "DUI",
+  "palace": "木",
+  "world": 4,
+  "judgment": "栋桡，非常之时当非常之举",
+  "kingWen": 28
+ },
+ {
+  "name": "坎",
+  "binary": "010010",
+  "lower": "KAN",
+  "upper": "KAN",
+  "palace": "水",
+  "world": 6,
+  "judgment": "习坎，维心亨，重险能济",
+  "kingWen": 29
+ },
+ {
+  "name": "离",
+  "binary": "101101",
+  "lower": "LI",
+  "upper": "LI",
+  "palace": "火",
+  "world": 6,
+  "judgment": "利贞，附丽光明",
+  "kingWen": 30
+ },
+ {
+  "name": "咸",
+  "binary": "001110",
+  "lower": "GEN",
+  "upper": "DUI",
+  "palace": "金",
+  "world": 3,
+  "judgment": "亨，取女吉，感应相应",
+  "kingWen": 31
+ },
+ {
+  "name": "恒",
+  "binary": "011100",
+  "lower": "XUN",
+  "upper": "ZHEN",
+  "palace": "木",
+  "world": 3,
+  "judgment": "亨，恒久不已",
+  "kingWen": 32
+ },
+ {
+  "name": "遁",
+  "binary": "001111",
+  "lower": "GEN",
+  "upper": "QIAN",
+  "palace": "金",
+  "world": 2,
+  "judgment": "亨，小利贞，退避以全",
+  "kingWen": 33
+ },
+ {
+  "name": "大壮",
+  "binary": "111100",
+  "lower": "QIAN",
+  "upper": "ZHEN",
+  "palace": "土",
+  "world": 4,
+  "judgment": "利贞，盛壮当止",
+  "kingWen": 34
+ },
+ {
+  "name": "晋",
+  "binary": "000101",
+  "lower": "KUN",
+  "upper": "LI",
+  "palace": "金",
+  "world": 4,
+  "judgment": "康侯晋升，光明上进",
+  "kingWen": 35
+ },
+ {
+  "name": "明夷",
+  "binary": "101000",
+  "lower": "LI",
+  "upper": "KUN",
+  "palace": "水",
+  "world": 4,
+  "judgment": "利艰贞，明入地中",
+  "kingWen": 36
+ },
+ {
+  "name": "家人",
+  "binary": "101011",
+  "lower": "LI",
+  "upper": "XUN",
+  "palace": "木",
+  "world": 2,
+  "judgment": "利女贞，齐家有序",
+  "kingWen": 37
+ },
+ {
+  "name": "睽",
+  "binary": "110101",
+  "lower": "DUI",
+  "upper": "LI",
+  "palace": "土",
+  "world": 4,
+  "judgment": "小事吉，乖离求合",
+  "kingWen": 38
+ },
+ {
+  "name": "蹇",
+  "binary": "001010",
+  "lower": "GEN",
+  "upper": "KAN",
+  "palace": "金",
+  "world": 4,
+  "judgment": "利见大人，蹇难济涉",
+  "kingWen": 39
+ },
+ {
+  "name": "解",
+  "binary": "010100",
+  "lower": "KAN",
+  "upper": "ZHEN",
+  "palace": "木",
+  "world": 2,
+  "judgment": "利西南，险难消解",
+  "kingWen": 40
+ },
+ {
+  "name": "损",
+  "binary": "110001",
+  "lower": "DUI",
+  "upper": "GEN",
+  "palace": "土",
+  "world": 3,
+  "judgment": "有孚元吉，减损修德",
+  "kingWen": 41
+ },
+ {
+  "name": "益",
+  "binary": "100011",
+  "lower": "ZHEN",
+  "upper": "XUN",
+  "palace": "木",
+  "world": 3,
+  "judgment": "利有攸往，增益兴利",
+  "kingWen": 42
+ },
+ {
+  "name": "夬",
+  "binary": "111110",
+  "lower": "QIAN",
+  "upper": "DUI",
+  "palace": "土",
+  "world": 5,
+  "judgment": "扬于王庭，决而能和",
+  "kingWen": 43
+ },
+ {
+  "name": "姤",
+  "binary": "011111",
+  "lower": "XUN",
+  "upper": "QIAN",
+  "palace": "金",
+  "world": 1,
+  "judgment": "女壮，遇合须慎",
+  "kingWen": 44
+ },
+ {
+  "name": "萃",
+  "binary": "000110",
+  "lower": "KUN",
+  "upper": "DUI",
+  "palace": "金",
+  "world": 2,
+  "judgment": "亨，荟萃聚众",
+  "kingWen": 45
+ },
+ {
+  "name": "升",
+  "binary": "011000",
+  "lower": "XUN",
+  "upper": "KUN",
+  "palace": "木",
+  "world": 4,
+  "judgment": "元亨，步步高升",
+  "kingWen": 46
+ },
+ {
+  "name": "困",
+  "binary": "010110",
+  "lower": "KAN",
+  "upper": "DUI",
+  "palace": "金",
+  "world": 1,
+  "judgment": "亨，处困守正",
+  "kingWen": 47
+ },
+ {
+  "name": "井",
+  "binary": "011010",
+  "lower": "XUN",
+  "upper": "KAN",
+  "palace": "木",
+  "world": 5,
+  "judgment": "改邑不改井，养而不穷",
+  "kingWen": 48
+ },
+ {
+  "name": "革",
+  "binary": "101110",
+  "lower": "LI",
+  "upper": "DUI",
+  "palace": "水",
+  "world": 4,
+  "judgment": "巳日乃孚，顺天应人",
+  "kingWen": 49
+ },
+ {
+  "name": "鼎",
+  "binary": "011101",
+  "lower": "XUN",
+  "upper": "LI",
+  "palace": "火",
+  "world": 2,
+  "judgment": "元吉，鼎新取象",
+  "kingWen": 50
+ },
+ {
+  "name": "震",
+  "binary": "100100",
+  "lower": "ZHEN",
+  "upper": "ZHEN",
+  "palace": "木",
+  "world": 6,
+  "judgment": "亨，震来虩虩，奋发惊醒",
+  "kingWen": 51
+ },
+ {
+  "name": "艮",
+  "binary": "001001",
+  "lower": "GEN",
+  "upper": "GEN",
+  "palace": "土",
+  "world": 6,
+  "judgment": "艮其背，行止有节",
+  "kingWen": 52
+ },
+ {
+  "name": "渐",
+  "binary": "001011",
+  "lower": "GEN",
+  "upper": "XUN",
+  "palace": "土",
+  "world": 3,
+  "judgment": "女归吉，循序渐进",
+  "kingWen": 53
+ },
+ {
+  "name": "归妹",
+  "binary": "110100",
+  "lower": "DUI",
+  "upper": "ZHEN",
+  "palace": "金",
+  "world": 3,
+  "judgment": "征凶，归妹失序",
+  "kingWen": 54
+ },
+ {
+  "name": "丰",
+  "binary": "101100",
+  "lower": "LI",
+  "upper": "ZHEN",
+  "palace": "水",
+  "world": 5,
+  "judgment": "亨，丰大光明，宜日中",
+  "kingWen": 55
+ },
+ {
+  "name": "旅",
+  "binary": "001101",
+  "lower": "GEN",
+  "upper": "LI",
+  "palace": "火",
+  "world": 1,
+  "judgment": "小亨，行旅安分",
+  "kingWen": 56
+ },
+ {
+  "name": "巽",
+  "binary": "011011",
+  "lower": "XUN",
+  "upper": "XUN",
+  "palace": "木",
+  "world": 6,
+  "judgment": "小亨，顺而能入",
+  "kingWen": 57
+ },
+ {
+  "name": "兑",
+  "binary": "110110",
+  "lower": "DUI",
+  "upper": "DUI",
+  "palace": "金",
+  "world": 6,
+  "judgment": "亨，利贞，悦而能和",
+  "kingWen": 58
+ },
+ {
+  "name": "涣",
+  "binary": "010011",
+  "lower": "KAN",
+  "upper": "XUN",
+  "palace": "火",
+  "world": 5,
+  "judgment": "亨，涣释离散",
+  "kingWen": 59
+ },
+ {
+  "name": "节",
+  "binary": "110010",
+  "lower": "DUI",
+  "upper": "KAN",
+  "palace": "水",
+  "world": 1,
+  "judgment": "亨，节制有度",
+  "kingWen": 60
+ },
+ {
+  "name": "中孚",
+  "binary": "110011",
+  "lower": "DUI",
+  "upper": "XUN",
+  "palace": "土",
+  "world": 4,
+  "judgment": "豚鱼吉，中心诚信",
+  "kingWen": 61
+ },
+ {
+  "name": "小过",
+  "binary": "001100",
+  "lower": "GEN",
+  "upper": "ZHEN",
+  "palace": "金",
+  "world": 4,
+  "judgment": "可小事不可大事，过犹不及",
+  "kingWen": 62
+ },
+ {
+  "name": "既济",
+  "binary": "101010",
+  "lower": "LI",
+  "upper": "KAN",
+  "palace": "水",
+  "world": 3,
+  "judgment": "亨，初吉终乱，慎保成",
+  "kingWen": 63
+ },
+ {
+  "name": "未济",
+  "binary": "010101",
+  "lower": "KAN",
+  "upper": "LI",
+  "palace": "火",
+  "world": 3,
+  "judgment": "亨，事未竟，慎终如始",
+  "kingWen": 64
+ }
+]

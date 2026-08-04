@@ -1,0 +1,626 @@
+[
+ {
+  "nameCn": "愚者",
+  "nameEn": "The Fool",
+  "arcana": "major",
+  "suit": "",
+  "upright": "新的开始、自由与冒险",
+  "reversed": "鲁莽冒进、漂泊不定"
+ },
+ {
+  "nameCn": "魔术师",
+  "nameEn": "The Magician",
+  "arcana": "major",
+  "suit": "",
+  "upright": "意志显化、创造与行动力",
+  "reversed": "潜能未用、操纵欺骗"
+ },
+ {
+  "nameCn": "女祭司",
+  "nameEn": "The High Priestess",
+  "arcana": "major",
+  "suit": "",
+  "upright": "直觉、神秘与内在智慧",
+  "reversed": "隐瞒、忽略内心声音"
+ },
+ {
+  "nameCn": "皇后",
+  "nameEn": "The Empress",
+  "arcana": "major",
+  "suit": "",
+  "upright": "丰饶、母性滋养与创造力",
+  "reversed": "依赖、创造力受阻"
+ },
+ {
+  "nameCn": "皇帝",
+  "nameEn": "The Emperor",
+  "arcana": "major",
+  "suit": "",
+  "upright": "权威、秩序与结构",
+  "reversed": "专制、僵化固执"
+ },
+ {
+  "nameCn": "教皇",
+  "nameEn": "The Hierophant",
+  "arcana": "major",
+  "suit": "",
+  "upright": "传统、信仰与指引",
+  "reversed": "墨守成规、被教条束缚"
+ },
+ {
+  "nameCn": "恋人",
+  "nameEn": "The Lovers",
+  "arcana": "major",
+  "suit": "",
+  "upright": "爱、结合与重要抉择",
+  "reversed": "失衡、错误的选择"
+ },
+ {
+  "nameCn": "战车",
+  "nameEn": "The Chariot",
+  "arcana": "major",
+  "suit": "",
+  "upright": "意志胜利、勇往直前",
+  "reversed": "失控、方向迷失"
+ },
+ {
+  "nameCn": "力量",
+  "nameEn": "Strength",
+  "arcana": "major",
+  "suit": "",
+  "upright": "勇气、柔韧而克制",
+  "reversed": "自我怀疑、软弱退缩"
+ },
+ {
+  "nameCn": "隐士",
+  "nameEn": "The Hermit",
+  "arcana": "major",
+  "suit": "",
+  "upright": "内省、寻道与独处",
+  "reversed": "孤立、逃避现实"
+ },
+ {
+  "nameCn": "命运之轮",
+  "nameEn": "Wheel of Fortune",
+  "arcana": "major",
+  "suit": "",
+  "upright": "转机、循环与时机",
+  "reversed": "厄运、失控的循环"
+ },
+ {
+  "nameCn": "正义",
+  "nameEn": "Justice",
+  "arcana": "major",
+  "suit": "",
+  "upright": "公正、因果与平衡",
+  "reversed": "不公、逃避责任"
+ },
+ {
+  "nameCn": "倒吊人",
+  "nameEn": "The Hanged Man",
+  "arcana": "major",
+  "suit": "",
+  "upright": "换个视角、有价值的暂停",
+  "reversed": "无谓牺牲、拖延"
+ },
+ {
+  "nameCn": "死神",
+  "nameEn": "Death",
+  "arcana": "major",
+  "suit": "",
+  "upright": "结束与重生、转化",
+  "reversed": "抗拒改变、停滞不前"
+ },
+ {
+  "nameCn": "节制",
+  "nameEn": "Temperance",
+  "arcana": "major",
+  "suit": "",
+  "upright": "平衡、调和与耐心",
+  "reversed": "失衡、过度或不足"
+ },
+ {
+  "nameCn": "恶魔",
+  "nameEn": "The Devil",
+  "arcana": "major",
+  "suit": "",
+  "upright": "束缚、欲望与执念",
+  "reversed": "挣脱束缚、觉醒"
+ },
+ {
+  "nameCn": "高塔",
+  "nameEn": "The Tower",
+  "arcana": "major",
+  "suit": "",
+  "upright": "突变、崩塌后的觉醒",
+  "reversed": "余波、缓慢恢复"
+ },
+ {
+  "nameCn": "星星",
+  "nameEn": "The Star",
+  "arcana": "major",
+  "suit": "",
+  "upright": "希望、疗愈与灵感",
+  "reversed": "失望、信心动摇"
+ },
+ {
+  "nameCn": "月亮",
+  "nameEn": "The Moon",
+  "arcana": "major",
+  "suit": "",
+  "upright": "潜意识、迷雾与直觉",
+  "reversed": "释疑、走出幻象"
+ },
+ {
+  "nameCn": "太阳",
+  "nameEn": "The Sun",
+  "arcana": "major",
+  "suit": "",
+  "upright": "喜悦、成功与光明",
+  "reversed": "短暂阴霾、过度乐观"
+ },
+ {
+  "nameCn": "审判",
+  "nameEn": "Judgement",
+  "arcana": "major",
+  "suit": "",
+  "upright": "觉醒、召唤与回顾",
+  "reversed": "自我批判、犹豫不决"
+ },
+ {
+  "nameCn": "世界",
+  "nameEn": "The World",
+  "arcana": "major",
+  "suit": "",
+  "upright": "圆满、完成与整合",
+  "reversed": "未竟、留有缺口"
+ },
+ {
+  "nameCn": "权杖Ace",
+  "nameEn": "Ace of 权杖",
+  "arcana": "minor",
+  "suit": "权杖",
+  "upright": "行动热情、意志力：新始与潜能",
+  "reversed": "行动热情、意志力受阻：潜能未展、错失开端"
+ },
+ {
+  "nameCn": "权杖2",
+  "nameEn": "2 of 权杖",
+  "arcana": "minor",
+  "suit": "权杖",
+  "upright": "行动热情、意志力：抉择与配合",
+  "reversed": "行动热情、意志力受阻：犹豫、配合失衡"
+ },
+ {
+  "nameCn": "权杖3",
+  "nameEn": "3 of 权杖",
+  "arcana": "minor",
+  "suit": "权杖",
+  "upright": "行动热情、意志力：成长与基础",
+  "reversed": "行动热情、意志力受阻：基础不稳、进度迟缓"
+ },
+ {
+  "nameCn": "权杖4",
+  "nameEn": "4 of 权杖",
+  "arcana": "minor",
+  "suit": "权杖",
+  "upright": "行动热情、意志力：稳固与守成",
+  "reversed": "行动热情、意志力受阻：停滞、抗拒改变"
+ },
+ {
+  "nameCn": "权杖5",
+  "nameEn": "5 of 权杖",
+  "arcana": "minor",
+  "suit": "权杖",
+  "upright": "行动热情、意志力：冲突与失落",
+  "reversed": "行动热情、意志力受阻：和解、走出低谷"
+ },
+ {
+  "nameCn": "权杖6",
+  "nameEn": "6 of 权杖",
+  "arcana": "minor",
+  "suit": "权杖",
+  "upright": "行动热情、意志力：和谐与平衡",
+  "reversed": "行动热情、意志力受阻：失衡、关系紧张"
+ },
+ {
+  "nameCn": "权杖7",
+  "nameEn": "7 of 权杖",
+  "arcana": "minor",
+  "suit": "权杖",
+  "upright": "行动热情、意志力：挑战与评估",
+  "reversed": "行动热情、意志力受阻：受挫、评估有误"
+ },
+ {
+  "nameCn": "权杖8",
+  "nameEn": "8 of 权杖",
+  "arcana": "minor",
+  "suit": "权杖",
+  "upright": "行动热情、意志力：掌控与动能",
+  "reversed": "行动热情、意志力受阻：失控、精力分散"
+ },
+ {
+  "nameCn": "权杖9",
+  "nameEn": "9 of 权杖",
+  "arcana": "minor",
+  "suit": "权杖",
+  "upright": "行动热情、意志力：接近圆满、审慎",
+  "reversed": "行动热情、意志力受阻：焦虑、临近而惧"
+ },
+ {
+  "nameCn": "权杖10",
+  "nameEn": "10 of 权杖",
+  "arcana": "minor",
+  "suit": "权杖",
+  "upright": "行动热情、意志力：完成与负担",
+  "reversed": "行动热情、意志力受阻：重担、难以为继"
+ },
+ {
+  "nameCn": "权杖Page",
+  "nameEn": "Page of 权杖",
+  "arcana": "minor",
+  "suit": "权杖",
+  "upright": "行动热情、意志力：学习、讯息与好奇",
+  "reversed": "行动热情、意志力受阻：分心、幼稚不实"
+ },
+ {
+  "nameCn": "权杖Knight",
+  "nameEn": "Knight of 权杖",
+  "arcana": "minor",
+  "suit": "权杖",
+  "upright": "行动热情、意志力：行动、推进与热忱",
+  "reversed": "行动热情、意志力受阻：莽撞、方向偏差"
+ },
+ {
+  "nameCn": "权杖Queen",
+  "nameEn": "Queen of 权杖",
+  "arcana": "minor",
+  "suit": "权杖",
+  "upright": "行动热情、意志力：滋养、掌控与包容",
+  "reversed": "行动热情、意志力受阻：情绪化、过度干预"
+ },
+ {
+  "nameCn": "权杖King",
+  "nameEn": "King of 权杖",
+  "arcana": "minor",
+  "suit": "权杖",
+  "upright": "行动热情、意志力：权威、成就与稳定",
+  "reversed": "行动热情、意志力受阻：专断、滥用权力"
+ },
+ {
+  "nameCn": "圣杯Ace",
+  "nameEn": "Ace of 圣杯",
+  "arcana": "minor",
+  "suit": "圣杯",
+  "upright": "情感关系、直觉：新始与潜能",
+  "reversed": "情感关系、直觉受阻：潜能未展、错失开端"
+ },
+ {
+  "nameCn": "圣杯2",
+  "nameEn": "2 of 圣杯",
+  "arcana": "minor",
+  "suit": "圣杯",
+  "upright": "情感关系、直觉：抉择与配合",
+  "reversed": "情感关系、直觉受阻：犹豫、配合失衡"
+ },
+ {
+  "nameCn": "圣杯3",
+  "nameEn": "3 of 圣杯",
+  "arcana": "minor",
+  "suit": "圣杯",
+  "upright": "情感关系、直觉：成长与基础",
+  "reversed": "情感关系、直觉受阻：基础不稳、进度迟缓"
+ },
+ {
+  "nameCn": "圣杯4",
+  "nameEn": "4 of 圣杯",
+  "arcana": "minor",
+  "suit": "圣杯",
+  "upright": "情感关系、直觉：稳固与守成",
+  "reversed": "情感关系、直觉受阻：停滞、抗拒改变"
+ },
+ {
+  "nameCn": "圣杯5",
+  "nameEn": "5 of 圣杯",
+  "arcana": "minor",
+  "suit": "圣杯",
+  "upright": "情感关系、直觉：冲突与失落",
+  "reversed": "情感关系、直觉受阻：和解、走出低谷"
+ },
+ {
+  "nameCn": "圣杯6",
+  "nameEn": "6 of 圣杯",
+  "arcana": "minor",
+  "suit": "圣杯",
+  "upright": "情感关系、直觉：和谐与平衡",
+  "reversed": "情感关系、直觉受阻：失衡、关系紧张"
+ },
+ {
+  "nameCn": "圣杯7",
+  "nameEn": "7 of 圣杯",
+  "arcana": "minor",
+  "suit": "圣杯",
+  "upright": "情感关系、直觉：挑战与评估",
+  "reversed": "情感关系、直觉受阻：受挫、评估有误"
+ },
+ {
+  "nameCn": "圣杯8",
+  "nameEn": "8 of 圣杯",
+  "arcana": "minor",
+  "suit": "圣杯",
+  "upright": "情感关系、直觉：掌控与动能",
+  "reversed": "情感关系、直觉受阻：失控、精力分散"
+ },
+ {
+  "nameCn": "圣杯9",
+  "nameEn": "9 of 圣杯",
+  "arcana": "minor",
+  "suit": "圣杯",
+  "upright": "情感关系、直觉：接近圆满、审慎",
+  "reversed": "情感关系、直觉受阻：焦虑、临近而惧"
+ },
+ {
+  "nameCn": "圣杯10",
+  "nameEn": "10 of 圣杯",
+  "arcana": "minor",
+  "suit": "圣杯",
+  "upright": "情感关系、直觉：完成与负担",
+  "reversed": "情感关系、直觉受阻：重担、难以为继"
+ },
+ {
+  "nameCn": "圣杯Page",
+  "nameEn": "Page of 圣杯",
+  "arcana": "minor",
+  "suit": "圣杯",
+  "upright": "情感关系、直觉：学习、讯息与好奇",
+  "reversed": "情感关系、直觉受阻：分心、幼稚不实"
+ },
+ {
+  "nameCn": "圣杯Knight",
+  "nameEn": "Knight of 圣杯",
+  "arcana": "minor",
+  "suit": "圣杯",
+  "upright": "情感关系、直觉：行动、推进与热忱",
+  "reversed": "情感关系、直觉受阻：莽撞、方向偏差"
+ },
+ {
+  "nameCn": "圣杯Queen",
+  "nameEn": "Queen of 圣杯",
+  "arcana": "minor",
+  "suit": "圣杯",
+  "upright": "情感关系、直觉：滋养、掌控与包容",
+  "reversed": "情感关系、直觉受阻：情绪化、过度干预"
+ },
+ {
+  "nameCn": "圣杯King",
+  "nameEn": "King of 圣杯",
+  "arcana": "minor",
+  "suit": "圣杯",
+  "upright": "情感关系、直觉：权威、成就与稳定",
+  "reversed": "情感关系、直觉受阻：专断、滥用权力"
+ },
+ {
+  "nameCn": "宝剑Ace",
+  "nameEn": "Ace of 宝剑",
+  "arcana": "minor",
+  "suit": "宝剑",
+  "upright": "思想冲突、理性：新始与潜能",
+  "reversed": "思想冲突、理性受阻：潜能未展、错失开端"
+ },
+ {
+  "nameCn": "宝剑2",
+  "nameEn": "2 of 宝剑",
+  "arcana": "minor",
+  "suit": "宝剑",
+  "upright": "思想冲突、理性：抉择与配合",
+  "reversed": "思想冲突、理性受阻：犹豫、配合失衡"
+ },
+ {
+  "nameCn": "宝剑3",
+  "nameEn": "3 of 宝剑",
+  "arcana": "minor",
+  "suit": "宝剑",
+  "upright": "思想冲突、理性：成长与基础",
+  "reversed": "思想冲突、理性受阻：基础不稳、进度迟缓"
+ },
+ {
+  "nameCn": "宝剑4",
+  "nameEn": "4 of 宝剑",
+  "arcana": "minor",
+  "suit": "宝剑",
+  "upright": "思想冲突、理性：稳固与守成",
+  "reversed": "思想冲突、理性受阻：停滞、抗拒改变"
+ },
+ {
+  "nameCn": "宝剑5",
+  "nameEn": "5 of 宝剑",
+  "arcana": "minor",
+  "suit": "宝剑",
+  "upright": "思想冲突、理性：冲突与失落",
+  "reversed": "思想冲突、理性受阻：和解、走出低谷"
+ },
+ {
+  "nameCn": "宝剑6",
+  "nameEn": "6 of 宝剑",
+  "arcana": "minor",
+  "suit": "宝剑",
+  "upright": "思想冲突、理性：和谐与平衡",
+  "reversed": "思想冲突、理性受阻：失衡、关系紧张"
+ },
+ {
+  "nameCn": "宝剑7",
+  "nameEn": "7 of 宝剑",
+  "arcana": "minor",
+  "suit": "宝剑",
+  "upright": "思想冲突、理性：挑战与评估",
+  "reversed": "思想冲突、理性受阻：受挫、评估有误"
+ },
+ {
+  "nameCn": "宝剑8",
+  "nameEn": "8 of 宝剑",
+  "arcana": "minor",
+  "suit": "宝剑",
+  "upright": "思想冲突、理性：掌控与动能",
+  "reversed": "思想冲突、理性受阻：失控、精力分散"
+ },
+ {
+  "nameCn": "宝剑9",
+  "nameEn": "9 of 宝剑",
+  "arcana": "minor",
+  "suit": "宝剑",
+  "upright": "思想冲突、理性：接近圆满、审慎",
+  "reversed": "思想冲突、理性受阻：焦虑、临近而惧"
+ },
+ {
+  "nameCn": "宝剑10",
+  "nameEn": "10 of 宝剑",
+  "arcana": "minor",
+  "suit": "宝剑",
+  "upright": "思想冲突、理性：完成与负担",
+  "reversed": "思想冲突、理性受阻：重担、难以为继"
+ },
+ {
+  "nameCn": "宝剑Page",
+  "nameEn": "Page of 宝剑",
+  "arcana": "minor",
+  "suit": "宝剑",
+  "upright": "思想冲突、理性：学习、讯息与好奇",
+  "reversed": "思想冲突、理性受阻：分心、幼稚不实"
+ },
+ {
+  "nameCn": "宝剑Knight",
+  "nameEn": "Knight of 宝剑",
+  "arcana": "minor",
+  "suit": "宝剑",
+  "upright": "思想冲突、理性：行动、推进与热忱",
+  "reversed": "思想冲突、理性受阻：莽撞、方向偏差"
+ },
+ {
+  "nameCn": "宝剑Queen",
+  "nameEn": "Queen of 宝剑",
+  "arcana": "minor",
+  "suit": "宝剑",
+  "upright": "思想冲突、理性：滋养、掌控与包容",
+  "reversed": "思想冲突、理性受阻：情绪化、过度干预"
+ },
+ {
+  "nameCn": "宝剑King",
+  "nameEn": "King of 宝剑",
+  "arcana": "minor",
+  "suit": "宝剑",
+  "upright": "思想冲突、理性：权威、成就与稳定",
+  "reversed": "思想冲突、理性受阻：专断、滥用权力"
+ },
+ {
+  "nameCn": "星币Ace",
+  "nameEn": "Ace of 星币",
+  "arcana": "minor",
+  "suit": "星币",
+  "upright": "物质实务、资源：新始与潜能",
+  "reversed": "物质实务、资源受阻：潜能未展、错失开端"
+ },
+ {
+  "nameCn": "星币2",
+  "nameEn": "2 of 星币",
+  "arcana": "minor",
+  "suit": "星币",
+  "upright": "物质实务、资源：抉择与配合",
+  "reversed": "物质实务、资源受阻：犹豫、配合失衡"
+ },
+ {
+  "nameCn": "星币3",
+  "nameEn": "3 of 星币",
+  "arcana": "minor",
+  "suit": "星币",
+  "upright": "物质实务、资源：成长与基础",
+  "reversed": "物质实务、资源受阻：基础不稳、进度迟缓"
+ },
+ {
+  "nameCn": "星币4",
+  "nameEn": "4 of 星币",
+  "arcana": "minor",
+  "suit": "星币",
+  "upright": "物质实务、资源：稳固与守成",
+  "reversed": "物质实务、资源受阻：停滞、抗拒改变"
+ },
+ {
+  "nameCn": "星币5",
+  "nameEn": "5 of 星币",
+  "arcana": "minor",
+  "suit": "星币",
+  "upright": "物质实务、资源：冲突与失落",
+  "reversed": "物质实务、资源受阻：和解、走出低谷"
+ },
+ {
+  "nameCn": "星币6",
+  "nameEn": "6 of 星币",
+  "arcana": "minor",
+  "suit": "星币",
+  "upright": "物质实务、资源：和谐与平衡",
+  "reversed": "物质实务、资源受阻：失衡、关系紧张"
+ },
+ {
+  "nameCn": "星币7",
+  "nameEn": "7 of 星币",
+  "arcana": "minor",
+  "suit": "星币",
+  "upright": "物质实务、资源：挑战与评估",
+  "reversed": "物质实务、资源受阻：受挫、评估有误"
+ },
+ {
+  "nameCn": "星币8",
+  "nameEn": "8 of 星币",
+  "arcana": "minor",
+  "suit": "星币",
+  "upright": "物质实务、资源：掌控与动能",
+  "reversed": "物质实务、资源受阻：失控、精力分散"
+ },
+ {
+  "nameCn": "星币9",
+  "nameEn": "9 of 星币",
+  "arcana": "minor",
+  "suit": "星币",
+  "upright": "物质实务、资源：接近圆满、审慎",
+  "reversed": "物质实务、资源受阻：焦虑、临近而惧"
+ },
+ {
+  "nameCn": "星币10",
+  "nameEn": "10 of 星币",
+  "arcana": "minor",
+  "suit": "星币",
+  "upright": "物质实务、资源：完成与负担",
+  "reversed": "物质实务、资源受阻：重担、难以为继"
+ },
+ {
+  "nameCn": "星币Page",
+  "nameEn": "Page of 星币",
+  "arcana": "minor",
+  "suit": "星币",
+  "upright": "物质实务、资源：学习、讯息与好奇",
+  "reversed": "物质实务、资源受阻：分心、幼稚不实"
+ },
+ {
+  "nameCn": "星币Knight",
+  "nameEn": "Knight of 星币",
+  "arcana": "minor",
+  "suit": "星币",
+  "upright": "物质实务、资源：行动、推进与热忱",
+  "reversed": "物质实务、资源受阻：莽撞、方向偏差"
+ },
+ {
+  "nameCn": "星币Queen",
+  "nameEn": "Queen of 星币",
+  "arcana": "minor",
+  "suit": "星币",
+  "upright": "物质实务、资源：滋养、掌控与包容",
+  "reversed": "物质实务、资源受阻：情绪化、过度干预"
+ },
+ {
+  "nameCn": "星币King",
+  "nameEn": "King of 星币",
+  "arcana": "minor",
+  "suit": "星币",
+  "upright": "物质实务、资源：权威、成就与稳定",
+  "reversed": "物质实务、资源受阻：专断、滥用权力"
+ }
+]

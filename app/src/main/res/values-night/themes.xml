@@ -1,0 +1,18 @@
+<resources>
+    <!-- 窗口级主题：深色平台 Material，与 Compose 深色主题一致 -->
+    <style name="Theme.Xuanji" parent="android:Theme.Material.NoActionBar">
+        <!-- 沉浸式外观：状态栏/导航栏用 app 深色实底 + 浅色图标，与 Compose 深色背景融为一体 -->
+        <item name="android:windowBackground">@color/splash_bg</item>
+        <item name="android:statusBarColor">@color/splash_bg</item>
+        <item name="android:navigationBarColor">@color/splash_bg</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+    </style>
+
+    <!-- Android 12+ 开屏（夜间沿用深色背景） -->
+    <style name="Theme.Xuanji.Splash" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/splash_bg</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_launcher_foreground</item>
+        <item name="postSplashScreenTheme">@style/Theme.Xuanji</item>
+    </style>
+</resources>

@@ -1,0 +1,45 @@
+# Built application files
+*.apk
+*.aar
+*.jar
+*.war
+*.ear
+*.jks
+*.keystore
+*.p12
+
+# Gradle / IDE / local config
+.gradle/
+.idea/
+*.iml
+local.properties
+captures/
+.externalNativeBuild/
+.cxx/
+
+# Build outputs
+build/
+app/build/
+build_artifacts/
+
+# Local screenshot / verification scratch artifacts (not part of the source)
+*.png
+crashlog.txt
+k1.xml
+v1.xml
+v2.xml
+v3.xml
+liuyao_verify.png
+screen.png
+screen_divination.png
+screen_home.png
+screen_western.png
+screen_western_scroll.png
+screen_ziwei.png
+verify/
+gen_hexagrams.py
+verify_vedic.py
+overview.md
+
+# Personal donation QR (privacy) — remove this line if you want it published
+app/src/main/res/drawable/donate_qrcode.jpg

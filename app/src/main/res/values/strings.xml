@@ -1,0 +1,52 @@
+<resources>
+    <string name="app_name">玄星</string>
+    <string name="nav_eastern">东方玄学</string>
+    <string name="nav_western">西方星座</string>
+    <string name="nav_profile">我的</string>
+    <string name="eastern_title">五行八字</string>
+    <string name="western_title">星座运势</string>
+    <string name="profile_title">命盘设置</string>
+    <string name="birth_date">出生日期</string>
+    <string name="birth_time">出生时间</string>
+    <string name="location">出生地点</string>
+    <string name="save">保存命盘</string>
+    <string name="no_profile">尚未设置出生信息，请先到「我的」填写。</string>
+    <string name="loading">正在推算命盘…</string>
+    <string name="notification_title">今日运势已更新</string>
+    <string name="notification_text">打开玄星，查看你今日的五行与星座运势</string>
+    <string name="saved_toast">命盘已保存，运势已刷新</string>
+    <string name="day_master">日主</string>
+    <string name="zodiac">生肖</string>
+    <string name="five_elements">五行分布</string>
+    <string name="bazi_chart">八字命盘</string>
+    <string name="today_fortune">今日运势</string>
+    <string name="overall">综合</string>
+    <string name="career">事业</string>
+    <string name="wealth">财运</string>
+    <string name="love">感情</string>
+    <string name="health">健康</string>
+    <string name="lucky_color">幸运色</string>
+    <string name="lucky_direction">吉利方位</string>
+    <string name="favorable">喜用神</string>
+    <string name="today_pillar">今日干支</string>
+    <string name="advice">今日建议</string>
+    <string name="sign_element">星座属性</string>
+    <string name="lucky_number">幸运数字</string>
+    <string name="date_range">日期范围</string>
+    <string name="trait">性格特质</string>
+
+    <!-- 开屏引导页 -->
+    <string name="guide_title_east">东方玄学 · 五行八字</string>
+    <string name="guide_desc_east">输入生辰，即可推算完整八字命盘、五行强弱与喜用神。</string>
+    <string name="guide_title_west">西方星座 · 十二宫运</string>
+    <string name="guide_desc_west">依据出生月日判定星座，每日更新运势评分与幸运指引。</string>
+    <string name="guide_title_daily">每日更新 · 准时提醒</string>
+    <string name="guide_desc_daily">打开即按当日重算运势，并在每天上午推送「今日运势已更新」。</string>
+    <string name="guide_start">开始体验</string>
+    <string name="guide_next">下一步</string>
+
+    <!-- 历史上的今天 -->
+    <string name="nav_history">历史</string>
+    <string name="history_title">历史上的今天</string>
+    <string name="history_subtitle">岁月长河中的玄学与人文印记</string>
+</resources>
