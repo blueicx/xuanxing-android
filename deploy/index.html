@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>玄星 App 下载</title>
+  <style>
+    :root { --gold: #d4af37; --bg: #0e0e14; --card: #1a1a24; --text: #e8e8ef; --sub: #9a9aae; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: radial-gradient(circle at 50% 0%, #1a1a2e 0%, var(--bg) 70%);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+      min-height: 100vh; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; padding: 24px;
+    }
+    .star { color: var(--gold); font-size: 56px; margin-bottom: 8px; }
+    h1 { color: var(--gold); font-size: 26px; letter-spacing: 4px; margin-bottom: 4px; }
+    .ver { color: var(--sub); font-size: 13px; margin-bottom: 28px; }
+    .card {
+      background: var(--card); border: 1px solid rgba(212,175,55,0.3);
+      border-radius: 16px; padding: 24px; width: 100%; max-width: 360px;
+      text-align: center; box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+    }
+    .btn {
+      display: inline-block; background: linear-gradient(135deg, #d4af37, #b8932e);
+      color: #1a1a24; font-weight: 700; font-size: 17px; text-decoration: none;
+      padding: 14px 32px; border-radius: 999px; margin: 8px 0;
+      box-shadow: 0 4px 16px rgba(212,175,55,0.4);
+    }
+    .size { color: var(--sub); font-size: 12px; margin-top: 8px; }
+    .tip { color: var(--sub); font-size: 12px; line-height: 1.6; margin-top: 20px; text-align: left; }
+    .tip b { color: var(--gold); }
+  </style>
+</head>
+<body>
+  <div class="star">✶</div>
+  <h1>玄 星</h1>
+  <div class="ver">XuanXing · Debug v1.0.0</div>
+  <div class="card">
+    <a class="btn" href="app-debug.apk" download>⬇ 下载安装包</a>
+    <div class="size">APK · 约 18.5 MB</div>
+    <div class="tip">
+      <b>安装提示：</b><br/>
+      1. 下载完成后，在通知栏或「文件管理」中点击 APK。<br/>
+      2. 若提示「未知来源」，请允许本浏览器安装应用。<br/>
+      3. 安装后即可打开玄星，体验占卜 / 运势 / 手相等功能。
+    </div>
+  </div>
+</body>
+</html>

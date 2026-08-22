@@ -6,7 +6,8 @@ import java.time.LocalDate
  * 抽签式占卜集合（9 系统）：
  * 中国灵签、藏传签卜、泰国暹罗签、古希腊神谕、圣经掣签、
  * 非洲贝壳占卜、翻书占卜、水占神签、日本御神签。
- * 原代码用 random 抽取，本实现全部改为「日期种子」确定性——当日结果固定，离线可复现。
+ * 纯随机抽样：每次抽签由调用方传入一个随机种子，结果完全随机、不可预测，
+ * 同一人不同时刻、不同人之间都不会拿到相同结果。
  */
 object LotDraw {
 
@@ -175,65 +176,73 @@ object LotDraw {
         val detail: List<Pair<String, String>>
     )
 
-    /** 按日期种子确定性抽取（seed 用于「再抽一次」时变化结果） */
-    fun draw(system: LotSystem, date: LocalDate = LocalDate.now(), seedOffset: Int = 0): LotResult {
-        val seed = date.year * 372 + date.monthValue * 31 + date.dayOfMonth + seedOffset * 7919
+    /**
+     * 纯随机抽样。
+     * @param system 抽签系统
+     * @param seed 调用方传入的随机种子（如 Random.nextInt()）。同一种子结果可复现，
+     *             但种子本身随机 → 每次、每人的结果都不可预测。
+     */
+    fun draw(system: LotSystem, seed: Int): LotResult {
+        val rnd = java.util.Random(seed.toLong())
+        val date = LocalDate.now()
         return when (system) {
             LotSystem.ChineseKauCim -> {
-                val s = KAU_CIM[seed % KAU_CIM.size]
-                LotResult(system, date, "签号 ${seed % KAU_CIM.size + 1} · ${s.grade} · ${s.title}", listOf(
+                val idx = rnd.nextInt(KAU_CIM.size)
+                val s = KAU_CIM[idx]
+                LotResult(system, date, "签号 ${idx + 1} · ${s.grade} · ${s.title}", listOf(
                     "签诗" to s.poem, "释义" to s.meaning, "建议" to s.advice
                 ))
             }
             LotSystem.TibetanDivination -> {
-                val s = TIBETAN[seed % TIBETAN.size]
+                val s = TIBETAN[rnd.nextInt(TIBETAN.size)]
                 LotResult(system, date, "${s.grade} · ${s.title}", listOf(
                     "解读" to s.meaning, "教诫" to s.advice
                 ))
             }
             LotSystem.ThaiSiamCee -> {
-                val s = SIAM[seed % SIAM.size]
+                val s = SIAM[rnd.nextInt(SIAM.size)]
                 LotResult(system, date, "${s.grade} · ${s.title}", listOf(
                     "整体运势" to s.overall, "事业" to s.work, "爱情" to s.love,
                     "健康" to s.health, "建议" to s.advice
                 ))
             }
             LotSystem.GreekOracle -> {
-                val o = GREEK[seed % GREEK.size]
+                val o = GREEK[rnd.nextInt(GREEK.size)]
                 LotResult(system, date, "德尔斐神谕", listOf(
                     "神谕" to o,
                     "解读" to "此箴言提醒你审视内心，顺应自然之道，在纷扰中保持清醒，命运由你的选择塑造。"
                 ))
             }
             LotSystem.BibleLot -> {
-                val m = BIBLE[seed % BIBLE.size]
+                val m = BIBLE[rnd.nextInt(BIBLE.size)]
                 LotResult(system, date, "乌陵与土明", listOf(
                     "神谕" to m,
                     "指引" to "这是神圣的回应，请以信心接受，并遵行其指引，必得平安。"
                 ))
             }
             LotSystem.CowrieShell -> {
-                val c = COWRIE[seed % COWRIE.size]
-                LotResult(system, date, "${c.name}（贝壳组合 ${(seed % 16).toString(2).padStart(4, '0')}）", listOf(
+                val c = COWRIE[rnd.nextInt(COWRIE.size)]
+                val combo = rnd.nextInt(16).toString(2).padStart(4, '0')
+                LotResult(system, date, "${c.name}（贝壳组合 ${combo}）", listOf(
                     "解读" to c.meaning, "建议" to c.advice
                 ))
             }
             LotSystem.Bibliomancy -> {
-                val (author, quote) = BIBLIO[seed % BIBLIO.size]
+                val (author, quote) = BIBLIO[rnd.nextInt(BIBLIO.size)]
                 LotResult(system, date, author, listOf(
                     "箴言" to "「$quote」",
                     "启示" to "此句引导你思考当前处境，以智慧之光照亮前路。"
                 ))
             }
             LotSystem.MizuKuji -> {
-                val s = MIZU[seed % MIZU.size]
+                val s = MIZU[rnd.nextInt(MIZU.size)]
                 LotResult(system, date, "${s.grade}", listOf(
                     "签文" to s.text, "释义" to s.meaning, "建议" to s.advice,
                     "备注" to "（此签放入水中方显文字，意为心诚则灵）"
                 ))
             }
             LotSystem.Omikuji -> {
-                val lv = OMIKUJI_LEVELS[seed % OMIKUJI_LEVELS.size]
+                val lv = OMIKUJI_LEVELS[rnd.nextInt(OMIKUJI_LEVELS.size)]
                 val m = OMIKUJI_MEANING.getValue(lv.id)
                 val summary = m.first
                 val meaning = m.second.first

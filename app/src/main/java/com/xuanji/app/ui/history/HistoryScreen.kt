@@ -14,6 +14,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -60,10 +61,28 @@ fun HistoryScreen() {
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         if (events.isEmpty()) {
-            Text(
-                "暂无收录。",
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            Card(Modifier.fillMaxWidth()) {
+                Column(
+                    Modifier.fillMaxWidth().padding(24.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        "📭",
+                        style = MaterialTheme.typography.headlineMedium
+                    )
+                    Text(
+                        "今天暂无收录的历史事件",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        "$todayStr 这一天尚未收录专属的玄学与人文印记，日后会继续补充。",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
         } else {
             events.forEach { EventCard(it) }
         }
@@ -115,11 +134,21 @@ private fun SameDayBirthCard(fig: SameDayBirth.Figure) {
 
 @Composable
 private fun EventCard(event: HistoryEvent) {
+    // 事件自身的真实月日（"MM-dd" → "M月d日"），避免旧版「日期被写死」的 Bug 复发
+    val dateStr = run {
+        val parts = event.date.split("-")
+        if (parts.size == 2) "${parts[0].toInt()}月${parts[1].toInt()}日" else event.date
+    }
     Card(Modifier.fillMaxWidth()) {
         Column(
             Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
+            Text(
+                dateStr,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.primary
+            )
             Text(
                 event.title,
                 style = MaterialTheme.typography.titleMedium,

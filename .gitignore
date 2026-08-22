@@ -43,3 +43,9 @@ overview.md
 
 # Personal donation QR (privacy) — remove this line if you want it published
 app/src/main/res/drawable/donate_qrcode.jpg
+
+# Local build output
+build_log.txt
+
+# Generated image / scratch artifacts
+generated-images/

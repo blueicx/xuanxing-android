@@ -48,7 +48,6 @@ import com.xuanji.app.domain.divination.LotDraw.LotSystem
 import com.xuanji.app.ui.components.FortuneCard
 import com.xuanji.app.ui.components.SectionTitle
 import com.xuanji.app.ui.components.SystemExplanation
-import java.time.LocalDate
 import kotlinx.coroutines.delay
 
 /**
@@ -59,10 +58,10 @@ import kotlinx.coroutines.delay
 @Composable
 fun LotDrawScreen(systemKey: String?) {
     val system = LotDraw.ALL.firstOrNull { it.key == systemKey } ?: LotSystem.ChineseKauCim
-    val today = LocalDate.now()
 
-    // 抽签次数：每次重抽递增 → 改变结果（原日期种子确定性，重抽换卦）
-    var askCount by rememberSaveable { mutableStateOf(0) }
+    // 当前抽签的随机种子（null 表示尚未抽签）。种子由系统随机生成，
+    // 结果因此完全随机、不可预测；种子存入 rememberSaveable，旋转/重组时结果稳定不变。
+    var seed by rememberSaveable { mutableStateOf<Int?>(null) }
     // 动画进行中：点击后先播对应系统的动画，播完才出结果
     var isDrawing by remember { mutableStateOf(false) }
 
@@ -70,7 +69,7 @@ fun LotDrawScreen(systemKey: String?) {
         if (isDrawing) {
             delay(1400)
             isDrawing = false
-            askCount++
+            seed = kotlin.random.Random.nextInt()
         }
     }
 
@@ -235,21 +234,21 @@ fun LotDrawScreen(systemKey: String?) {
                 Text(
                     when {
                         isDrawing -> "${system.actionLabel()}中…"
-                        askCount == 0 -> "开始${system.actionLabel()}"
+                        seed == null -> "开始${system.actionLabel()}"
                         else -> "再${system.actionLabel()}一次（换一签）"
                     }
                 )
             }
             Spacer(Modifier.height(4.dp))
             Text(
-                "本页为确定性抽取：同一天首次结果固定；点「再抽一次」会重新起卦（模拟摇签桶变化）。",
+                "本页为纯随机抽取：每次抽签结果完全随机、不可预测，同一人不同时刻、不同人都可能抽到不同签。",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
 
-        if (askCount > 0) {
-            val res = LotDraw.draw(system, today, askCount)
+        if (seed != null) {
+            val res = LotDraw.draw(system, seed!!)
             // 按文化风格渲染成「一张签」：签头 + 纸面，文字用深色保证可读
             SignPaper(systemKey = system.key, result = res)
         }
