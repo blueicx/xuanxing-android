@@ -192,6 +192,88 @@ object MysticGuideGenerator {
         )
     }
 
+    /** 盘面定制局：只用已有分数和幸运开关做轻量实验提示，不新增命运判决。 */
+    private fun contextualGames(
+        scholar: Boolean,
+        fortune: CompositeDailyFortune
+    ): List<MysticInteraction> {
+        val high = fortune.dimensions.maxByOrNull { it.score } ?: fortune.dimensions.first()
+        val low = fortune.dimensions.minByOrNull { it.score } ?: fortune.dimensions.first()
+        return if (scholar) {
+            listOf(
+                MysticInteraction(
+                    title = "强弱接力",
+                    description = "今天「${high.label}」 ${high.score} 分，「${low.label}」 ${low.score} 分。选一个衔接方式。",
+                    options = listOf(
+                        MysticInteractionOption(
+                            "用强项带一带",
+                            "好。「${high.label}」的 ${high.score} 分不是拿来炫耀的，拿它给「${low.label}」开个头。"
+                        ),
+                        MysticInteractionOption(
+                            "先照顾弱项",
+                            "对，${low.score} 分只需要一个小动作；别逼它今天变成满分。"
+                        ),
+                        MysticInteractionOption("只观察不改动", "可以，记录本身就是校准；明天的对照会更清楚。")
+                    )
+                ),
+                MysticInteraction(
+                    title = "开关实验",
+                    description = "幸运开关是「${fortune.luckyColor}」和「${fortune.luckyDirection}」。选一个轻量实验。",
+                    options = listOf(
+                        MysticInteractionOption(
+                            "带上幸运色",
+                            "把它当作提醒，不是护身符：看到颜色就回到那件小事。"
+                        ),
+                        MysticInteractionOption(
+                            "顺吉利方向走走",
+                            "如果顺路就走一段；重点是换气，不是改命。"
+                        ),
+                        MysticInteractionOption(
+                            "定一个十分钟提醒",
+                            "十分钟后回看「${low.label}」，只问一句：现在能做的最小步是什么？"
+                        )
+                    )
+                )
+            )
+        } else {
+            listOf(
+                MysticInteraction(
+                    title = "仙家调配室",
+                    description = "「${high.label}」举着 ${high.score} 分，「${low.label}」只有 ${low.score} 分！选个调法。",
+                    options = listOf(
+                        MysticInteractionOption(
+                            "抽高项借火力",
+                            "批准借用！把「${high.label}」的劲头挪一点去暖「${low.label}」。"
+                        ),
+                        MysticInteractionOption(
+                            "给低项加云朵棉",
+                            "安排！软处理不丢人，${low.score} 分也能慢慢爬坡。"
+                        ),
+                        MysticInteractionOption("先盖休息章", "章已盖好！神仙也得充电，别拿硬撑当法术。")
+                    )
+                ),
+                MysticInteraction(
+                    title = "幸运快递·定制",
+                    description = "今日包裹按盘面打包：${fortune.luckyColor}、${fortune.luckyDirection}，签一样！",
+                    options = listOf(
+                        MysticInteractionOption(
+                            "${fortune.luckyColor}便签",
+                            "签收！上面写着：颜色只是开关，真正动手的还是你。"
+                        ),
+                        MysticInteractionOption(
+                            "${fortune.luckyDirection}绕路券",
+                            "券已生效！顺路就绕一小段，不顺路就原地做小事。"
+                        ),
+                        MysticInteractionOption(
+                            "${high.label}试用装",
+                            "发货啦！先用一小时，别贪多；用完写一句哪里顺手。"
+                        )
+                    )
+                )
+            )
+        }
+    }
+
     /** 小互动也走稳定取样；“再来一局”通过 round 换到下一个可选局面。 */
     fun interaction(
         mode: String,
@@ -200,7 +282,7 @@ object MysticGuideGenerator {
         round: Int
     ): MysticInteraction {
         val scholar = mode != "half"
-        val games = if (scholar) {
+        val staticGames = if (scholar) {
             listOf(
                 MysticInteraction(
                     title = "六十秒校准",
@@ -297,6 +379,7 @@ object MysticGuideGenerator {
                 )
             )
         }
+        val games = staticGames + contextualGames(scholar, fortune)
         val seed = interactionSeed(mode, topicKey, fortune, 0)
         val picked = ((seed / 19L).toInt() + round.coerceAtLeast(0)) % games.size
         return games[picked]
