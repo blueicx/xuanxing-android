@@ -97,7 +97,7 @@ fun WuxingWheel(counts: Map<Element, Int>) {
                             val ringR = w * 0.33f
                             val maxNode = w * 0.115f
                             val minNode = w * 0.048f
-                            val maxV = (CYCLE.maxOf { counts[it] ?: 0 }).coerceAtLeast(1)
+                            val tapMax = (CYCLE.maxOf { counts[it] ?: 0 }).coerceAtLeast(1)
 
                             val hit = CYCLE.indexOfFirst { element ->
                                 val index = CYCLE.indexOf(element)
@@ -107,7 +107,7 @@ fun WuxingWheel(counts: Map<Element, Int>) {
                                     cy + ringR * sin(angle).toFloat()
                                 )
                                 val value = counts[element] ?: 0
-                                val radius = minNode + (maxNode - minNode) * (value.toFloat() / maxV)
+                                val radius = minNode + (maxNode - minNode) * (value.toFloat() / tapMax)
                                 hypot(offset.x - center.x, offset.y - center.y) <= radius + 14.dp.toPx()
                             }
                             selected = if (hit >= 0) CYCLE[hit] else null
