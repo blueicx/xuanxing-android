@@ -79,6 +79,25 @@ fun ProfileScreen() {
     ) {
         SelectedLocation(provinceIndex, cityIndex, districtIndex)
     } else null
+    val currentProfile = profile
+    val savedLocation = currentProfile?.let {
+        ChinaLocations.find(it.locationCode) ?: ChinaLocations.findLegacyCity(it.locationName)
+    }
+    val profileDirty = if (currentProfile == null) {
+        birthYear != null || birthMonth != null || birthDay != null ||
+            birthHour != null || birthMinute != null ||
+            selectedLocation != null || gender != null
+    } else {
+        birthYear != currentProfile.birthYear ||
+            birthMonth != currentProfile.birthMonth ||
+            birthDay != currentProfile.birthDay ||
+            birthHour != currentProfile.birthHour ||
+            birthMinute != currentProfile.birthMinute ||
+            provinceIndex != (savedLocation?.provinceIndex ?: -1) ||
+            cityIndex != (savedLocation?.cityIndex ?: -1) ||
+            districtIndex != (savedLocation?.districtIndex ?: -1) ||
+            gender != currentProfile.gender
+    }
 
     LaunchedEffect(profile) {
         if (profile != null) {
@@ -229,7 +248,7 @@ fun ProfileScreen() {
                     Toast.makeText(context, "请填写出生地点", Toast.LENGTH_SHORT).show()
                     return@Button
                 }
-                viewModel.save(y, m, d, h, min, selected, gender ?: "男")
+                viewModel.save(y, m, d, h, min, selected, gender)
                 Toast.makeText(context, context.getString(R.string.saved_toast), Toast.LENGTH_SHORT).show()
             },
             enabled = missingProfileFields.isEmpty(),
@@ -244,6 +263,15 @@ fun ProfileScreen() {
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
+        Text(
+            when {
+                profile == null && !profileDirty -> "尚未设置"
+                profileDirty -> "有未保存修改"
+                else -> "档案已是最新"
+            },
+            style = MaterialTheme.typography.labelMedium,
+            color = if (profileDirty) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+        )
         FortuneCard {
             SectionTitle("隐私与数据")
             Spacer(Modifier.height(8.dp))

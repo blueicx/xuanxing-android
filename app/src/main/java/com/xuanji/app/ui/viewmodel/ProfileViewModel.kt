@@ -27,7 +27,7 @@ class ProfileViewModel(private val repository: FortuneRepository) : ViewModel() 
         hour: Int,
         minute: Int,
         location: SelectedLocation,
-        gender: String
+        gender: String?
     ) {
         viewModelScope.launch {
             repository.saveUserProfile(
