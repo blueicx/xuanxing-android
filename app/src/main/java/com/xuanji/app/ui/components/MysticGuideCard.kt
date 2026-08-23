@@ -99,7 +99,7 @@ fun MysticGuideCard(
             conversation.isNotEmpty() -> "branch"
             else -> "ask"
         }
-        val reactionLine = MysticGuideGenerator.reaction(mode, action, askedCount)
+        val reactionLine = MysticGuideGenerator.reaction(mode, action, askedCount, guide.styleKey)
         if (action == "repeat" && conversation.lastOrNull()?.key == key) {
             conversation[conversation.lastIndex] = conversation.last().copy(reaction = reactionLine)
         } else {
@@ -148,7 +148,7 @@ fun MysticGuideCard(
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
-                        if (mode == "half") "浮夸演绎 · 仅供娱乐" else "只讲盘面 · 慢慢说",
+                        "${guide.styleName} · ${guide.styleIntro}",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )

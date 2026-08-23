@@ -9,6 +9,9 @@ data class MysticGuide(
     val mode: String,
     val topicKey: String,
     val roleName: String,
+    val styleKey: String,
+    val styleName: String,
+    val styleIntro: String,
     val signature: String,
     val arrival: String,
     val headline: String,
@@ -57,6 +60,24 @@ object MysticGuideGenerator {
         return if (seed % 2L == 0L) "scholar" else "half"
     }
 
+    /** 作风仍由稳定种子决定：同一天、同一话题、同一盘面遇到的是同一位“熟人”。 */
+    private fun style(scholar: Boolean, topicKey: String, fortune: CompositeDailyFortune): Triple<String, String, String> {
+        val index = ((presenceSeed(topicKey, fortune) / 7L) % 3L).toInt()
+        return if (scholar) {
+            when (index) {
+                0 -> Triple("archive", "档案室学者", "翻页很轻 · 先核对再说话")
+                1 -> Triple("harbor", "灯下倾听者", "先接情绪 · 再看盘面")
+                else -> Triple("compass", "慢速罗盘", "给方向 · 不催你出发")
+            }
+        } else {
+            when (index) {
+                0 -> Triple("herald", "天庭司仪", "开场锣鼓 · 顺便阴阳")
+                1 -> Triple("alley", "街口半仙", "嘴硬心软 · 人间气")
+                else -> Triple("intern", "云端的实习生", "法术不稳 · 态度很好")
+            }
+        }
+    }
+
     fun generate(
         mode: String,
         topicKey: String,
@@ -103,6 +124,7 @@ object MysticGuideGenerator {
             if (test != null) add("最近测试：${test.testName} → ${test.resultCode}（${test.resultName}）")
         }
         val scholar = mode != "half"
+        val (styleKey, styleName, styleIntro) = style(scholar, topicKey, fortune)
         val arrival = arrivalLine(scholar, fortune.overallScore, presenceSeed(topicKey, fortune))
         val headline = if (scholar) {
             scholarHeadline(focus.score, label)
@@ -158,6 +180,9 @@ object MysticGuideGenerator {
             mode = mode,
             topicKey = topicKey,
             roleName = if (scholar) "玄学家" else "半仙",
+            styleKey = styleKey,
+            styleName = styleName,
+            styleIntro = styleIntro,
             signature = if (scholar) "只讲盘面依据 · 仅供娱乐参考" else "浮夸但讲逻辑 · 仅供娱乐参考",
             arrival = arrival,
             headline = headline,
@@ -203,6 +228,24 @@ object MysticGuideGenerator {
                         MysticInteractionOption("说一句真话", "表达清楚需求，关系里的雾会散掉一些。"),
                         MysticInteractionOption("先休息一下", "低电量时，休息不是偷懒，是校准。")
                     )
+                ),
+                MysticInteraction(
+                    title = "两栏笔记",
+                    description = "把今天的事分成“我能做”和“我只能等”。",
+                    options = listOf(
+                        MysticInteractionOption("我能做的一件", "很好，把它放到下一个二十五分钟里。"),
+                        MysticInteractionOption("只能等的一件", "写下来就够了；等待也可以被安放。"),
+                        MysticInteractionOption("先划掉一件", "少一件事，盘面会立刻清爽一点。")
+                    )
+                ),
+                MysticInteraction(
+                    title = "三分钟观察站",
+                    description = "选一个信号，接下来只观察它。",
+                    options = listOf(
+                        MysticInteractionOption("呼吸的节奏", "先让身体成为参照物，答案会慢下来。"),
+                        MysticInteractionOption("最常打开的软件", "看清注意力的去向，不做批评，只做记录。"),
+                        MysticInteractionOption("今天的低电量时刻", "找到它，明天就能提前设一个休息点。")
+                    )
                 )
             )
         } else {
@@ -233,15 +276,39 @@ object MysticGuideGenerator {
                         MysticInteractionOption("月老探头", "他递来的不是红线，是话筒：把想要什么说清楚。"),
                         MysticInteractionOption("太白记笔记", "老头子写下四个字：少开五个头。专一比热闹灵光。")
                     )
+                ),
+                MysticInteraction(
+                    title = "云上签筒",
+                    description = "抽一支不吓人的仙家提示！",
+                    options = listOf(
+                        MysticInteractionOption("先做小事", "签文只有四个字：小事先行。别小看它，这招最灵。"),
+                        MysticInteractionOption("说清楚点", "上签！把需求讲明白，神仙都省得猜谜。"),
+                        MysticInteractionOption("歇一小会儿", "云朵盖章：休息不是偷懒，是给仙气充电。")
+                    )
+                ),
+                MysticInteraction(
+                    title = "仙界快递",
+                    description = "本半仙给你寄个包裹，选一个！",
+                    options = listOf(
+                        MysticInteractionOption("一盒勇气", "已发货！用量说明：先用于那件拖了很久的小事。"),
+                        MysticInteractionOption("一条边界", "签收成功。今天可以对多余的任务说：仙鹤也要下班。"),
+                        MysticInteractionOption("十分钟安静", "包裹有点轻，效果不小；安静完记得回来。")
+                    )
                 )
             )
         }
-        val seed = interactionSeed(mode, topicKey, fortune, round)
-        return games[((seed / 19L) % games.size).toInt()]
+        val seed = interactionSeed(mode, topicKey, fortune, 0)
+        val picked = ((seed / 19L).toInt() + round.coerceAtLeast(0)) % games.size
+        return games[picked]
     }
 
     /** 追问前的短反应；repeat 用次数递进，让连续追问像被同一个人记住了。 */
-    fun reaction(mode: String, action: String, askedCount: Int): String {
+    fun reaction(
+        mode: String,
+        action: String,
+        askedCount: Int,
+        styleKey: String = ""
+    ): String {
         val scholar = mode != "half"
         val count = askedCount.coerceAtLeast(1)
         return if (scholar) {
@@ -252,10 +319,22 @@ object MysticGuideGenerator {
                 } else {
                     "还在想这件事？那我们把入口再缩小一点。"
                 }
-                else -> when (count % 3) {
-                    0 -> "我把这一页又翻了一遍，你问到点子上了。"
-                    1 -> "好，这个问题可以慢慢拆。"
-                    else -> "嗯，我先看盘面，再照着你的处境说。"
+                else -> when (styleKey) {
+                    "archive" -> when (count % 3) {
+                        0 -> "我把这一页又翻了一遍，你问到点子上了。"
+                        1 -> "这个问题我先归档；慢慢拆，不急着下结论。"
+                        else -> "嗯，档案里最稳的线索还是盘面。"
+                    }
+                    "harbor" -> when (count % 3) {
+                        0 -> "好，这句话我听见了；我们把它的来路拆开。"
+                        1 -> "可以慢慢问，这里不用赶时间。"
+                        else -> "我先陪你把情绪放稳，再看数字怎么走。"
+                    }
+                    else -> when (count % 3) {
+                        0 -> "这个问得好，罗盘可以先指一个小方向。"
+                        1 -> "我们只转一格，看看哪里最先清楚。"
+                        else -> "方向要能落地；我来帮你收窄一点。"
+                    }
                 }
             }
         } else {
@@ -266,10 +345,22 @@ object MysticGuideGenerator {
                 } else {
                     "还惦记着呢？好吧，仙界给你加播一次。"
                 }
-                else -> when (count % 3) {
-                    0 -> "这个问题有点锋利，本半仙先垫块云！"
-                    1 -> "好问题！本半仙袖子都撸起来了。"
-                    else -> "稍等，仙家客服正在翻盘面！"
+                else -> when (styleKey) {
+                    "herald" -> when (count % 3) {
+                        0 -> "锣鼓已响！这个问题有点锋利，本司仪先垫块云！"
+                        1 -> "好问题！开场词都替你想好了！"
+                        else -> "稍等，天庭司仪正在翻盘面！"
+                    }
+                    "alley" -> when (count % 3) {
+                        0 -> "哟，这话够直接；本半仙先给你沏口大碗茶。"
+                        1 -> "好问题！街口消息灵通，但咱不吓人。"
+                        else -> "稍等，半仙正在跟云朵打听！"
+                    }
+                    else -> when (count % 3) {
+                        0 -> "这个问题有点锋利，实习生小本本已掏出来！"
+                        1 -> "好问题！法术不稳，态度先拉满。"
+                        else -> "稍等，云端工单正在流转！"
+                    }
                 }
             }
         }
