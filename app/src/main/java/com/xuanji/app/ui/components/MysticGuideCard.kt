@@ -54,6 +54,7 @@ private data class MysticTurn(
 private class MysticCompanionState(initialMode: String, initialTopic: String) {
     var mode by mutableStateOf(initialMode)
     var topic by mutableStateOf(initialTopic)
+    var interactionCarryoverOption by mutableStateOf<String?>(null)
 }
 
 private val mysticCompanionStates = mutableMapOf<String, MysticCompanionState>()
@@ -83,6 +84,7 @@ fun MysticGuideCard(
     val companion = remember(companionKey) { mysticCompanionState(companionKey, fortune) }
     var topic by remember(companion) { companion::topic }
     var mode by remember(companion) { companion::mode }
+    var interactionCarryoverOption by remember(companion) { companion::interactionCarryoverOption }
     val latestTest = records.maxByOrNull { it.date }
     val guide = remember(mode, topic, bazi, fortune, latestTest) {
         MysticGuideGenerator.generate(mode, topic, bazi, fortune, latestTest)
@@ -94,6 +96,7 @@ fun MysticGuideCard(
     var pendingFollowUp by remember(guide) { mutableStateOf<String?>(null) }
     var pendingInteraction by remember(guide) { mutableStateOf<MysticInteractionOption?>(null) }
     var pendingHandoff by remember { mutableStateOf<String?>(null) }
+    var pendingHandoffEcho by remember { mutableStateOf<String?>(null) }
     var pendingCustom by remember(guide) { mutableStateOf<String?>(null) }
     var customQuestion by remember(guide) { mutableStateOf("") }
     var interactionCount by remember(guide) { mutableStateOf(0) }
@@ -103,6 +106,12 @@ fun MysticGuideCard(
     var selectedInteraction by remember(guide, interactionRound) { mutableStateOf<MysticInteractionOption?>(null) }
     val interaction = remember(mode, topic, fortune, interactionRound) {
         MysticGuideGenerator.interaction(mode, topic, fortune, interactionRound)
+    }
+
+    LaunchedEffect(guide) {
+        if (pendingHandoff == null) {
+            interactionCarryoverOption = null
+        }
     }
 
     LaunchedEffect(guide) {
@@ -129,6 +138,17 @@ fun MysticGuideCard(
         customQuestion = ""
     }
 
+    fun switchPersona(targetMode: String) {
+        if (
+            pendingFollowUp != null ||
+            pendingInteraction != null ||
+            pendingHandoff != null ||
+            pendingCustom != null
+        ) return
+        interactionCarryoverOption = null
+        mode = targetMode
+    }
+
     fun selectTopic(key: String) {
         if (
             key == topic ||
@@ -138,11 +158,17 @@ fun MysticGuideCard(
             pendingCustom != null
         ) return
         val previousTopic = topic
+        val carryover = MysticGuideGenerator.interactionCarryover(
+            mode,
+            guide.styleKey,
+            interactionCarryoverOption.orEmpty()
+        )
         selectedInteraction = null
         pendingFollowUp = null
         pendingInteraction = null
         topic = key
         pendingHandoff = previousTopic
+        pendingHandoffEcho = carryover
     }
 
     LaunchedEffect(pendingHandoff, guide) {
@@ -158,12 +184,17 @@ fun MysticGuideCard(
                     fromTopic,
                     guide.topicKey
                 ),
-                reaction = MysticGuideGenerator.handoffReaction(mode, guide.styleKey),
+                reaction = MysticGuideGenerator.composeReaction(
+                    pendingHandoffEcho.orEmpty(),
+                    MysticGuideGenerator.handoffReaction(mode, guide.styleKey)
+                ),
                 kind = "handoff"
             )
         )
         while (conversation.size > 5) conversation.removeAt(0)
+        interactionCarryoverOption = null
         pendingHandoff = null
+        pendingHandoffEcho = null
     }
 
     LaunchedEffect(pendingCustom, guide) {
@@ -180,12 +211,20 @@ fun MysticGuideCard(
                     fortune,
                     latestTest
                 ),
-                reaction = MysticGuideGenerator.customReaction(mode, guide.styleKey, question),
+                reaction = MysticGuideGenerator.composeReaction(
+                    MysticGuideGenerator.interactionCarryover(
+                        mode,
+                        guide.styleKey,
+                        interactionCarryoverOption.orEmpty()
+                    ),
+                    MysticGuideGenerator.customReaction(mode, guide.styleKey, question)
+                ),
                 kind = "ask"
             )
         )
         while (conversation.size > 5) conversation.removeAt(0)
         customCount += 1
+        interactionCarryoverOption = null
         pendingCustom = null
     }
 
@@ -203,6 +242,7 @@ fun MysticGuideCard(
         )
         while (conversation.size > 5) conversation.removeAt(0)
         interactionCount += 1
+        interactionCarryoverOption = option.label
         pendingInteraction = null
     }
 
@@ -219,7 +259,14 @@ fun MysticGuideCard(
             conversation.isNotEmpty() -> "branch"
             else -> "ask"
         }
-        val reactionLine = MysticGuideGenerator.reaction(mode, action, askedCount, guide.styleKey)
+        val reactionLine = MysticGuideGenerator.composeReaction(
+            MysticGuideGenerator.interactionCarryover(
+                mode,
+                guide.styleKey,
+                interactionCarryoverOption.orEmpty()
+            ),
+            MysticGuideGenerator.reaction(mode, action, askedCount, guide.styleKey)
+        )
         if (action == "repeat" && conversation.lastOrNull()?.key == key) {
             conversation[conversation.lastIndex] = conversation.last().copy(reaction = reactionLine)
         } else {
@@ -231,6 +278,7 @@ fun MysticGuideCard(
         }
         askCounts[key] = askedCount
         selectedFollowUp = key
+        interactionCarryoverOption = null
         pendingFollowUp = null
     }
     val accent by animateColorAsState(
@@ -272,6 +320,11 @@ fun MysticGuideCard(
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                    Text(
+                        "现场 · ${MysticGuideGenerator.presenceState(mode, guide.styleKey, conversation.size)}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = accent.copy(alpha = 0.86f)
+                    )
                 }
             }
 
@@ -311,8 +364,20 @@ fun MysticGuideCard(
             ) {
                 val scholarAccent = MaterialTheme.colorScheme.primary
                 val halfAccent = MaterialTheme.colorScheme.tertiary
-                MysticPersonaButton("玄学家", "心理按摩", mode == "scholar", scholarAccent, Modifier.weight(1f)) { mode = "scholar" }
-                MysticPersonaButton("半仙", "浮夸吐槽", mode == "half", halfAccent, Modifier.weight(1f)) { mode = "half" }
+                MysticPersonaButton(
+                    "玄学家",
+                    "心理按摩",
+                    mode == "scholar",
+                    scholarAccent,
+                    Modifier.weight(1f)
+                ) { switchPersona("scholar") }
+                MysticPersonaButton(
+                    "半仙",
+                    "浮夸吐槽",
+                    mode == "half",
+                    halfAccent,
+                    Modifier.weight(1f)
+                ) { switchPersona("half") }
             }
 
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -446,10 +511,12 @@ fun MysticGuideCard(
                                         conversation.clear()
                                         selectedFollowUp = ""
                                         selectedInteraction = null
+                                        interactionCarryoverOption = null
                                         askCounts.clear()
                                         pendingFollowUp = null
                                         pendingInteraction = null
                                         pendingHandoff = null
+                                        pendingHandoffEcho = null
                                         pendingCustom = null
                                         customQuestion = ""
                                     },

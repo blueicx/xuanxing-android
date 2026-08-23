@@ -61,6 +61,86 @@ object MysticGuideGenerator {
         return if (seed % 2L == 0L) "scholar" else "half"
     }
 
+    /** 卡片头部的短状态：只说明玄师此刻的工作姿态，不判断用户运势。 */
+    fun presenceState(mode: String, styleKey: String, exchangeCount: Int): String {
+        val count = exchangeCount.coerceAtLeast(0)
+        val scholar = mode != "half"
+        return if (scholar) {
+            when (styleKey) {
+                "archive" -> when {
+                    count <= 0 -> "档案刚翻开"
+                    count <= 2 -> "档案翻了几页"
+                    count <= 4 -> "档案桌上线索渐多"
+                    else -> "档案桌正忙着核对"
+                }
+                "harbor" -> when {
+                    count <= 0 -> "灯刚点起来"
+                    count <= 2 -> "垫子上放进了几句话"
+                    count <= 4 -> "港口正在换气"
+                    else -> "潮声来回正热闹"
+                }
+                else -> when {
+                    count <= 0 -> "罗盘刚归位"
+                    count <= 2 -> "罗盘微调过一格"
+                    count <= 4 -> "指针还在慢慢对齐"
+                    else -> "几条方向并排摆着"
+                }
+            }
+        } else {
+            when (styleKey) {
+                "herald" -> when {
+                    count <= 0 -> "锣鼓正在候场"
+                    count <= 2 -> "台词已经排开"
+                    count <= 4 -> "场记单渐渐变厚"
+                    else -> "舞台正处在换场节奏"
+                }
+                "alley" -> when {
+                    count <= 0 -> "大碗茶刚放下"
+                    count <= 2 -> "茶已经续了一轮"
+                    count <= 4 -> "街口聊出了热气"
+                    else -> "几摊话题一起开着"
+                }
+                else -> when {
+                    count <= 0 -> "云端工单刚新建"
+                    count <= 2 -> "小本本添了几行"
+                    count <= 4 -> "便签开始排起队"
+                    else -> "多张工单并行流转"
+                }
+            }
+        }
+    }
+
+    /** 把小游戏选项折成一句短回声；下一次非游戏反应用完即清。 */
+    fun interactionCarryover(mode: String, styleKey: String, optionLabel: String): String {
+        val label = optionLabel.trim()
+        if (label.isEmpty()) return ""
+        val scholar = mode != "half"
+        return if (scholar) {
+            when (styleKey) {
+                "archive" -> "档案边角先记一笔：你刚才选了「$label」。"
+                "harbor" -> "我记得你刚才选了「$label」，先把它放在手边。"
+                "compass" -> "你刚才选的「$label」，我当作一个参照点留着。"
+                else -> "你刚才选的「$label」，我当作一个参照点留着。"
+            }
+        } else {
+            when (styleKey) {
+                "herald" -> "刚才那句「$label」已在后台登记！"
+                "alley" -> "行，你刚挑的是「$label」，咱记着这茬。"
+                else -> "工单备注：你刚才选了「$label」。"
+            }
+        }
+    }
+
+    fun composeReaction(carryover: String?, reaction: String): String {
+        val echo = carryover?.trim().orEmpty()
+        val base = reaction.trim()
+        return when {
+            echo.isEmpty() -> base
+            base.isEmpty() -> echo
+            else -> "$echo $base"
+        }
+    }
+
     /** 作风仍按话题微调：同一个人换到不同话题，会有不同的讲解姿势。 */
     private fun style(scholar: Boolean, topicKey: String, fortune: CompositeDailyFortune): Triple<String, String, String> {
         val index = ((presenceSeed(topicKey, fortune) / 7L) % 3L).toInt()
