@@ -71,6 +71,7 @@ fun ProfileScreen() {
     var districtIndex by rememberSaveable { mutableStateOf(-1) }
     var locationDialog by rememberSaveable { mutableStateOf<String?>(null) }
     var gender by rememberSaveable { mutableStateOf<String?>(null) }
+    var showClearProfileDialog by rememberSaveable { mutableStateOf(false) }
     var showClearDialog by rememberSaveable { mutableStateOf(false) }
     val dailyReminderOn by viewModel.dailyReminderOn.collectAsStateWithLifecycle()
 
@@ -297,10 +298,7 @@ fun ProfileScreen() {
             if (currentProfile != null) {
                 Spacer(Modifier.height(4.dp))
                 OutlinedButton(
-                    onClick = {
-                        viewModel.clearUserProfile()
-                        Toast.makeText(context, "已清除", Toast.LENGTH_SHORT).show()
-                    },
+                    onClick = { showClearProfileDialog = true },
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text("清除并重新设置")
@@ -500,6 +498,30 @@ fun ProfileScreen() {
                 },
                 dismissButton = {
                     TextButton(onClick = { showClearDialog = false }) {
+                        Text("取消")
+                    }
+                }
+            )
+        }
+
+        if (showClearProfileDialog) {
+            AlertDialog(
+                onDismissRequest = { showClearProfileDialog = false },
+                title = { Text("清除出生档案") },
+                text = { Text("将删除当前出生档案，且无法恢复。") },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            showClearProfileDialog = false
+                            viewModel.clearUserProfile()
+                            Toast.makeText(context, "已清除", Toast.LENGTH_SHORT).show()
+                        }
+                    ) {
+                        Text("清除", color = MaterialTheme.colorScheme.error)
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showClearProfileDialog = false }) {
                         Text("取消")
                     }
                 }
