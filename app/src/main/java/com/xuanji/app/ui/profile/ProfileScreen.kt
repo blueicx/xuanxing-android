@@ -267,6 +267,42 @@ fun ProfileScreen() {
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
+        if (profileDirty) {
+            OutlinedButton(
+                onClick = {
+                    val target = currentProfile
+                    if (target == null) {
+                        birthYear = null
+                        birthMonth = null
+                        birthDay = null
+                        birthHour = null
+                        birthMinute = null
+                        provinceIndex = -1
+                        cityIndex = -1
+                        districtIndex = -1
+                        gender = null
+                        Toast.makeText(context, "已清空", Toast.LENGTH_SHORT).show()
+                    } else {
+                        birthYear = target.birthYear
+                        birthMonth = target.birthMonth
+                        birthDay = target.birthDay
+                        birthHour = target.birthHour
+                        birthMinute = target.birthMinute
+                        provinceIndex = savedLocation?.provinceIndex ?: -1
+                        cityIndex = savedLocation?.cityIndex ?: -1
+                        districtIndex = savedLocation?.districtIndex ?: -1
+                        gender = target.gender
+                        Toast.makeText(context, "已恢复", Toast.LENGTH_SHORT).show()
+                    }
+                },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    if (currentProfile == null) "清空重填" else "放弃修改",
+                    color = MaterialTheme.colorScheme.secondary
+                )
+            }
+        }
         FortuneCard {
             SectionTitle("当前档案")
             Spacer(Modifier.height(8.dp))
