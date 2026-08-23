@@ -26,7 +26,6 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -52,6 +51,21 @@ private data class MysticTurn(
     val kind: String = "ask"
 )
 
+private class MysticCompanionState(initialMode: String, initialTopic: String) {
+    var mode by mutableStateOf(initialMode)
+    var topic by mutableStateOf(initialTopic)
+}
+
+private val mysticCompanionStates = mutableMapOf<String, MysticCompanionState>()
+
+private fun mysticCompanionState(
+    key: String,
+    fortune: CompositeDailyFortune
+): MysticCompanionState = mysticCompanionStates.getOrPut(key) {
+    val topic = "composite"
+    MysticCompanionState(MysticGuideGenerator.suggestedMode(topic, fortune), topic)
+}
+
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun MysticGuideCard(
@@ -59,10 +73,16 @@ fun MysticGuideCard(
     fortune: CompositeDailyFortune
 ) {
     val records by AppModule.testRecordRepository.records.collectAsStateWithLifecycle(initialValue = emptyList())
-    var topic by rememberSaveable { mutableStateOf("composite") }
-    var mode by remember(fortune.dateKey, fortune.overallScore, fortune.luckyNumber) {
-        mutableStateOf(MysticGuideGenerator.suggestedMode(topic, fortune))
-    }
+    val companionKey = listOf(
+        bazi.chart.display,
+        bazi.strength.level,
+        fortune.dateKey,
+        fortune.overallScore,
+        fortune.luckyNumber
+    ).joinToString("|")
+    val companion = remember(companionKey) { mysticCompanionState(companionKey, fortune) }
+    var topic by remember(companion) { companion::topic }
+    var mode by remember(companion) { companion::mode }
     val latestTest = records.maxByOrNull { it.date }
     val guide = remember(mode, topic, bazi, fortune, latestTest) {
         MysticGuideGenerator.generate(mode, topic, bazi, fortune, latestTest)
