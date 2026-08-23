@@ -42,6 +42,8 @@ import com.xuanji.app.di.AppModule
 import com.xuanji.app.domain.MysticInteraction
 import com.xuanji.app.domain.MysticInteractionOption
 import com.xuanji.app.domain.MysticGuideGenerator
+import com.xuanji.app.domain.MysticOpeningCheckin
+import com.xuanji.app.domain.MysticOpeningOption
 
 private data class MysticTurn(
     val key: String,
@@ -98,6 +100,8 @@ fun MysticGuideCard(
     var pendingHandoff by remember { mutableStateOf<String?>(null) }
     var pendingHandoffEcho by remember { mutableStateOf<String?>(null) }
     var pendingCustom by remember(guide) { mutableStateOf<String?>(null) }
+    var pendingOpening by remember(guide) { mutableStateOf<MysticOpeningOption?>(null) }
+    var openingAnswered by remember(guide) { mutableStateOf(false) }
     var customQuestion by remember(guide) { mutableStateOf("") }
     var interactionCount by remember(guide) { mutableStateOf(0) }
     var customCount by remember(guide) { mutableStateOf(0) }
@@ -106,6 +110,14 @@ fun MysticGuideCard(
     var selectedInteraction by remember(guide, interactionRound) { mutableStateOf<MysticInteractionOption?>(null) }
     val interaction = remember(mode, topic, fortune, interactionRound) {
         MysticGuideGenerator.interaction(mode, topic, fortune, interactionRound)
+    }
+    val opening: MysticOpeningCheckin? = remember(mode, guide.topicKey, guide.styleKey, fortune) {
+        MysticGuideGenerator.openingCheckin(
+            mode,
+            guide.topicKey,
+            guide.styleKey,
+            fortune
+        )
     }
 
     LaunchedEffect(guide) {
@@ -125,13 +137,20 @@ fun MysticGuideCard(
             pendingFollowUp != null ||
             pendingInteraction != null ||
             pendingHandoff != null ||
-            pendingCustom != null
+            pendingCustom != null ||
+            pendingOpening != null
         ) return
         pendingFollowUp = key
     }
 
     fun submitCustom() {
-        if (pendingFollowUp != null || pendingInteraction != null || pendingHandoff != null || pendingCustom != null) return
+        if (
+            pendingFollowUp != null ||
+            pendingInteraction != null ||
+            pendingHandoff != null ||
+            pendingCustom != null ||
+            pendingOpening != null
+        ) return
         val cleanQuestion = customQuestion.trim().take(60)
         if (cleanQuestion.isEmpty()) return
         pendingCustom = cleanQuestion
@@ -143,7 +162,8 @@ fun MysticGuideCard(
             pendingFollowUp != null ||
             pendingInteraction != null ||
             pendingHandoff != null ||
-            pendingCustom != null
+            pendingCustom != null ||
+            pendingOpening != null
         ) return
         interactionCarryoverOption = null
         mode = targetMode
@@ -155,7 +175,8 @@ fun MysticGuideCard(
             pendingFollowUp != null ||
             pendingInteraction != null ||
             pendingHandoff != null ||
-            pendingCustom != null
+            pendingCustom != null ||
+            pendingOpening != null
         ) return
         val previousTopic = topic
         val carryover = MysticGuideGenerator.interactionCarryover(
@@ -195,6 +216,51 @@ fun MysticGuideCard(
         interactionCarryoverOption = null
         pendingHandoff = null
         pendingHandoffEcho = null
+        pendingOpening = null
+    }
+
+    fun selectOpening(option: MysticOpeningOption) {
+        if (
+            openingAnswered ||
+            pendingFollowUp != null ||
+            pendingInteraction != null ||
+            pendingHandoff != null ||
+            pendingCustom != null ||
+            pendingOpening != null ||
+            opening?.options?.none { it.key == option.key } != false
+        ) return
+        pendingOpening = option
+    }
+
+    LaunchedEffect(pendingOpening, guide) {
+        val option = pendingOpening ?: return@LaunchedEffect
+        kotlinx.coroutines.delay(360)
+        val expectedOption = MysticGuideGenerator.openingCheckin(
+            mode,
+            guide.topicKey,
+            guide.styleKey,
+            fortune
+        )?.options?.firstOrNull { it.key == option.key }
+        val currentStyleKey = MysticGuideGenerator.styleKeyFor(mode, guide.topicKey, fortune)
+        val guideMatches = guide.mode == mode &&
+            guide.topicKey == topic &&
+            guide.styleKey == currentStyleKey
+        if (!guideMatches || expectedOption == null || pendingOpening?.key != option.key) {
+            pendingOpening = null
+            return@LaunchedEffect
+        }
+        conversation.add(
+            MysticTurn(
+                key = "opening-${guide.topicKey}-${expectedOption.key}",
+                question = expectedOption.label,
+                answer = expectedOption.response,
+                reaction = MysticGuideGenerator.openingReaction(mode, guide.styleKey),
+                kind = "opening"
+            )
+        )
+        while (conversation.size > 5) conversation.removeAt(0)
+        openingAnswered = true
+        pendingOpening = null
     }
 
     LaunchedEffect(pendingCustom, guide) {
@@ -462,36 +528,43 @@ fun MysticGuideCard(
                             }
                         }
 
-                        if (
-                            pendingFollowUp != null ||
-                            pendingInteraction != null ||
-                            pendingHandoff != null ||
-                            pendingCustom != null
-                        ) {
-                            Row(
+                        if (!openingAnswered && opening != null) {
+                            Column(
                                 Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalAlignment = Alignment.CenterVertically
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
                                 Text(
-                                    MysticGuideGenerator.thinkingLine(
-                                        current.mode,
-                                        current.styleKey,
-                                        when {
-                                            pendingInteraction != null -> "game"
-                                            pendingHandoff != null -> "handoff"
-                                            else -> "ask"
-                                        }
-                                    ),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                                Text(
-                                    "···",
-                                    style = MaterialTheme.typography.titleSmall,
+                                    opening.prompt,
+                                    style = MaterialTheme.typography.labelMedium,
                                     fontWeight = FontWeight.Bold,
-                                    color = accent
+                                    lineHeight = 19.sp,
+                                    color = MaterialTheme.colorScheme.onSurface
                                 )
+                                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    opening.options.forEach { option ->
+                                        Surface(
+                                            onClick = { selectOpening(option) },
+                                            shape = RoundedCornerShape(999.dp),
+                                            color = if (pendingOpening == option) {
+                                                accent
+                                            } else {
+                                                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.48f)
+                                            }
+                                        ) {
+                                            Text(
+                                                option.label,
+                                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                                style = MaterialTheme.typography.labelMedium,
+                                                lineHeight = 17.sp,
+                                                color = if (pendingOpening == option) {
+                                                    Color.White
+                                                } else {
+                                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                                }
+                                            )
+                                        }
+                                    }
+                                }
                             }
                         }
 
@@ -505,7 +578,14 @@ fun MysticGuideCard(
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
-                            if (conversation.isNotEmpty()) {
+                            if (
+                                conversation.isNotEmpty() ||
+                                pendingFollowUp != null ||
+                                pendingInteraction != null ||
+                                pendingHandoff != null ||
+                                pendingCustom != null ||
+                                pendingOpening != null
+                            ) {
                                 Surface(
                                     onClick = {
                                         conversation.clear()
@@ -518,6 +598,8 @@ fun MysticGuideCard(
                                         pendingHandoff = null
                                         pendingHandoffEcho = null
                                         pendingCustom = null
+                                        pendingOpening = null
+                                        openingAnswered = false
                                         customQuestion = ""
                                     },
                                     color = Color.Transparent
@@ -576,7 +658,8 @@ fun MysticGuideCard(
                                     pendingFollowUp == null &&
                                     pendingInteraction == null &&
                                     pendingHandoff == null &&
-                                    pendingCustom == null
+                                    pendingCustom == null &&
+                                    pendingOpening == null
                             ) {
                                 Text("问")
                             }
@@ -630,6 +713,41 @@ fun MysticGuideCard(
                             }
                         }
 
+                        if (
+                            pendingFollowUp != null ||
+                            pendingInteraction != null ||
+                            pendingHandoff != null ||
+                            pendingCustom != null ||
+                            pendingOpening != null
+                        ) {
+                            Row(
+                                Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    MysticGuideGenerator.thinkingLine(
+                                        current.mode,
+                                        current.styleKey,
+                                        when {
+                                            pendingInteraction != null -> "game"
+                                            pendingHandoff != null -> "handoff"
+                                            pendingOpening != null -> "opening"
+                                            else -> "ask"
+                                        }
+                                    ),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Text(
+                                    "···",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = accent
+                                )
+                            }
+                        }
+
                         Row(
                             Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
@@ -646,7 +764,8 @@ fun MysticGuideCard(
                                         pendingFollowUp != null ||
                                         pendingInteraction != null ||
                                         pendingHandoff != null ||
-                                        pendingCustom != null
+                                        pendingCustom != null ||
+                                        pendingOpening != null
                                     ) {
                                         // Keep the current game visible until its pending reply lands.
                                     } else {
@@ -679,7 +798,8 @@ fun MysticGuideCard(
                                             pendingFollowUp == null &&
                                             pendingInteraction == null &&
                                             pendingHandoff == null &&
-                                            pendingCustom == null
+                                            pendingCustom == null &&
+                                            pendingOpening == null
                                         ) {
                                             selectedInteraction = option
                                             pendingInteraction = option

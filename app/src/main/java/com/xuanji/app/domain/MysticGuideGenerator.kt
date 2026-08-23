@@ -37,6 +37,17 @@ data class MysticInteraction(
     val options: List<MysticInteractionOption>
 )
 
+data class MysticOpeningOption(
+    val key: String,
+    val label: String,
+    val response: String
+)
+
+data class MysticOpeningCheckin(
+    val prompt: String,
+    val options: List<MysticOpeningOption>
+)
+
 /**
  * 双面灵语：玄学家负责基于现有算法结果做心理按摩，半仙负责浮夸调侃。
  * 不使用随机数；同一个人、同一天、同一问题、同一模式必然得到同一回答。
@@ -79,11 +90,17 @@ object MysticGuideGenerator {
                     count <= 4 -> "港口正在换气"
                     else -> "潮声来回正热闹"
                 }
-                else -> when {
+                "compass" -> when {
                     count <= 0 -> "罗盘刚归位"
                     count <= 2 -> "罗盘微调过一格"
                     count <= 4 -> "指针还在慢慢对齐"
                     else -> "几条方向并排摆着"
+                }
+                else -> when {
+                    count <= 0 -> "档案刚翻开"
+                    count <= 2 -> "档案翻了几页"
+                    count <= 4 -> "档案桌上线索渐多"
+                    else -> "档案桌正忙着核对"
                 }
             }
         } else {
@@ -138,6 +155,184 @@ object MysticGuideGenerator {
             echo.isEmpty() -> base
             base.isEmpty() -> echo
             else -> "$echo $base"
+        }
+    }
+
+    /** 开场签到：只把已有盘面变成一句可回应的入口，不新增命运判断。 */
+    fun openingCheckin(
+        mode: String,
+        topicKey: String,
+        styleKey: String,
+        fortune: CompositeDailyFortune
+    ): MysticOpeningCheckin? {
+        if (fortune.dimensions.isEmpty()) return null
+        val strong = fortune.dimensions.maxByOrNull { it.score } ?: return null
+        val weak = fortune.dimensions.minByOrNull { it.score } ?: return null
+        val useColor = fortune.overallScore % 2 == 0
+        val switchLabel = if (useColor) fortune.luckyColor else fortune.luckyDirection
+        val switchSource = if (useColor) "幸运色" else "吉利方位"
+        val scholar = mode != "half"
+        val prompt = openingPrompt(scholar, styleKey, topicKey)
+        val options = listOf(
+            MysticOpeningOption(
+                key = "strength",
+                label = if (scholar) {
+                    "从「${strong.label}」聊起"
+                } else {
+                    "看看「${strong.label}」的排面"
+                },
+                response = openingResponse(scholar, styleKey, topicKey, true, strong.label, strong.score)
+            ),
+            MysticOpeningOption(
+                key = "pressure",
+                label = if (scholar) {
+                    "先照看「${weak.label}」"
+                } else {
+                    "给「${weak.label}」搭个梯子"
+                },
+                response = openingResponse(scholar, styleKey, topicKey, false, weak.label, weak.score)
+            ),
+            MysticOpeningOption(
+                key = "switch",
+                label = if (scholar) {
+                    "用${switchSource}「${switchLabel}」提醒自己"
+                } else {
+                    "领「${switchLabel}」${switchSource}便签"
+                },
+                response = openingSwitchResponse(scholar, styleKey, topicKey, switchSource, switchLabel)
+            )
+        )
+        return MysticOpeningCheckin(prompt, options)
+    }
+
+    /** 开场选择前的短反应；保持玄师接话的节奏，不做结果承诺。 */
+    fun openingReaction(mode: String, styleKey: String): String {
+        val scholar = mode != "half"
+        return if (scholar) {
+            when (styleKey) {
+                "archive" -> "好，这一句我先放进今天的档案。"
+                "harbor" -> "嗯，你选的门我看见了；慢慢说。"
+                else -> "罗盘先停在这里，我们把这条线看清楚。"
+            }
+        } else {
+            when (styleKey) {
+                "herald" -> "开场签到收到！锣鼓先收半个音！"
+                "alley" -> "行，就从这个茬开聊；茶给你续上。"
+                else -> "工单已接！实习生这就翻开对应页！"
+            }
+        }
+    }
+
+    private fun openingPrompt(scholar: Boolean, styleKey: String, topicKey: String): String {
+        val topic = topicLabel(topicKey)
+        return if (scholar) {
+            when (styleKey) {
+                "archive" -> when (topicKey) {
+                    "composite" -> "综合档案已摊平，先用哪一条做今天的书签？"
+                    "career" -> "事业卷宗有一处折角，你想从哪里核对？"
+                    "love" -> "感情这页写着具体的事；先翻哪一行？"
+                    "wealth" -> "钱袋账册摆在右手边，先看哪一栏？"
+                    "study" -> "学习笔记还留着一页空白，先补哪里？"
+                    "health" -> "身体档案不催促人；先记录哪一项？"
+                    else -> "最近测试只是材料；先取哪一面镜子？"
+                }
+                "harbor" -> when (topicKey) {
+                    "composite" -> "灯亮了，${topic}这件事想先从哪头靠岸？"
+                    "career" -> "事业的潮水不急着赶；你想先卸下哪一件？"
+                    "love" -> "感情这片水面很安静；先说哪一句？"
+                    "wealth" -> "钱袋的小船系着呢；先看哪里吃水？"
+                    "study" -> "学习像整理行囊；先放下哪本书？"
+                    "health" -> "身体也需要泊位；先让它歇在哪一处？"
+                    else -> "测试结果不是判决；先坐下来照哪一面？"
+                }
+                else -> when (topicKey) {
+                    "composite" -> "${topic}盘面已经归位；罗盘先对哪一格？"
+                    "career" -> "事业方向有几条并排；先确认哪条小路？"
+                    "love" -> "感情指针很轻；先停在哪个词上？"
+                    "wealth" -> "钱袋路线可以慢走；先核哪一个路标？"
+                    "study" -> "学习是一格一格推进；先转哪一页？"
+                    "health" -> "身体坐标值得看清；先校准哪一项？"
+                    else -> "测试材料已经编号；先读哪一段注脚？"
+                }
+            }
+        } else {
+            when (styleKey) {
+                "herald" -> when (topicKey) {
+                    "composite" -> "锣鼓轻一点！${topic}开场签到，先递哪张名帖？"
+                    "career" -> "事业大幕拉开一条缝；先报哪个节目？"
+                    "love" -> "感情舞台不打追光；先点哪盏小灯？"
+                    "wealth" -> "钱袋账本已呈上来；先翻哪页奏折？"
+                    "study" -> "文昌香火已备好；先点哪炷？"
+                    "health" -> "仙体保养司就位；先验哪件行李？"
+                    else -> "测试榜单暂不宣读；先挑哪面镜子？"
+                }
+                "alley" -> when (topicKey) {
+                    "composite" -> "大碗茶放好了；${topic}这摊先唠哪句？"
+                    "career" -> "班还是得上；先把哪件事摆上桌？"
+                    "love" -> "感情这事不猜谜；先从哪句实话开始？"
+                    "wealth" -> "钱包不用晒；先看哪个口子？"
+                    "study" -> "书山有近道也有远路；先迈哪步？"
+                    "health" -> "神仙也怕硬熬；先顾哪一块？"
+                    else -> "测试单别吓自己；先拿哪面照照？"
+                }
+                else -> when (topicKey) {
+                    "composite" -> "云端签到页打开啦；${topic}先勾哪个框？"
+                    "career" -> "事业工单已建号；先处理哪条备注？"
+                    "love" -> "感情信号稳定；先发送哪句草稿？"
+                    "wealth" -> "钱包云账本同步中；先核对哪一笔？"
+                    "study" -> "学习进度条不催人；先点亮哪格？"
+                    "health" -> "仙体巡检开始啦；先贴哪张便签？"
+                    else -> "测试报告已脱敏；先展开哪段摘要？"
+                }
+            }
+        }
+    }
+
+    private fun openingResponse(
+        scholar: Boolean,
+        styleKey: String,
+        topicKey: String,
+        strength: Boolean,
+        label: String,
+        score: Int
+    ): String {
+        val topic = topicLabel(topicKey)
+        val position = if (strength) "较强" else "较需照看"
+        return if (scholar) {
+            when (styleKey) {
+                "archive" -> "${topic}档案里，「$label」$position（$score 分）。先把它当作参照，不改结论，也不急着定义今天。"
+                "harbor" -> "「$label」现在$position，$score 分。我先把这句话放在桌上；它值得被慢慢说清。"
+                else -> "${topic}的「$label」$position（$score 分）。罗盘只标这个位置，下一步仍由你选。"
+            }
+        } else {
+            when (styleKey) {
+                "herald" -> "报——「$label」$position，$score 分！这不是判决，只是今天${topic}的开场字幕！"
+                "alley" -> "「$label」$position，$score 分。咱把话摊开：它能当线索，不能替你过日子。"
+                else -> "${topic}工单显示「$label」$position（$score 分）。已登记！用法说明：观察优先，不吹法术。"
+            }
+        }
+    }
+
+    private fun openingSwitchResponse(
+        scholar: Boolean,
+        styleKey: String,
+        topicKey: String,
+        source: String,
+        value: String
+    ): String {
+        val topic = topicLabel(topicKey)
+        return if (scholar) {
+            when (styleKey) {
+                "archive" -> "$source「$value」可以夹进${topic}那一页；它适合当提醒，不适合当保证。"
+                "harbor" -> "把$source「$value」放在顺手的地方；${topic}需要时，让它帮你想起歇一口气。"
+                else -> "$source「$value」先当作${topic}的小路标；走到哪儿、歇多久，都由你定。"
+            }
+        } else {
+            when (styleKey) {
+                "herald" -> "$source「$value」已盖章！${topic}专用提醒送达，但它不包办结局！"
+                "alley" -> "$source「$value」给你压在茶杯底下；${topic}忙起来时看一眼就行，别迷信。"
+                else -> "$source「$value」已写进${topic}便签！功能只有一条：提醒你回来照顾自己。"
+            }
         }
     }
 
@@ -550,6 +745,10 @@ object MysticGuideGenerator {
 
     fun topicLabel(key: String): String = topics[key] ?: "综合"
 
+    /** 供界面校验异步回应仍属于当前话题与作风；结果完全由既有盘面输入决定。 */
+    fun styleKeyFor(mode: String, topicKey: String, fortune: CompositeDailyFortune): String =
+        style(mode != "half", topicKey, fortune).second
+
     /** 等待行也带作风，让“正在处理”像一个人手上的小动作。 */
     fun thinkingLine(mode: String, styleKey: String, kind: String): String {
         val scholar = mode != "half"
@@ -558,16 +757,19 @@ object MysticGuideGenerator {
                 "archive" -> when (kind) {
                     "game" -> "正在把你的选择抄进档案"
                     "handoff" -> "正在把上一页夹好"
+                    "opening" -> "正在给签到句找位置"
                     else -> "正在翻对应的那一页"
                 }
                 "harbor" -> when (kind) {
                     "game" -> "正在看你选出的那一步"
                     "handoff" -> "正在给话题换个坐姿"
+                    "opening" -> "正在接住开场那句"
                     else -> "先接住这句话"
                 }
                 else -> when (kind) {
                     "game" -> "正在核对最小一步"
                     "handoff" -> "罗盘准备只转一格"
+                    "opening" -> "罗盘正在对准入口"
                     else -> "指针正在慢慢对齐"
                 }
             }
@@ -576,16 +778,19 @@ object MysticGuideGenerator {
                 "herald" -> when (kind) {
                     "game" -> "锣鼓小队正在验票"
                     "handoff" -> "换场锣鼓正在调音"
+                    "opening" -> "开场名帖正在登记"
                     else -> "天庭司仪正翻到那一页"
                 }
                 "alley" -> when (kind) {
                     "game" -> "半仙正在给你递签"
                     "handoff" -> "大碗茶先挪个位置"
+                    "opening" -> "开场这茬正摆上桌"
                     else -> "街口半仙正在打听"
                 }
                 else -> when (kind) {
                     "game" -> "云上工单正在登记"
                     "handoff" -> "云端工单正在改派"
+                    "opening" -> "签到表单提交中"
                     else -> "实习生法术加载中"
                 }
             }
