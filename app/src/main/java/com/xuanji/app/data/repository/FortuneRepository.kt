@@ -40,6 +40,7 @@ class FortuneRepository(private val context: Context) {
 
     private val gson = Gson()
     private val profileKey = stringPreferencesKey("user_profile")
+    private val dailyReminderKey = booleanPreferencesKey("daily_reminder_on")
 
     /** 后台作用域：命盘重算放到 Default 调度器，避免主线程卡顿导致切换转场阻塞。
      *  挂 CoroutineExceptionHandler，任何命盘计算异常都只记日志，绝不杀进程。 */
@@ -52,6 +53,11 @@ class FortuneRepository(private val context: Context) {
     /** 用户档案流（必须在 init 之前声明，否则 init 启动时它为 null 会崩） */
     val userProfileFlow: Flow<UserProfile?> = context.dataStore.data
         .map { prefs -> prefs[profileKey]?.let { gson.fromJson(it, UserProfile::class.java) } }
+        .distinctUntilChanged()
+
+    /** 每日运势提醒开关；默认关闭，与小程序保持一致 */
+    val dailyReminderFlow: Flow<Boolean> = context.dataStore.data
+        .map { prefs -> prefs[dailyReminderKey] ?: false }
         .distinctUntilChanged()
 
     /** 八字命盘缓存（随 profile 后台计算），让东方页切回即显 */
@@ -87,6 +93,17 @@ class FortuneRepository(private val context: Context) {
     suspend fun saveUserProfile(profile: UserProfile) {
         context.dataStore.edit { it[profileKey] = gson.toJson(profile) }
     }
+
+    suspend fun setDailyReminderOn(enabled: Boolean) {
+        context.dataStore.edit { it[dailyReminderKey] = enabled }
+    }
+
+    suspend fun clearUserProfile() {
+        context.dataStore.edit { it.remove(profileKey) }
+    }
+
+    suspend fun isDailyReminderOn(): Boolean =
+        context.dataStore.data.map { it[dailyReminderKey] ?: false }.first()
 
     /** 用户主动清除本机 DataStore 中的命盘、缓存与测试记录 */
     suspend fun clearAllLocalData() {

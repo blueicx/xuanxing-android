@@ -6,6 +6,7 @@ import android.widget.DatePicker
 import android.widget.TimePicker
 import android.widget.Toast
 import androidx.compose.foundation.border
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -27,6 +28,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -70,6 +72,7 @@ fun ProfileScreen() {
     var locationDialog by rememberSaveable { mutableStateOf<String?>(null) }
     var gender by rememberSaveable { mutableStateOf<String?>(null) }
     var showClearDialog by rememberSaveable { mutableStateOf(false) }
+    val dailyReminderOn by viewModel.dailyReminderOn.collectAsStateWithLifecycle()
 
     val selectedLocation = if (
         provinceIndex >= 0 && cityIndex >= 0 && districtIndex >= 0 &&
@@ -263,23 +266,96 @@ fun ProfileScreen() {
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
-        Text(
-            when {
-                profile == null && !profileDirty -> "尚未设置"
-                profileDirty -> "有未保存修改"
-                else -> "档案已是最新"
-            },
-            style = MaterialTheme.typography.labelMedium,
-            color = if (profileDirty) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-        )
+        FortuneCard {
+            SectionTitle("当前档案")
+            Spacer(Modifier.height(8.dp))
+            StatusChip(
+                label = when {
+                    currentProfile == null && !profileDirty -> "尚未设置"
+                    profileDirty -> "有未保存更改"
+                    else -> "已保存"
+                },
+                dirty = profileDirty
+            )
+            ProfileInfoRow(
+                label = "生日",
+                value = currentProfile?.let {
+                    String.format(
+                        "%04d-%02d-%02d %02d:%02d",
+                        it.birthYear, it.birthMonth, it.birthDay, it.birthHour, it.birthMinute
+                    )
+                } ?: "未设置"
+            )
+            ProfileInfoRow(
+                label = "地点",
+                value = currentProfile?.locationName ?: "未设置"
+            )
+            ProfileInfoRow(
+                label = "性别",
+                value = currentProfile?.gender ?: "未设置"
+            )
+            if (currentProfile != null) {
+                Spacer(Modifier.height(4.dp))
+                OutlinedButton(
+                    onClick = {
+                        viewModel.clearUserProfile()
+                        Toast.makeText(context, "已清除", Toast.LENGTH_SHORT).show()
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("清除并重新设置")
+                }
+            }
+        }
+        FortuneCard {
+            SectionTitle("关于玄星")
+            Spacer(Modifier.height(8.dp))
+            Text(
+                "玄星融合东方八字与西方星座，提供每日运势、占卜抽签、心理测试与手相参考。所有命理推算仅供娱乐与自我探索，请理性看待。",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(Modifier.height(6.dp))
+            Text(
+                "占卜抽签均为纯随机抽取，每一次结果都独一无二。",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
         FortuneCard {
             SectionTitle("隐私与数据")
             Spacer(Modifier.height(8.dp))
             Text(
-                "玄星不联网、不登录、不上传或统计你的个人数据。出生档案和测试记录只保存在这台设备上，可随时清除。",
+                "玄星的命理推算在本地完成，不上传或统计你的出生档案与测试记录。开启每日提醒时仅使用本地通知。",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(top = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        "每日运势提醒",
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        "每天 09:00 · 本地通知",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Switch(
+                    checked = dailyReminderOn,
+                    onCheckedChange = { enabled ->
+                        viewModel.setDailyReminderOn(enabled)
+                        Toast.makeText(context, if (enabled) "已开启" else "已关闭", Toast.LENGTH_SHORT).show()
+                    }
+                )
+            }
             Spacer(Modifier.height(12.dp))
             OutlinedButton(
                 onClick = { showClearDialog = true },
@@ -448,5 +524,48 @@ private fun LocationOption(label: String, selected: Boolean, onClick: () -> Unit
             style = if (selected) MaterialTheme.typography.titleSmall else MaterialTheme.typography.bodyLarge
         )
         HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.18f))
+    }
+}
+
+@Composable
+private fun StatusChip(label: String, dirty: Boolean) {
+    val shape = RoundedCornerShape(50)
+    val color = if (dirty) {
+        MaterialTheme.colorScheme.primary
+    } else {
+        MaterialTheme.colorScheme.tertiary
+    }
+    Text(
+        label,
+        modifier = Modifier
+            .clip(shape)
+            .background(color.copy(alpha = if (dirty) 0.14f else 0.12f), shape)
+            .border(1.dp, color.copy(alpha = if (dirty) 0.48f else 0.34f), shape)
+            .padding(horizontal = 9.dp, vertical = 3.dp),
+        color = color,
+        style = MaterialTheme.typography.labelMedium
+    )
+}
+
+@Composable
+private fun ProfileInfoRow(label: String, value: String) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .padding(vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            label,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Text(
+            value,
+            modifier = Modifier.fillMaxWidth(),
+            textAlign = androidx.compose.ui.text.style.TextAlign.End,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurface
+        )
     }
 }
