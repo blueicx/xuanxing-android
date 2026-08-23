@@ -1,5 +1,7 @@
 package com.xuanji.app.ui.test
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -17,17 +19,25 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.xuanji.app.data.model.TestRecord
 import com.xuanji.app.di.AppModule
+import com.google.gson.Gson
 import com.xuanji.app.ui.components.SectionTitle
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import android.widget.Toast
+import java.time.LocalDateTime
+import java.time.OffsetDateTime
+import java.time.format.DateTimeFormatter
 
 /**
  * 测试记录：持久化每次测试结果，按「职业 / 性格 / 趣味」分组展示在测试 tab 顶部。
@@ -47,11 +57,51 @@ object TestRecordRecorder {
     fun reset() { savedKeys.clear() }
 }
 
+private data class TestRecordExport(
+    val app: String,
+    val type: String,
+    val version: Int,
+    val exportedAt: String,
+    val records: List<TestRecord>
+)
+
+private val exportGson = Gson()
+
 /** 测试记录区块：显示在测试 tab 顶部，按职业/性格/趣味分组。 */
 @Composable
 fun TestRecordsSection() {
     val records by AppModule.testRecordRepository.records.collectAsStateWithLifecycle(initialValue = emptyList())
     var expanded by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val exportLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/json")
+    ) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        scope.launch(Dispatchers.IO) {
+            try {
+                val payload = TestRecordExport(
+                    app = "玄星",
+                    type = "test_records",
+                    version = 1,
+                    exportedAt = OffsetDateTime.now().format(DateTimeFormatter.ISO_OFFSET_DATE_TIME),
+                    records = records
+                )
+                val output = context.contentResolver.openOutputStream(uri)
+                    ?: throw IllegalStateException("Unable to open export destination")
+                output.use { stream ->
+                    stream.write(exportGson.toJson(payload).toByteArray(Charsets.UTF_8))
+                }
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(context, "已导出测试记录", Toast.LENGTH_SHORT).show()
+                }
+            } catch (_: Exception) {
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(context, "导出失败", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
 
     if (records.isEmpty()) return
 
@@ -67,12 +117,24 @@ fun TestRecordsSection() {
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 SectionTitle("测试记录（${records.size}）")
-                Text(
-                    if (expanded) "收起 ⌃" else "展开 ⌄",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.clickable { expanded = !expanded }
-                )
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(
+                        "导出",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.secondary,
+                        modifier = Modifier.clickable {
+                            val stamp = LocalDateTime.now()
+                                .format(DateTimeFormatter.ofPattern("yyyy-MM-dd_HHmmss"))
+                            exportLauncher.launch("xuanji-test-records-$stamp.json")
+                        }
+                    )
+                    Text(
+                        if (expanded) "收起 ⌃" else "展开 ⌄",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.clickable { expanded = !expanded }
+                    )
+                }
             }
             if (expanded) {
                 Spacer(Modifier.height(8.dp))
@@ -92,7 +154,7 @@ fun TestRecordsSection() {
                     }
                 }
                 Text(
-                    "结果保存在本机，仅供回顾。",
+                    "结果保存在本机；导出的 JSON 不包含出生档案。",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

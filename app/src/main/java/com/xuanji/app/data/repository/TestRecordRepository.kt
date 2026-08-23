@@ -46,7 +46,7 @@ class TestRecordRepository(private val context: Context) {
                 val t = object : TypeToken<List<TestRecord>>() {}.type
                 gson.fromJson<List<TestRecord>>(oldJson, t) ?: emptyList()
             } catch (_: Exception) { emptyList() }
-            val merged = (listOf(record) + old).take(50)  // 最多保留 50 条
+            val merged = (listOf(record) + old).take(20)  // 对齐小程序，最多保留 20 条
             prefs[key] = gson.toJson(merged)
         }
     }
