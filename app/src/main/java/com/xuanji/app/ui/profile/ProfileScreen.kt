@@ -254,13 +254,22 @@ fun ProfileScreen() {
                 onDismissRequest = { locationDialog = null },
                 confirmButton = {},
                 dismissButton = {
-                    TextButton(onClick = { locationDialog = null }) { Text("关闭") }
+                    Row {
+                        if (level != "province") {
+                            TextButton(
+                                onClick = {
+                                    locationDialog = if (level == "district") "city" else "province"
+                                }
+                            ) { Text("上一级") }
+                        }
+                        TextButton(onClick = { locationDialog = null }) { Text("关闭") }
+                    }
                 },
                 title = {
                     Text(
                         when (level) {
-                            "city" -> "选择市"
-                            "district" -> "选择县（区）"
+                            "city" -> "选择市 · ${province?.name ?: ""}"
+                            "district" -> "选择县（区） · ${city?.name ?: ""}"
                             else -> "选择省 / 直辖市 / 自治区"
                         }
                     )
@@ -269,24 +278,33 @@ fun ProfileScreen() {
                     LazyColumn(Modifier.height(360.dp)) {
                         if (level == "province") {
                             items(locations.provinces.size) { index ->
-                                LocationOption("${locations.provinces[index].name}（${locations.provinces[index].cities.size}市）") {
+                                LocationOption(
+                                    "${locations.provinces[index].name}（${locations.provinces[index].cities.size}市）",
+                                    selected = index == provinceIndex
+                                ) {
                                     provinceIndex = index
                                     cityIndex = -1
                                     districtIndex = -1
-                                    locationDialog = null
+                                    locationDialog = "city"
                                 }
                             }
                         } else if (level == "city" && province != null) {
                             items(province.cities.size) { index ->
-                                LocationOption(province.cities[index].name) {
+                                LocationOption(
+                                    "${province.cities[index].name}（${province.cities[index].districts.size}区县）",
+                                    selected = index == cityIndex
+                                ) {
                                     cityIndex = index
                                     districtIndex = -1
-                                    locationDialog = null
+                                    locationDialog = "district"
                                 }
                             }
                         } else if (level == "district" && city != null) {
                             items(city.districts.size) { index ->
-                                LocationOption(city.districts[index].name) {
+                                LocationOption(
+                                    city.districts[index].name,
+                                    selected = index == districtIndex
+                                ) {
                                     districtIndex = index
                                     locationDialog = null
                                 }
@@ -372,7 +390,7 @@ fun ProfileScreen() {
 }
 
 @Composable
-private fun LocationOption(label: String, onClick: () -> Unit) {
+private fun LocationOption(label: String, selected: Boolean, onClick: () -> Unit) {
     Column(
         Modifier
             .fillMaxWidth()
@@ -382,7 +400,9 @@ private fun LocationOption(label: String, onClick: () -> Unit) {
             label,
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 8.dp, vertical = 12.dp)
+                .padding(horizontal = 8.dp, vertical = 12.dp),
+            color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+            style = if (selected) MaterialTheme.typography.titleSmall else MaterialTheme.typography.bodyLarge
         )
         HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.18f))
     }
