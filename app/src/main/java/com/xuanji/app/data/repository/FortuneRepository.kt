@@ -9,10 +9,12 @@ import com.google.gson.Gson
 import com.xuanji.app.data.local.dataStore
 import com.xuanji.app.data.model.BaziChart
 import com.xuanji.app.data.model.BaziFull
+import com.xuanji.app.data.model.CompositeDailyFortune
 import com.xuanji.app.data.model.EasternDailyFortune
 import com.xuanji.app.data.model.UserProfile
 import com.xuanji.app.data.model.WesternDailyFortune
 import com.xuanji.app.domain.BaziCalculator
+import com.xuanji.app.domain.CompositeFortuneGenerator
 import com.xuanji.app.domain.EasternFortuneGenerator
 import com.xuanji.app.domain.WesternFortuneGenerator
 import com.xuanji.app.domain.ZodiacCalculator
@@ -103,27 +105,61 @@ class FortuneRepository(private val context: Context) {
         context.dataStore.edit { it[guideSeenKey] = true }
     }
 
-    suspend fun getEasternFortune(chart: BaziChart, date: LocalDate): EasternDailyFortune {
+    suspend fun getEasternFortune(chart: BaziChart, date: LocalDate, period: String = "day"): EasternDailyFortune {
         // 缓存键要含命盘指纹：同一天切换生日后不能命中别人/旧的运势
-        val key = stringPreferencesKey("eastern_${dateKey(date)}_${chartFingerprint(chart)}")
+        val key = stringPreferencesKey("eastern_${period}_${dateKey(date)}_${chartFingerprint(chart)}")
         context.dataStore.data.map { it[key] }.first()?.let {
             return gson.fromJson(it, EasternDailyFortune::class.java)
         }
-        val fortune = EasternFortuneGenerator.generate(chart, date)
+        val fortune = when (period) {
+            "week" -> EasternFortuneGenerator.generateWeekly(chart, date)
+            "month" -> EasternFortuneGenerator.generateMonthly(chart, date)
+            else -> EasternFortuneGenerator.generate(chart, date)
+        }
         context.dataStore.edit { it[key] = gson.toJson(fortune) }
         return fortune
     }
 
     suspend fun getWesternFortune(
         info: ZodiacCalculator.ZodiacInfo,
-        date: LocalDate
+        date: LocalDate,
+        period: String = "day"
     ): WesternDailyFortune {
         // 同上：缓存键含星座指纹
-        val key = stringPreferencesKey("western_${dateKey(date)}_${info.sign}_${info.element}")
+        val key = stringPreferencesKey("western_${period}_${dateKey(date)}_${info.sign}_${info.element}")
         context.dataStore.data.map { it[key] }.first()?.let {
             return gson.fromJson(it, WesternDailyFortune::class.java)
         }
-        val fortune = WesternFortuneGenerator.generate(info, date)
+        val fortune = when (period) {
+            "week" -> WesternFortuneGenerator.generateWeekly(info, date)
+            "month" -> WesternFortuneGenerator.generateMonthly(info, date)
+            else -> WesternFortuneGenerator.generate(info, date)
+        }
+        context.dataStore.edit { it[key] = gson.toJson(fortune) }
+        return fortune
+    }
+
+    suspend fun getCompositeFortune(
+        chart: BaziChart,
+        info: ZodiacCalculator.ZodiacInfo,
+        date: LocalDate,
+        period: String = "day"
+    ): CompositeDailyFortune {
+        val key = stringPreferencesKey(
+            "composite_${period}_${dateKey(date)}_${chartFingerprint(chart)}_${info.sign}"
+        )
+        context.dataStore.data.map { it[key] }.first()?.let {
+            return gson.fromJson(it, CompositeDailyFortune::class.java)
+        }
+        val fortune = when (period) {
+            "week" -> CompositeFortuneGenerator.generateWeekly(chart, info, date)
+            "month" -> CompositeFortuneGenerator.generateMonthly(chart, info, date)
+            else -> {
+                val easternF = getEasternFortune(chart, date)
+                val westernF = getWesternFortune(info, date)
+                CompositeFortuneGenerator.generate(easternF, westernF, date)
+            }
+        }
         context.dataStore.edit { it[key] = gson.toJson(fortune) }
         return fortune
     }

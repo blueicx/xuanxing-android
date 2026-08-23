@@ -13,7 +13,8 @@ data class EasternDailyFortune(
     val dayPillarText: String,       // 今日干支
     val favorableToday: List<Element>,
     val luckyColor: String,
-    val luckyDirection: String
+    val luckyDirection: String,
+    val period: String = "day"       // day / week / month
 )
 
 /** 西方（星座）每日运势 */
@@ -28,5 +29,6 @@ data class WesternDailyFortune(
     val summary: String,
     val luckyNumber: Int,
     val luckyColor: String,
-    val luckyDirection: String
+    val luckyDirection: String,
+    val period: String = "day"       // day / week / month
 )

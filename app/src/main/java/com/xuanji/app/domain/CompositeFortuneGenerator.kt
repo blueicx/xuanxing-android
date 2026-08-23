@@ -4,6 +4,7 @@ import com.xuanji.app.data.model.CompositeDailyFortune
 import com.xuanji.app.data.model.EasternDailyFortune
 import com.xuanji.app.data.model.FortuneDimension
 import com.xuanji.app.data.model.WesternDailyFortune
+import com.xuanji.app.data.model.BaziChart
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import kotlin.math.round
@@ -105,7 +106,100 @@ object CompositeFortuneGenerator {
             luckyDirection = luckyDirection,
             cautions = cautions,
             eastern = eastern,
-            western = western
+            western = western,
+            period = "day"
+        )
+    }
+
+    private fun epochWeek(date: LocalDate): Long = Math.floorDiv(date.toEpochDay(), 7L)
+
+    private fun epochMonth(date: LocalDate): Long = date.year.toLong() * 12L + (date.monthValue - 1)
+
+    /** 综合每周运势 — 逻辑融合（与小程序 compositeFortune.js 对齐） */
+    fun generateWeekly(chart: BaziChart, info: ZodiacCalculator.ZodiacInfo, date: LocalDate): CompositeDailyFortune {
+        val easternW = EasternFortuneGenerator.generateWeekly(chart, date)
+        val westernW = WesternFortuneGenerator.generateWeekly(info, date)
+        return buildLogical(easternW, westernW, date, "week")
+    }
+
+    /** 综合每月运势 */
+    fun generateMonthly(chart: BaziChart, info: ZodiacCalculator.ZodiacInfo, date: LocalDate): CompositeDailyFortune {
+        val easternM = EasternFortuneGenerator.generateMonthly(chart, date)
+        val westernM = WesternFortuneGenerator.generateMonthly(info, date)
+        return buildLogical(easternM, westernM, date, "month")
+    }
+
+    /** 确定性融合：直接取两套体系均值，无随机扰动（与小程序对齐） */
+    private fun buildLogical(
+        eastern: EasternDailyFortune,
+        western: WesternDailyFortune,
+        date: LocalDate,
+        periodTag: String
+    ): CompositeDailyFortune {
+        fun blend(a: Int, b: Int) = Math.round((a + b) / 2.0).toInt()
+
+        val career = blend(eastern.careerScore, western.careerScore).coerceIn(10, 98)
+        val wealth = blend(eastern.wealthScore, western.wealthScore).coerceIn(10, 98)
+        val love = blend(eastern.loveScore, western.loveScore).coerceIn(10, 98)
+        // 情感以爱情为基础，偏移由东方感情分决定
+        val emotionShift = if (eastern.loveScore > western.loveScore) 3 else -3
+        val emotion = (love + emotionShift).coerceIn(10, 98)
+        // 桃花运：两系感情分加权
+        val peach = Math.round(eastern.loveScore * 0.6 + western.loveScore * 0.4).toInt().coerceIn(10, 98)
+        // 学习：事业分的延伸
+        val studyShift = if (eastern.careerScore >= 60) 2 else -2
+        val study = (blend(eastern.careerScore, western.careerScore) + studyShift).coerceIn(10, 98)
+        val health = blend(eastern.healthScore, western.healthScore).coerceIn(10, 98)
+
+        val overall = round((career + wealth + love + emotion + peach + study + health) / 7.0)
+            .toInt().coerceIn(15, 98)
+
+        fun band(s: Int): String = when {
+            s >= 80 -> "上佳"; s >= 65 -> "良好"; s >= 50 -> "平稳"; s >= 35 -> "偏弱"; else -> "低迷"
+        }
+        fun interp(label: String, s: Int): String = when {
+            s >= 65 -> "$label${band(s)}，宜积极把握，顺势而为。"
+            s >= 50 -> "$label${band(s)}，按部就班即可，细节决定成效。"
+            s >= 35 -> "$label${band(s)}，宜守不宜攻，稳妥为先。"
+            else -> "$label${band(s)}，宜低调蓄力，谨慎行事。"
+        }
+
+        val dimensions = listOf(
+            FortuneDimension("peach", "桃花运", peach, interp("桃花运", peach)),
+            FortuneDimension("emotion", "情感", emotion, interp("情感", emotion)),
+            FortuneDimension("career", "事业", career, interp("事业", career)),
+            FortuneDimension("study", "学习", study, interp("学习", study)),
+            FortuneDimension("wealth", "财富", wealth, interp("财富", wealth)),
+            FortuneDimension("health", "健康", health, interp("健康", health))
+        )
+
+        val luckyColor = eastern.luckyColor
+        val luckyDirection = eastern.luckyDirection
+        val luckyNumber = 1 + ((eastern.overallScore + western.overallScore) % 9)
+
+        val lowDim = dimensions.minByOrNull { it.score }
+        val cautions = buildString {
+            append("综合运势${band(overall)}。")
+            if (lowDim != null && lowDim.score < 55) {
+                append("需留意「${lowDim.label}」(${lowDim.score}分)：${lowDim.interpretation}")
+            } else {
+                append("各项较为均衡，保持节奏即可。")
+            }
+            val periodLabel = if (periodTag == "week") "本周" else "本月"
+            append("\n东方${periodLabel}流期${eastern.dayPillarText}，西方${periodLabel}${western.sign}相位。")
+        }
+
+        return CompositeDailyFortune(
+            dateKey = date.format(DateTimeFormatter.ISO_LOCAL_DATE),
+            overallScore = overall,
+            dimensions = dimensions,
+            luckyNumber = luckyNumber,
+            luckyColor = luckyColor,
+            luckyDirection = luckyDirection,
+            cautions = cautions,
+            eastern = eastern,
+            western = western,
+            period = periodTag
         )
     }
 }

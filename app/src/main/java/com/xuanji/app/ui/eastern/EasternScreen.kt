@@ -46,6 +46,7 @@ import com.xuanji.app.ui.components.ElementBalance
 import com.xuanji.app.ui.components.FortuneCard
 import com.xuanji.app.ui.components.HealthBodyAtlas
 import com.xuanji.app.ui.components.InfoRow
+import com.xuanji.app.ui.components.PeriodToggleRow
 import com.xuanji.app.ui.components.PillarCard
 import com.xuanji.app.ui.components.ScoreRow
 import com.xuanji.app.ui.components.SectionTitle
@@ -76,6 +77,7 @@ fun EasternScreen() {
             is EasternUiState.Loading -> Text("正在推算命盘…")
             is EasternUiState.Empty -> Text("尚未设置出生信息，请先到「我的」填写。")
             is EasternUiState.Ready -> {
+                PeriodToggleRow(s.period) { viewModel.setPeriod(it) }
                 PillarSection(s.full.chart)
                 ConclusionSection(s.full.conclusion)
                 GejuSection(s.full.geju)
@@ -88,7 +90,7 @@ fun EasternScreen() {
                 if (s.full.relations.isNotEmpty()) RelationsSection(s.full.relations)
                 ShenShaSection(s.full.shenSha)
                 ShenShaAtlasSection(s.full.shenSha)
-                TodayFortuneSection(s.fortune, s.full.chart.favorableElements)
+                TodayFortuneSection(s.fortune, s.full.chart.favorableElements, s.period)
                 Text(
                     s.full.note,
                     style = MaterialTheme.typography.bodySmall,
@@ -322,10 +324,16 @@ private fun RelationsSection(relations: List<BranchRelation>) {
 @Composable
 private fun TodayFortuneSection(
     fortune: EasternDailyFortune,
-    favorable: List<Element>
+    favorable: List<Element>,
+    period: String = "day"
 ) {
     FortuneCard {
-        SectionTitle("今日运势 · ${fortune.dateKey}")
+        val periodTitle = when (period) {
+            "week" -> "本周"
+            "month" -> "本月"
+            else -> "今日"
+        }
+        SectionTitle("${periodTitle}运势 · ${fortune.dateKey}")
         Spacer(Modifier.height(8.dp))
         Text(fortune.summary, style = MaterialTheme.typography.bodyLarge)
         Spacer(Modifier.height(12.dp))

@@ -29,6 +29,7 @@ import com.xuanji.app.domain.ZodiacCalculator
 import com.xuanji.app.ui.components.FortuneCard
 import com.xuanji.app.ui.components.InfoRow
 import com.xuanji.app.ui.components.NatalWheelChart
+import com.xuanji.app.ui.components.PeriodToggleRow
 import com.xuanji.app.ui.components.ScoreRow
 import com.xuanji.app.ui.components.SectionTitle
 import com.xuanji.app.ui.components.SystemExplanation
@@ -56,7 +57,13 @@ fun WesternScreen() {
         when (val s = uiState) {
             is WesternUiState.Loading -> Text("正在推算星盘…")
             is WesternUiState.Empty -> Text("尚未设置出生信息，请先到「我的」填写。")
-            is WesternUiState.Ready -> WesternContent(s.detail, s.fortune, s.chart)
+            is WesternUiState.Ready -> WesternContent(
+                detail = s.detail,
+                fortune = s.fortune,
+                chart = s.chart,
+                period = s.period,
+                onPeriodChange = viewModel::setPeriod
+            )
         }
         SystemExplanation("western")
     }
@@ -97,9 +104,12 @@ private fun SignBlock(title: String, info: ZodiacCalculator.ZodiacInfo) {
 private fun WesternContent(
     detail: ZodiacCalculator.WesternDetail,
     fortune: WesternDailyFortune,
-    chart: ZodiacCalculator.NatalChart
+    chart: ZodiacCalculator.NatalChart,
+    period: String,
+    onPeriodChange: (String) -> Unit
 ) {
     val interp = ZodiacCalculator.interpretChart(chart)
+    PeriodToggleRow(period, onPeriodChange)
     FortuneCard {
         SectionTitle("圆盘星盘")
         Spacer(Modifier.height(8.dp))
@@ -281,7 +291,12 @@ private fun WesternContent(
     }
     WesternConclusionSection(ZodiacCalculator.computeConclusion(detail, chart))
     FortuneCard {
-        SectionTitle("今日运势 · ${fortune.dateKey}")
+        val periodTitle = when (period) {
+            "week" -> "本周"
+            "month" -> "本月"
+            else -> "今日"
+        }
+        SectionTitle("${periodTitle}运势 · ${fortune.dateKey}")
         Spacer(Modifier.height(8.dp))
         Text(fortune.summary, style = MaterialTheme.typography.bodyLarge)
         Spacer(Modifier.height(12.dp))

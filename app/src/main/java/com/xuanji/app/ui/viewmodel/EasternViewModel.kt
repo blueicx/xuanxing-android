@@ -15,12 +15,13 @@ import java.time.LocalDate
 sealed interface EasternUiState {
     data object Loading : EasternUiState
     data object Empty : EasternUiState
-    data class Ready(val full: BaziFull, val fortune: EasternDailyFortune) : EasternUiState
+    data class Ready(val full: BaziFull, val fortune: EasternDailyFortune, val period: String = "day") : EasternUiState
 }
 
 class EasternViewModel(private val repository: FortuneRepository) : ViewModel() {
     private val _uiState = MutableStateFlow<EasternUiState>(EasternUiState.Loading)
     val uiState: StateFlow<EasternUiState> = _uiState.asStateFlow()
+    private var currentPeriod = "day"
 
     init {
         viewModelScope.launch(Dispatchers.Default) {
@@ -28,9 +29,21 @@ class EasternViewModel(private val repository: FortuneRepository) : ViewModel() 
                 if (full == null) {
                     _uiState.value = EasternUiState.Empty
                 } else {
-                    val fortune = repository.getEasternFortune(full.chart, LocalDate.now())
-                    _uiState.value = EasternUiState.Ready(full, fortune)
+                    val fortune = repository.getEasternFortune(full.chart, LocalDate.now(), currentPeriod)
+                    _uiState.value = EasternUiState.Ready(full, fortune, currentPeriod)
                 }
+            }
+        }
+    }
+
+    fun setPeriod(period: String) {
+        if (period == currentPeriod) return
+        currentPeriod = period
+        viewModelScope.launch(Dispatchers.Default) {
+            val full = repository.baziFullFlow.value
+            if (full != null) {
+                val fortune = repository.getEasternFortune(full.chart, LocalDate.now(), period)
+                _uiState.value = EasternUiState.Ready(full, fortune, period)
             }
         }
     }

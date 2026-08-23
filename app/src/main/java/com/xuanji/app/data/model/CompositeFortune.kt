@@ -13,7 +13,8 @@ data class CompositeDailyFortune(
     val luckyDirection: String,                 // 吉利方位
     val cautions: String,                       // 注意事项
     val eastern: EasternDailyFortune,           // 东方来源（用于标签展示）
-    val western: WesternDailyFortune            // 西方来源
+    val western: WesternDailyFortune,           // 西方来源
+    val period: String = "day"                  // day / week / month
 )
 
 /** 单个运势维度 */

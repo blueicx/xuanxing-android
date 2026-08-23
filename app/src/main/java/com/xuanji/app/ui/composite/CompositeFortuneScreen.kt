@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.xuanji.app.data.model.FortuneDimension
 import com.xuanji.app.di.AppModule
+import com.xuanji.app.ui.components.PeriodToggleRow
 import com.xuanji.app.ui.viewmodel.CompositeFortuneViewModel
 import com.xuanji.app.ui.viewmodel.CompositeUiState
 import com.xuanji.app.ui.xuanjiViewModel
@@ -44,12 +45,20 @@ fun CompositeFortuneScreen(
                 color = MaterialTheme.colorScheme.error
             )
         }
-        is CompositeUiState.Ready -> CompositeContent(s.fortune)
+        is CompositeUiState.Ready -> CompositeContent(
+            fortune = s.fortune,
+            period = s.period,
+            onPeriodChange = viewModel::setPeriod
+        )
     }
 }
 
 @Composable
-private fun CompositeContent(f: com.xuanji.app.data.model.CompositeDailyFortune) {
+private fun CompositeContent(
+    fortune: com.xuanji.app.data.model.CompositeDailyFortune,
+    period: String,
+    onPeriodChange: (String) -> Unit
+) {
     Column(
         Modifier
             .fillMaxSize()
@@ -73,14 +82,18 @@ private fun CompositeContent(f: com.xuanji.app.data.model.CompositeDailyFortune)
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     Text(
-                        "今日综合运势",
+                        when (period) {
+                            "week" -> "本周综合运势"
+                            "month" -> "本月综合运势"
+                            else -> "今日综合运势"
+                        },
                         style = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.onPrimaryContainer
                     )
                     Text(
-                        "${f.overallScore}",
+                        "${fortune.overallScore}",
                         style = MaterialTheme.typography.headlineLarge.copy(fontWeight = FontWeight.Bold),
-                        color = scoreColor(f.overallScore)
+                        color = scoreColor(fortune.overallScore)
                     )
                     Text(
                         "分",
@@ -88,7 +101,7 @@ private fun CompositeContent(f: com.xuanji.app.data.model.CompositeDailyFortune)
                         color = MaterialTheme.colorScheme.onPrimaryContainer
                     )
                     Text(
-                        scoreEmoji(f.overallScore),
+                        scoreEmoji(fortune.overallScore),
                         style = MaterialTheme.typography.headlineSmall,
                     )
                 }
@@ -100,16 +113,18 @@ private fun CompositeContent(f: com.xuanji.app.data.model.CompositeDailyFortune)
             }
         }
 
+        PeriodToggleRow(period, onPeriodChange)
+
         // 幸运信息
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            LuckChip("幸运数字", f.luckyNumber.toString(), Modifier.weight(1f))
-            LuckChip("幸运色", f.luckyColor, Modifier.weight(1f))
-            LuckChip("吉利方位", f.luckyDirection, Modifier.weight(1f))
+            LuckChip("幸运数字", fortune.luckyNumber.toString(), Modifier.weight(1f))
+            LuckChip("幸运色", fortune.luckyColor, Modifier.weight(1f))
+            LuckChip("吉利方位", fortune.luckyDirection, Modifier.weight(1f))
         }
 
         // 维度
         Text("今日维度", style = MaterialTheme.typography.titleSmall)
-        f.dimensions.forEach { dim -> DimensionCard(dim) }
+        fortune.dimensions.forEach { dim -> DimensionCard(dim) }
 
         // 注意事项
         Card(Modifier.fillMaxWidth()) {
@@ -123,7 +138,7 @@ private fun CompositeContent(f: com.xuanji.app.data.model.CompositeDailyFortune)
                     color = MaterialTheme.colorScheme.primary
                 )
                 Text(
-                    f.cautions,
+                    fortune.cautions,
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
