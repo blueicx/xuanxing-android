@@ -30,9 +30,11 @@ import com.xuanji.app.ui.components.FortuneCard
 import com.xuanji.app.ui.components.InfoRow
 import com.xuanji.app.ui.components.NatalWheelChart
 import com.xuanji.app.ui.components.PeriodToggleRow
+import com.xuanji.app.ui.components.ResultShare
 import com.xuanji.app.ui.components.ScoreRow
 import com.xuanji.app.ui.components.SectionTitle
 import com.xuanji.app.ui.components.SystemExplanation
+import com.xuanji.app.ui.components.ShareButton
 import com.xuanji.app.ui.viewmodel.WesternUiState
 import com.xuanji.app.ui.viewmodel.WesternViewModel
 import com.xuanji.app.ui.xuanjiViewModel
@@ -296,7 +298,11 @@ private fun WesternContent(
             "month" -> "本月"
             else -> "今日"
         }
-        SectionTitle("${periodTitle}运势 · ${fortune.dateKey}")
+        SectionTitle("${periodTitle}运势 · ${fortune.dateKey}") {
+            ShareButton(
+                sharedText = ResultShare.fortuneTitle("星座运势", period, fortune.overallScore)
+            )
+        }
         Spacer(Modifier.height(8.dp))
         Text(fortune.summary, style = MaterialTheme.typography.bodyLarge)
         Spacer(Modifier.height(12.dp))

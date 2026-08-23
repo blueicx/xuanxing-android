@@ -63,8 +63,10 @@ import com.xuanji.app.ui.components.HealthBodyAtlas
 import com.xuanji.app.ui.components.InfoRow
 import com.xuanji.app.ui.components.PeriodToggleRow
 import com.xuanji.app.ui.components.PillarCard
+import com.xuanji.app.ui.components.ResultShare
 import com.xuanji.app.ui.components.ScoreRow
 import com.xuanji.app.ui.components.SectionTitle
+import com.xuanji.app.ui.components.ShareButton
 import com.xuanji.app.ui.components.WuxingRatioList
 import com.xuanji.app.ui.components.WuxingWheel
 import com.xuanji.app.ui.viewmodel.EasternUiState
@@ -489,7 +491,11 @@ private fun TodayFortuneSection(
             "month" -> "本月"
             else -> "今日"
         }
-        SectionTitle("${periodTitle}运势 · ${fortune.dateKey}")
+        SectionTitle("${periodTitle}运势 · ${fortune.dateKey}") {
+            ShareButton(
+                sharedText = ResultShare.fortuneTitle("东方运势", period, fortune.overallScore)
+            )
+        }
         Spacer(Modifier.height(8.dp))
         Text(fortune.summary, style = MaterialTheme.typography.bodyLarge)
         Spacer(Modifier.height(12.dp))

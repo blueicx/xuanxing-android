@@ -41,6 +41,8 @@ import com.xuanji.app.data.model.FortuneDimension
 import com.xuanji.app.di.AppModule
 import com.xuanji.app.domain.MysticGuideGenerator
 import com.xuanji.app.ui.components.PeriodToggleRow
+import com.xuanji.app.ui.components.ResultShare
+import com.xuanji.app.ui.components.ShareButton
 import com.xuanji.app.ui.viewmodel.CompositeFortuneViewModel
 import com.xuanji.app.ui.viewmodel.CompositeUiState
 import com.xuanji.app.ui.xuanjiViewModel
@@ -89,44 +91,56 @@ private fun CompositeContent(
             Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
         ) {
-            Column(
-                Modifier.fillMaxWidth().padding(20.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                // 第一行：标题 + 分数（同一个 Row，避免分数单独换到第二行）
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+            Box(Modifier.fillMaxWidth()) {
+                Column(
+                    Modifier.fillMaxWidth().padding(20.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
+                    // 第一行：标题 + 分数（同一个 Row，避免分数单独换到第二行）
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Text(
+                            when (period) {
+                                "week" -> "本周综合运势"
+                                "month" -> "本月综合运势"
+                                else -> "今日综合运势"
+                            },
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                        Text(
+                            "${fortune.overallScore}",
+                            style = MaterialTheme.typography.headlineLarge.copy(fontWeight = FontWeight.Bold),
+                            color = scoreColor(fortune.overallScore)
+                        )
+                        Text(
+                            "分",
+                            style = MaterialTheme.typography.titleSmall,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                        Text(
+                            scoreEmoji(fortune.overallScore),
+                            style = MaterialTheme.typography.headlineSmall,
+                        )
+                    }
                     Text(
-                        when (period) {
-                            "week" -> "本周综合运势"
-                            "month" -> "本月综合运势"
-                            else -> "今日综合运势"
-                        },
-                        style = MaterialTheme.typography.titleMedium,
+                        "融合东方八字与西方星座",
+                        style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onPrimaryContainer
-                    )
-                    Text(
-                        "${fortune.overallScore}",
-                        style = MaterialTheme.typography.headlineLarge.copy(fontWeight = FontWeight.Bold),
-                        color = scoreColor(fortune.overallScore)
-                    )
-                    Text(
-                        "分",
-                        style = MaterialTheme.typography.titleSmall,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer
-                    )
-                    Text(
-                        scoreEmoji(fortune.overallScore),
-                        style = MaterialTheme.typography.headlineSmall,
                     )
                 }
-                Text(
-                    "融合东方八字与西方星座",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer
+
+                val shareText = remember(period, fortune.overallScore) {
+                    ResultShare.fortuneTitle("综合运势", period, fortune.overallScore)
+                }
+                ShareButton(
+                    sharedText = shareText,
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(top = 14.dp, end = 14.dp)
                 )
             }
         }
