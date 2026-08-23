@@ -54,13 +54,14 @@ object MysticGuideGenerator {
 
     fun topicLabels(): List<Pair<String, String>> = topics.map { it.key to it.value }
 
-    /** 同一天、同一话题、同一分数稳定“随机”；但好运坏运不预设谁来接话。 */
+    /** 同一天、同一命盘默认由同一位玄师陪伴；好运坏运不预设谁来接话。 */
+    @Suppress("UNUSED_PARAMETER")
     fun suggestedMode(topicKey: String, fortune: CompositeDailyFortune): String {
-        val seed = presenceSeed(topicKey, fortune)
+        val seed = companionSeed(fortune)
         return if (seed % 2L == 0L) "scholar" else "half"
     }
 
-    /** 作风仍由稳定种子决定：同一天、同一话题、同一盘面遇到的是同一位“熟人”。 */
+    /** 作风仍按话题微调：同一个人换到不同话题，会有不同的讲解姿势。 */
     private fun style(scholar: Boolean, topicKey: String, fortune: CompositeDailyFortune): Triple<String, String, String> {
         val index = ((presenceSeed(topicKey, fortune) / 7L) % 3L).toInt()
         return if (scholar) {
@@ -707,6 +708,15 @@ object MysticGuideGenerator {
     /** DJB2 取样；两端用同一字符码与质数模，避免各端人设漂移。 */
     private fun presenceSeed(topicKey: String, fortune: CompositeDailyFortune): Long {
         val source = "${canonicalDateKey(fortune.dateKey)}|$topicKey|${fortune.overallScore}|${fortune.luckyNumber}"
+        var hash = 5381L
+        for (char in source) {
+            hash = (hash * 33L + char.code) % 2147483647L
+        }
+        return hash
+    }
+
+    private fun companionSeed(fortune: CompositeDailyFortune): Long {
+        val source = "${canonicalDateKey(fortune.dateKey)}|${fortune.overallScore}|${fortune.luckyNumber}"
         var hash = 5381L
         for (char in source) {
             hash = (hash * 33L + char.code) % 2147483647L

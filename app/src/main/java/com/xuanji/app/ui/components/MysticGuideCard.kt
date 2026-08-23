@@ -60,7 +60,7 @@ fun MysticGuideCard(
 ) {
     val records by AppModule.testRecordRepository.records.collectAsStateWithLifecycle(initialValue = emptyList())
     var topic by rememberSaveable { mutableStateOf("composite") }
-    var mode by remember(fortune.dateKey, fortune.overallScore, fortune.luckyNumber, topic) {
+    var mode by remember(fortune.dateKey, fortune.overallScore, fortune.luckyNumber) {
         mutableStateOf(MysticGuideGenerator.suggestedMode(topic, fortune))
     }
     val latestTest = records.maxByOrNull { it.date }
@@ -269,7 +269,7 @@ fun MysticGuideCard(
                         Text("✦", style = MaterialTheme.typography.titleSmall, color = accent)
                         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                             Text(
-                                "${guide.roleName}刚好过来",
+                                "${guide.roleName}今天陪你看盘",
                                 style = MaterialTheme.typography.labelMedium,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onSurface
