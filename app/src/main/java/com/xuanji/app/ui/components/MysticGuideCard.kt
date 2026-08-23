@@ -46,7 +46,8 @@ private data class MysticTurn(
     val key: String,
     val question: String,
     val answer: String,
-    val reaction: String = ""
+    val reaction: String = "",
+    val kind: String = "ask"
 )
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -69,6 +70,8 @@ fun MysticGuideCard(
     val conversation = remember(guide) { mutableStateListOf<MysticTurn>() }
     var arrivalVisible by remember(guide) { mutableStateOf(false) }
     var pendingFollowUp by remember(guide) { mutableStateOf<String?>(null) }
+    var pendingInteraction by remember(guide) { mutableStateOf<MysticInteractionOption?>(null) }
+    var interactionCount by remember(guide) { mutableStateOf(0) }
     val askCounts = remember(guide) { mutableStateMapOf<String, Int>() }
     var interactionRound by remember(guide) { mutableStateOf(0) }
     var selectedInteraction by remember(guide, interactionRound) { mutableStateOf<MysticInteractionOption?>(null) }
@@ -82,8 +85,25 @@ fun MysticGuideCard(
     }
 
     fun selectFollowUp(key: String) {
-        if (guide.followUps.none { it.key == key } || pendingFollowUp != null) return
+        if (guide.followUps.none { it.key == key } || pendingFollowUp != null || pendingInteraction != null) return
         pendingFollowUp = key
+    }
+
+    LaunchedEffect(pendingInteraction) {
+        val option = pendingInteraction ?: return@LaunchedEffect
+        kotlinx.coroutines.delay(380)
+        conversation.add(
+            MysticTurn(
+                key = "game-$interactionCount-${option.label}",
+                question = option.label,
+                answer = option.feedback,
+                reaction = MysticGuideGenerator.interactionReaction(mode, guide.styleKey),
+                kind = "game"
+            )
+        )
+        while (conversation.size > 5) conversation.removeAt(0)
+        interactionCount += 1
+        pendingInteraction = null
     }
 
     LaunchedEffect(pendingFollowUp) {
@@ -277,7 +297,7 @@ fun MysticGuideCard(
                             }
                         }
 
-                        if (pendingFollowUp != null) {
+                        if (pendingFollowUp != null || pendingInteraction != null) {
                             Row(
                                 Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -312,8 +332,10 @@ fun MysticGuideCard(
                                     onClick = {
                                         conversation.clear()
                                         selectedFollowUp = ""
+                                        selectedInteraction = null
                                         askCounts.clear()
                                         pendingFollowUp = null
+                                        pendingInteraction = null
                                     },
                                     color = Color.Transparent
                                 ) {
@@ -358,14 +380,17 @@ fun MysticGuideCard(
                                 verticalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
                                 conversation.forEach { turn ->
-                                    current.followUps.firstOrNull { it.key == turn.key }?.let { item ->
+                                    val followUp = current.followUps.firstOrNull { it.key == turn.key }
+                                    val userLine = followUp?.question ?: turn.question
+                                    val mysticLine = followUp?.answer ?: turn.answer
+                                    run {
                                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                                             Surface(
                                                 shape = RoundedCornerShape(14.dp),
                                                 color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.38f)
                                             ) {
                                                 Text(
-                                                    item.question,
+                                                    userLine,
                                                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
                                                     style = MaterialTheme.typography.bodySmall,
                                                     color = MaterialTheme.colorScheme.onSurface
@@ -385,7 +410,7 @@ fun MysticGuideCard(
                                             color = accent.copy(alpha = 0.16f)
                                         ) {
                                             Text(
-                                                item.answer,
+                                                mysticLine,
                                                 modifier = Modifier.padding(12.dp),
                                                 style = MaterialTheme.typography.bodySmall,
                                                 lineHeight = 21.sp,
@@ -410,6 +435,7 @@ fun MysticGuideCard(
                             Surface(
                                 onClick = {
                                     selectedInteraction = null
+                                    pendingInteraction = null
                                     interactionRound += 1
                                 },
                                 color = Color.Transparent
@@ -431,7 +457,12 @@ fun MysticGuideCard(
                         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             interaction.options.forEach { option ->
                                 Surface(
-                                    onClick = { selectedInteraction = option },
+                                    onClick = {
+                                        if (pendingFollowUp == null && pendingInteraction == null) {
+                                            selectedInteraction = option
+                                            pendingInteraction = option
+                                        }
+                                    },
                                     shape = RoundedCornerShape(999.dp),
                                     color = if (selectedInteraction == option) {
                                         accent
@@ -452,22 +483,6 @@ fun MysticGuideCard(
                                 }
                             }
                         }
-                        AnimatedVisibility(visible = selectedInteraction != null) {
-                            Surface(
-                                Modifier.fillMaxWidth(),
-                                shape = RoundedCornerShape(14.dp),
-                                color = accent.copy(alpha = 0.14f)
-                            ) {
-                                Text(
-                                    selectedInteraction?.feedback.orEmpty(),
-                                    modifier = Modifier.padding(12.dp),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    lineHeight = 21.sp,
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
-                            }
-                        }
-
                         Text(
                             current.signature,
                             style = MaterialTheme.typography.labelSmall,

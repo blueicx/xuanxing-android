@@ -366,6 +366,24 @@ object MysticGuideGenerator {
         }
     }
 
+    /** 小游戏选择也会被当作一句“用户发言”，玄师按自己的作风先接一句。 */
+    fun interactionReaction(mode: String, styleKey: String): String {
+        val scholar = mode != "half"
+        return if (scholar) {
+            when (styleKey) {
+                "archive" -> "我先把这项记在旁边；做法比说法更重要。"
+                "harbor" -> "好，你选的这一步我已经接住了。"
+                else -> "这个方向够小，适合真的走一步。"
+            }
+        } else {
+            when (styleKey) {
+                "herald" -> "恭喜！这条选择已经敲锣送进云海！"
+                "alley" -> "行，就按这个来；咱不整虚的。"
+                else -> "已登记工单！实习生保证不把它弄丢。"
+            }
+        }
+    }
+
     /** DJB2 取样；两端用同一字符码与质数模，避免各端人设漂移。 */
     private fun presenceSeed(topicKey: String, fortune: CompositeDailyFortune): Long {
         val source = "${canonicalDateKey(fortune.dateKey)}|$topicKey|${fortune.overallScore}|${fortune.luckyNumber}"
