@@ -1,14 +1,8 @@
 package com.xuanji.app.ui.composite
 
-import androidx.compose.animation.Crossfade
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.tween
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -30,8 +24,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -39,8 +31,8 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.xuanji.app.data.model.FortuneDimension
 import com.xuanji.app.di.AppModule
-import com.xuanji.app.domain.MysticGuideGenerator
 import com.xuanji.app.ui.components.PeriodToggleRow
+import com.xuanji.app.ui.components.MysticGuideCard
 import com.xuanji.app.ui.components.ResultShare
 import com.xuanji.app.ui.components.ShareButton
 import com.xuanji.app.ui.viewmodel.CompositeFortuneViewModel
@@ -184,132 +176,6 @@ private fun CompositeContent(
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.outline
         )
-    }
-}
-
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun MysticGuideCard(
-    bazi: com.xuanji.app.data.model.BaziFull,
-    fortune: com.xuanji.app.data.model.CompositeDailyFortune
-) {
-    val records by AppModule.testRecordRepository.records.collectAsStateWithLifecycle(initialValue = emptyList())
-    var mode by rememberSaveable { mutableStateOf("scholar") }
-    var topic by rememberSaveable { mutableStateOf("composite") }
-    val latestTest = records.maxByOrNull { it.date }
-    val guide = remember(mode, topic, bazi, fortune, latestTest) {
-        MysticGuideGenerator.generate(mode, topic, bazi, fortune, latestTest)
-    }
-    val accent by animateColorAsState(
-        targetValue = if (mode == "half") MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.primary,
-        animationSpec = tween(260),
-        label = "mysticAccent"
-    )
-
-    Card(Modifier.fillMaxWidth()) {
-        Column(
-            Modifier.fillMaxWidth().padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Row(
-                Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                val scholarAccent = MaterialTheme.colorScheme.primary
-                val halfAccent = MaterialTheme.colorScheme.tertiary
-                PersonaButton("玄学家", "心理按摩", mode == "scholar", scholarAccent, Modifier.weight(1f)) { mode = "scholar" }
-                PersonaButton("半仙", "浮夸吐槽", mode == "half", halfAccent, Modifier.weight(1f)) { mode = "half" }
-            }
-
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                MysticGuideGenerator.topicLabels().forEach { (key, label) ->
-                    Surface(
-                        onClick = { topic = key },
-                        shape = RoundedCornerShape(999.dp),
-                        color = if (topic == key) accent.copy(alpha = 0.20f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
-                    ) {
-                        Text(
-                            label,
-                            modifier = Modifier.padding(horizontal = 13.dp, vertical = 7.dp),
-                            style = MaterialTheme.typography.labelMedium,
-                            color = if (topic == key) accent else MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-            }
-
-            val readingShape = RoundedCornerShape(16.dp)
-            Surface(
-                Modifier.fillMaxWidth().background(
-                    Brush.linearGradient(
-                        listOf(accent.copy(alpha = 0.16f), Color.Transparent, accent.copy(alpha = 0.07f)),
-                        start = Offset.Zero,
-                        end = Offset.Infinite
-                    ),
-                    readingShape
-                ),
-                shape = readingShape,
-                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.16f)
-            ) {
-                Crossfade(targetState = guide, label = "mysticReading") { current ->
-                    Column(
-                        Modifier.fillMaxWidth().padding(14.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text("✦", style = MaterialTheme.typography.titleMedium, color = accent)
-                            Text(
-                                "${current.roleName} · ${current.headline}",
-                                modifier = Modifier.padding(start = 8.dp),
-                                style = MaterialTheme.typography.titleSmall,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                        }
-                        Text(
-                            current.body,
-                            style = MaterialTheme.typography.bodySmall,
-                            lineHeight = 22.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Text(
-                            current.signature,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = accent
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun PersonaButton(
-    title: String,
-    subtitle: String,
-    selected: Boolean,
-    accent: Color,
-    modifier: Modifier = Modifier,
-    onClick: () -> Unit
-) {
-    Surface(
-        modifier = modifier,
-        onClick = onClick,
-        shape = RoundedCornerShape(14.dp),
-        color = if (selected) accent.copy(alpha = 0.18f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.38f)
-    ) {
-        Column(
-            Modifier.fillMaxWidth().padding(vertical = 10.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(2.dp)
-        ) {
-            Text(title, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurface)
-            Text(
-                subtitle,
-                style = MaterialTheme.typography.labelSmall,
-                color = if (selected) accent else MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
     }
 }
 

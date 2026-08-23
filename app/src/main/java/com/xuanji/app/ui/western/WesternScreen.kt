@@ -28,6 +28,7 @@ import com.xuanji.app.di.AppModule
 import com.xuanji.app.domain.ZodiacCalculator
 import com.xuanji.app.ui.components.FortuneCard
 import com.xuanji.app.ui.components.InfoRow
+import com.xuanji.app.ui.components.MysticGuideCard
 import com.xuanji.app.ui.components.NatalWheelChart
 import com.xuanji.app.ui.components.PeriodToggleRow
 import com.xuanji.app.ui.components.ResultShare
@@ -60,9 +61,11 @@ fun WesternScreen() {
             is WesternUiState.Loading -> Text("正在推算星盘…")
             is WesternUiState.Empty -> Text("尚未设置出生信息，请先到「我的」填写。")
             is WesternUiState.Ready -> WesternContent(
+                bazi = s.bazi,
                 detail = s.detail,
                 fortune = s.fortune,
                 chart = s.chart,
+                composite = s.composite,
                 period = s.period,
                 onPeriodChange = viewModel::setPeriod
             )
@@ -104,14 +107,17 @@ private fun SignBlock(title: String, info: ZodiacCalculator.ZodiacInfo) {
 
 @Composable
 private fun WesternContent(
+    bazi: com.xuanji.app.data.model.BaziFull?,
     detail: ZodiacCalculator.WesternDetail,
     fortune: WesternDailyFortune,
     chart: ZodiacCalculator.NatalChart,
+    composite: com.xuanji.app.data.model.CompositeDailyFortune?,
     period: String,
     onPeriodChange: (String) -> Unit
 ) {
     val interp = ZodiacCalculator.interpretChart(chart)
     PeriodToggleRow(period, onPeriodChange)
+    if (bazi != null && composite != null) MysticGuideCard(bazi, composite)
     FortuneCard {
         SectionTitle("圆盘星盘")
         Spacer(Modifier.height(8.dp))

@@ -61,6 +61,7 @@ import com.xuanji.app.ui.components.ElementBalance
 import com.xuanji.app.ui.components.FortuneCard
 import com.xuanji.app.ui.components.HealthBodyAtlas
 import com.xuanji.app.ui.components.InfoRow
+import com.xuanji.app.ui.components.MysticGuideCard
 import com.xuanji.app.ui.components.PeriodToggleRow
 import com.xuanji.app.ui.components.PillarCard
 import com.xuanji.app.ui.components.ResultShare
@@ -111,6 +112,7 @@ fun EasternScreen() {
                 if (s.full.relations.isNotEmpty()) RelationsSection(s.full.relations)
                 ShenShaSection(s.full.shenSha)
                 ShenShaAtlasSection(s.full.shenSha)
+                s.composite?.let { MysticGuideCard(s.full, it) }
                 TodayFortuneSection(s.fortune, s.full.chart.favorableElements, s.period)
                 Text(
                     s.full.note,
