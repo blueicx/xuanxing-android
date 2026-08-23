@@ -109,6 +109,13 @@ fun ProfileScreen() {
     val province = locations.provinces.getOrNull(provinceIndex)
     val city = province?.cities?.getOrNull(cityIndex)
     val district = city?.districts?.getOrNull(districtIndex)
+    val missingProfileFields = listOfNotNull(
+        if (birthYear == null || birthMonth == null || birthDay == null) "日期" else null,
+        if (birthHour == null || birthMinute == null) "时间" else null,
+        if (province == null) "省份" else null,
+        if (city == null) "城市" else null,
+        if (district == null) "县（区）" else null
+    )
 
     // 日期/时间选择器需要具体初值，用合理占位（仅作为打开选择器时的起点，未保存前仍是空白）
     val pickerYear = birthYear ?: 2000
@@ -225,9 +232,17 @@ fun ProfileScreen() {
                 viewModel.save(y, m, d, h, min, selected, gender ?: "男")
                 Toast.makeText(context, context.getString(R.string.saved_toast), Toast.LENGTH_SHORT).show()
             },
+            enabled = missingProfileFields.isEmpty(),
             modifier = Modifier.fillMaxWidth()
         ) {
             Text("保存命盘")
+        }
+        if (missingProfileFields.isNotEmpty()) {
+            Text(
+                "还需填写：${missingProfileFields.joinToString(" / ")}",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
         FortuneCard {
             SectionTitle("隐私与数据")
