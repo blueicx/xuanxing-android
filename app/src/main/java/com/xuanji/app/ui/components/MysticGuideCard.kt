@@ -14,7 +14,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -72,7 +74,10 @@ fun MysticGuideCard(
     var pendingFollowUp by remember(guide) { mutableStateOf<String?>(null) }
     var pendingInteraction by remember(guide) { mutableStateOf<MysticInteractionOption?>(null) }
     var pendingHandoff by remember { mutableStateOf<String?>(null) }
+    var pendingCustom by remember(guide) { mutableStateOf<String?>(null) }
+    var customQuestion by remember(guide) { mutableStateOf("") }
     var interactionCount by remember(guide) { mutableStateOf(0) }
+    var customCount by remember(guide) { mutableStateOf(0) }
     val askCounts = remember(guide) { mutableStateMapOf<String, Int>() }
     var interactionRound by remember(guide) { mutableStateOf(0) }
     var selectedInteraction by remember(guide, interactionRound) { mutableStateOf<MysticInteractionOption?>(null) }
@@ -90,13 +95,28 @@ fun MysticGuideCard(
             guide.followUps.none { it.key == key } ||
             pendingFollowUp != null ||
             pendingInteraction != null ||
-            pendingHandoff != null
+            pendingHandoff != null ||
+            pendingCustom != null
         ) return
         pendingFollowUp = key
     }
 
+    fun submitCustom() {
+        if (pendingFollowUp != null || pendingInteraction != null || pendingHandoff != null || pendingCustom != null) return
+        val cleanQuestion = customQuestion.trim().take(60)
+        if (cleanQuestion.isEmpty()) return
+        pendingCustom = cleanQuestion
+        customQuestion = ""
+    }
+
     fun selectTopic(key: String) {
-        if (key == topic || pendingFollowUp != null || pendingInteraction != null || pendingHandoff != null) return
+        if (
+            key == topic ||
+            pendingFollowUp != null ||
+            pendingInteraction != null ||
+            pendingHandoff != null ||
+            pendingCustom != null
+        ) return
         val previousTopic = topic
         selectedInteraction = null
         pendingFollowUp = null
@@ -124,6 +144,29 @@ fun MysticGuideCard(
         )
         while (conversation.size > 5) conversation.removeAt(0)
         pendingHandoff = null
+    }
+
+    LaunchedEffect(pendingCustom, guide) {
+        val question = pendingCustom ?: return@LaunchedEffect
+        kotlinx.coroutines.delay(430)
+        conversation.add(
+            MysticTurn(
+                key = "custom-$customCount-${question.hashCode()}",
+                question = question,
+                answer = MysticGuideGenerator.customAnswer(
+                    mode,
+                    guide.topicKey,
+                    question,
+                    fortune,
+                    latestTest
+                ),
+                reaction = MysticGuideGenerator.customReaction(mode, guide.styleKey, question),
+                kind = "ask"
+            )
+        )
+        while (conversation.size > 5) conversation.removeAt(0)
+        customCount += 1
+        pendingCustom = null
     }
 
     LaunchedEffect(pendingInteraction) {
@@ -334,7 +377,12 @@ fun MysticGuideCard(
                             }
                         }
 
-                        if (pendingFollowUp != null || pendingInteraction != null || pendingHandoff != null) {
+                        if (
+                            pendingFollowUp != null ||
+                            pendingInteraction != null ||
+                            pendingHandoff != null ||
+                            pendingCustom != null
+                        ) {
                             Row(
                                 Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -382,6 +430,8 @@ fun MysticGuideCard(
                                         pendingFollowUp = null
                                         pendingInteraction = null
                                         pendingHandoff = null
+                                        pendingCustom = null
+                                        customQuestion = ""
                                     },
                                     color = Color.Transparent
                                 ) {
@@ -417,6 +467,31 @@ fun MysticGuideCard(
                                         }
                                     )
                                 }
+                            }
+                        }
+
+                        Row(
+                            Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            OutlinedTextField(
+                                value = customQuestion,
+                                onValueChange = { if (it.length <= 60) customQuestion = it },
+                                placeholder = { Text("问一句今天的事") },
+                                modifier = Modifier.weight(1f),
+                                singleLine = true,
+                                shape = RoundedCornerShape(14.dp)
+                            )
+                            OutlinedButton(
+                                onClick = ::submitCustom,
+                                enabled = customQuestion.isNotBlank() &&
+                                    pendingFollowUp == null &&
+                                    pendingInteraction == null &&
+                                    pendingHandoff == null &&
+                                    pendingCustom == null
+                            ) {
+                                Text("问")
                             }
                         }
 
@@ -480,9 +555,18 @@ fun MysticGuideCard(
                             )
                             Surface(
                                 onClick = {
-                                    selectedInteraction = null
-                                    pendingInteraction = null
-                                    interactionRound += 1
+                                    if (
+                                        pendingFollowUp != null ||
+                                        pendingInteraction != null ||
+                                        pendingHandoff != null ||
+                                        pendingCustom != null
+                                    ) {
+                                        // Keep the current game visible until its pending reply lands.
+                                    } else {
+                                        selectedInteraction = null
+                                        pendingInteraction = null
+                                        interactionRound += 1
+                                    }
                                 },
                                 color = Color.Transparent
                             ) {
@@ -504,7 +588,12 @@ fun MysticGuideCard(
                             interaction.options.forEach { option ->
                                 Surface(
                                     onClick = {
-                                        if (pendingFollowUp == null && pendingInteraction == null && pendingHandoff == null) {
+                                        if (
+                                            pendingFollowUp == null &&
+                                            pendingInteraction == null &&
+                                            pendingHandoff == null &&
+                                            pendingCustom == null
+                                        ) {
                                             selectedInteraction = option
                                             pendingInteraction = option
                                         }

@@ -469,6 +469,158 @@ object MysticGuideGenerator {
         }
     }
 
+    /** 自由提问先被“听见”；同一个人对同一句话的态度稳定，但不同问法不会都像模板。 */
+    fun customReaction(mode: String, styleKey: String, question: String): String {
+        val scholar = mode != "half"
+        val variant = (customPulse(question) % 2L).toInt()
+        return if (scholar) {
+            when (styleKey) {
+                "archive" -> if (variant == 0) "我把这句话放在这一页旁边看。" else "先留住你的原话，再对照盘面。"
+                "harbor" -> if (variant == 0) "这句话我接住了；我们慢慢拆。" else "嗯，这里可以不用急着要答案。"
+                else -> if (variant == 0) "问题收到了；罗盘只按这一句转。" else "先把范围收窄，再看它指向哪里。"
+            }
+        } else {
+            when (styleKey) {
+                "herald" -> if (variant == 0) "锣鼓轻一点，这句我听清了！" else "好胆量！当面问得这么直接！"
+                "alley" -> if (variant == 0) "哟，这话够直；大碗茶先放下。" else "行，咱不绕弯子，直接看这摊。"
+                else -> if (variant == 0) "工单已登记！实习生不弄丢这句。" else "收到收到！法术加载中，态度拉满！"
+            }
+        }
+    }
+
+    /** 自由提问仍回到真实盘面：分数、强弱项、幸运开关和注意事项都是已有计算结果。 */
+    fun customAnswer(
+        mode: String,
+        topicKey: String,
+        question: String,
+        fortune: CompositeDailyFortune,
+        test: TestRecord? = null
+    ): String {
+        val label = topics[topicKey] ?: "综合"
+        val focus = if (topicKey == "test") {
+            fortune.dimensions.maxByOrNull { it.score } ?: fortune.dimensions.first()
+        } else {
+            fortune.dimensions.firstOrNull { it.key == topicKey }
+                ?: fortune.dimensions.firstOrNull { it.key == "emotion" && topicKey == "love" }
+                ?: fortune.dimensions.first()
+        }
+        val high = fortune.dimensions.maxByOrNull { it.score } ?: focus
+        val low = fortune.dimensions.minByOrNull { it.score } ?: focus
+        val intent = customIntent(question)
+        val scholar = mode != "half"
+        val cleanCautions = fortune.cautions.replace("\n", " ")
+        return when (intent) {
+            "mood" -> if (scholar) {
+                "今天综合 ${fortune.overallScore} 分，最需要照看的是「${low.label}」 ${low.score} 分。" +
+                    "先把睡眠、吃饭和一件最小的事安排好；情绪紧的时候，判断可以晚一点再做。"
+            } else {
+                "综合 ${fortune.overallScore} 分，「${low.label}」只有 ${low.score} 分，仙界都不催你现在硬撑！" +
+                    "先喝口热的、歇十分钟，再把最麻烦的事切成一小块。"
+            }
+            "love" -> {
+                val dim = fortune.dimensions.firstOrNull { it.key == if (question.contains("桃花")) "peach" else "emotion" } ?: focus
+                if (scholar) {
+                    "「${dim.label}」当前 ${dim.score} 分。比起猜结果，今天更适合把想说的一件事说清楚；" +
+                        "关系里的安全感来自具体表达，不是反复试探。"
+                } else {
+                    "「${dim.label}」 ${dim.score} 分！别把话筒扔给对方猜，想要什么直接讲；" +
+                        "暧昧让神仙算账都费劲，直球省电！"
+                }
+            }
+            "wealth" -> {
+                val dim = fortune.dimensions.firstOrNull { it.key == "wealth" } ?: focus
+                if (scholar) {
+                    "「财富」 ${dim.score} 分。今天优先守住必要支出；若要尝试，金额小到失败也不影响生活。" +
+                        "幸运色「${fortune.luckyColor}」可以当作提醒自己冷静消费的开关。"
+                } else {
+                    "财库信号 ${dim.score} 分！小额快乐可以投喂，大额冲动先冷冻三天；" +
+                        "往「${fortune.luckyDirection}」挪一挪，不如先打开记账本！"
+                }
+            }
+            "career" -> {
+                val dim = fortune.dimensions.firstOrNull { it.key == "career" } ?: focus
+                if (scholar) {
+                    "「事业」 ${dim.score} 分。今天挑一件最重要的事推进；沟通时把需求、时间和需要的支持说清楚，" +
+                        "比同时开五个头更能建立可信度。"
+                } else {
+                    "事业炉火 ${dim.score} 分！主打一招，别十八般武艺一起抡；" +
+                        "把关键话说漂亮，胜过加班到冒烟。"
+                }
+            }
+            "study" -> {
+                val dim = fortune.dimensions.firstOrNull { it.key == "study" } ?: focus
+                if (scholar) {
+                    "「学习」 ${dim.score} 分。把它切成二十五分钟的小段：先回顾一次，再处理最难的一块；" +
+                        "完成比完美更容易带走停滞感。"
+                } else {
+                    "文昌香火 ${dim.score} 分！番茄钟启动，先把最烦的那块啃一小口；" +
+                        "成就感会自动续杯，别靠焦虑续命。"
+                }
+            }
+            "health" -> {
+                val dim = fortune.dimensions.firstOrNull { it.key == "health" } ?: focus
+                if (scholar) {
+                    "「健康」 ${dim.score} 分。优先睡眠、饮食和活动量；身体信号值得认真对待，" +
+                        "持续不舒服时请优先休息或寻求专业帮助。"
+                } else {
+                    "健康炉温 ${dim.score} 分！早点躺、好好吃、动一动；" +
+                        "别和沙发签永久契约，真不舒服也别硬撑成苦瓜。"
+                }
+            }
+            "why" -> if (scholar) {
+                "你问的这句落在「${label}」 ${focus.score} 分；全天综合 ${fortune.overallScore} 分。" +
+                    "最强是「${high.label}」 ${high.score}，最需照看是「${low.label}」 ${low.score}。这是现有盘面算法的参照，不是命运判决。"
+            } else {
+                "别急，本半仙把账摊开：「${label}」 ${focus.score} 分，综合 ${fortune.overallScore} 分！" +
+                    "「${high.label}」举火把，「${low.label}」坐轿子；数字来自既有算法，不是拍脑袋。"
+            }
+            "care" -> careAnswer(scholar, low.label, cleanCautions)
+            "outcome" -> if (scholar) {
+                "我不替未来盖章。当前能看见的是：「${high.label}」 ${high.score} 可用，「${low.label}」 ${low.score} 要照看。" +
+                    "把可控的一步做完，结果会比空等更清楚。"
+            } else {
+                "天机不打包票，打包票的都是卖符的！不过「${high.label}」 ${high.score} 在线，" +
+                    "「${low.label}」 ${low.score} 别硬闯；先做小事，再谈成不成。"
+            }
+            "action" -> actionAnswer(scholar, high.label, low.label, fortune.luckyColor, fortune.luckyDirection)
+            else -> topicAnswer(
+                scholar,
+                topicKey,
+                label,
+                focus.score,
+                high.label,
+                low.label,
+                test?.testName.orEmpty()
+            )
+        }
+    }
+
+    private fun customIntent(question: String): String {
+        val q = question.trim().lowercase()
+        return when {
+            listOf("焦虑", "压力", "害怕", "担心", "难过", "崩溃", "很累", "内耗").any { q.contains(it) } -> "mood"
+            listOf("感情", "恋爱", "对象", "复合", "暗恋", "表白", "桃花", "分手", "他", "她").any { q.contains(it) } -> "love"
+            listOf("财", "钱", "赚钱", "投资", "生意", "消费", "钱包").any { q.contains(it) } -> "wealth"
+            listOf("工作", "上班", "事业", "老板", "同事", "面试", "升职", "跳槽").any { q.contains(it) } -> "career"
+            listOf("学习", "考试", "复习", "作业", "论文", "背", "题").any { q.contains(it) } -> "study"
+            listOf("健康", "身体", "睡觉", "睡眠", "失眠", "生病", "累").any { q.contains(it) } -> "health"
+            listOf("为什么", "怎么来", "怎么算", "依据", "来源", "多少分").any { q.contains(it) } -> "why"
+            listOf("留意", "注意", "风险", "小心", "避免", "坑").any { q.contains(it) } -> "care"
+            listOf("能不能", "会不会", "可不可以", "行不行", "成不成", "该不该").any { q.contains(it) } -> "outcome"
+            listOf("什么时候", "几点", "哪天", "现在适合", "今天适合").any { q.contains(it) } -> "action"
+            listOf("怎么做", "怎么办", "如何", "建议", "行动", "开始", "计划", "破", "解").any { q.contains(it) } -> "action"
+            else -> "topic"
+        }
+    }
+
+    private fun customPulse(value: String): Long {
+        var hash = 5381L
+        for (char in value.trim()) {
+            hash = (hash * 33L + char.code) % 2147483647L
+        }
+        return hash
+    }
+
     /** DJB2 取样；两端用同一字符码与质数模，避免各端人设漂移。 */
     private fun presenceSeed(topicKey: String, fortune: CompositeDailyFortune): Long {
         val source = "${canonicalDateKey(fortune.dateKey)}|$topicKey|${fortune.overallScore}|${fortune.luckyNumber}"
