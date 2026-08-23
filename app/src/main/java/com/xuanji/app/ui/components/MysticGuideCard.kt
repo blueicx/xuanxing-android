@@ -1,5 +1,6 @@
 package com.xuanji.app.ui.components
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
@@ -17,6 +18,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -34,6 +37,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.xuanji.app.data.model.BaziFull
 import com.xuanji.app.data.model.CompositeDailyFortune
 import com.xuanji.app.di.AppModule
+import com.xuanji.app.domain.MysticInteraction
+import com.xuanji.app.domain.MysticInteractionOption
 import com.xuanji.app.domain.MysticGuideGenerator
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -43,14 +48,37 @@ fun MysticGuideCard(
     fortune: CompositeDailyFortune
 ) {
     val records by AppModule.testRecordRepository.records.collectAsStateWithLifecycle(initialValue = emptyList())
-    var mode by rememberSaveable { mutableStateOf("scholar") }
     var topic by rememberSaveable { mutableStateOf("composite") }
+    var mode by remember(fortune.dateKey, fortune.overallScore, fortune.luckyNumber, topic) {
+        mutableStateOf(MysticGuideGenerator.suggestedMode(topic, fortune))
+    }
     val latestTest = records.maxByOrNull { it.date }
     val guide = remember(mode, topic, bazi, fortune, latestTest) {
         MysticGuideGenerator.generate(mode, topic, bazi, fortune, latestTest)
     }
-    var selectedFollowUp by remember(guide) {
-        mutableStateOf(guide.followUps.firstOrNull()?.key.orEmpty())
+    var selectedFollowUp by remember(guide) { mutableStateOf("") }
+    var evidenceOpen by remember(guide) { mutableStateOf(false) }
+    val conversation = remember(guide) { mutableStateListOf<String>() }
+    var arrivalVisible by remember(guide) { mutableStateOf(false) }
+    var interactionRound by remember(guide) { mutableStateOf(0) }
+    var selectedInteraction by remember(guide, interactionRound) { mutableStateOf<MysticInteractionOption?>(null) }
+    val interaction = remember(mode, topic, fortune, interactionRound) {
+        MysticGuideGenerator.interaction(mode, topic, fortune, interactionRound)
+    }
+
+    LaunchedEffect(guide) {
+        kotlinx.coroutines.delay(180)
+        arrivalVisible = true
+    }
+
+    fun selectFollowUp(key: String) {
+        val branchIndex = conversation.indexOf(key)
+        if (branchIndex == conversation.lastIndex && key == selectedFollowUp) return
+        val kept = if (branchIndex >= 0) conversation.take(branchIndex) else conversation.toList()
+        selectedFollowUp = key
+        conversation.clear()
+        conversation.addAll(kept.takeLast(3))
+        conversation.add(key)
     }
     val accent by animateColorAsState(
         targetValue = if (mode == "half") MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.primary,
@@ -63,6 +91,67 @@ fun MysticGuideCard(
             Modifier.fillMaxWidth().padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(999.dp),
+                    color = accent.copy(alpha = 0.18f)
+                ) {
+                    Text(
+                        if (mode == "half") "半" else "玄",
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = accent
+                    )
+                }
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        if (mode == "half") "半仙" else "玄学家",
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        if (mode == "half") "浮夸演绎 · 仅供娱乐" else "只讲盘面 · 慢慢说",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
+            AnimatedVisibility(visible = arrivalVisible) {
+                Surface(
+                    Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(14.dp),
+                    color = accent.copy(alpha = 0.12f)
+                ) {
+                    Row(
+                        Modifier.fillMaxWidth().padding(12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalAlignment = Alignment.Top
+                    ) {
+                        Text("✦", style = MaterialTheme.typography.titleSmall, color = accent)
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text(
+                                "${guide.roleName}刚好过来",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                guide.arrival,
+                                style = MaterialTheme.typography.bodySmall,
+                                lineHeight = 20.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+            }
+
             Row(
                 Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -123,26 +212,61 @@ fun MysticGuideCard(
                             lineHeight = 22.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
-                        Surface(
-                            Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(10.dp),
-                            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.42f)
-                        ) {
-                            Column(
-                                Modifier.fillMaxWidth().padding(10.dp),
-                                verticalArrangement = Arrangement.spacedBy(5.dp)
+                        Surface(onClick = { evidenceOpen = !evidenceOpen }, color = Color.Transparent) {
+                            Text(
+                                if (evidenceOpen) "收起盘面依据" else "展开盘面依据",
+                                modifier = Modifier.padding(vertical = 6.dp),
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = accent
+                            )
+                        }
+
+                        AnimatedVisibility(visible = evidenceOpen) {
+                            Surface(
+                                Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(10.dp),
+                                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.42f)
                             ) {
-                                Text(
-                                    "盘面依据",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = accent
-                                )
-                                current.evidence.forEach { fact ->
+                                Column(
+                                    Modifier.fillMaxWidth().padding(10.dp),
+                                    verticalArrangement = Arrangement.spacedBy(5.dp)
+                                ) {
+                                    current.evidence.forEach { fact ->
+                                        Text(
+                                            fact,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            lineHeight = 19.sp,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        Row(
+                            Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                "继续问",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            if (conversation.isNotEmpty()) {
+                                Surface(
+                                    onClick = {
+                                        conversation.clear()
+                                        selectedFollowUp = ""
+                                    },
+                                    color = Color.Transparent
+                                ) {
                                     Text(
-                                        fact,
-                                        style = MaterialTheme.typography.bodySmall,
-                                        lineHeight = 19.sp,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        "重开对话",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = accent
                                     )
                                 }
                             }
@@ -151,9 +275,9 @@ fun MysticGuideCard(
                         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             current.followUps.forEach { item ->
                                 Surface(
-                                    onClick = { selectedFollowUp = item.key },
+                                    onClick = { selectFollowUp(item.key) },
                                     shape = RoundedCornerShape(999.dp),
-                                    color = if (selectedFollowUp == item.key) {
+                                    color = if (conversation.lastOrNull() == item.key) {
                                         accent
                                     } else {
                                         MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.48f)
@@ -163,27 +287,120 @@ fun MysticGuideCard(
                                         item.question,
                                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
                                         style = MaterialTheme.typography.labelMedium,
-                                        color = if (selectedFollowUp == item.key) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
+                                        color = if (conversation.lastOrNull() == item.key) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 }
                             }
                         }
 
-                        current.followUps.firstOrNull { it.key == selectedFollowUp }?.let { item ->
-                            Surface(
+                        if (conversation.isNotEmpty()) {
+                            Column(
                                 Modifier.fillMaxWidth(),
-                                shape = RoundedCornerShape(10.dp),
-                                color = accent.copy(alpha = 0.16f)
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                conversation.forEach { key ->
+                                    current.followUps.firstOrNull { it.key == key }?.let { item ->
+                                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                                            Surface(
+                                                shape = RoundedCornerShape(14.dp),
+                                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.38f)
+                                            ) {
+                                                Text(
+                                                    item.question,
+                                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = MaterialTheme.colorScheme.onSurface
+                                                )
+                                            }
+                                        }
+                                        Surface(
+                                            shape = RoundedCornerShape(14.dp),
+                                            color = accent.copy(alpha = 0.16f)
+                                        ) {
+                                            Text(
+                                                item.answer,
+                                                modifier = Modifier.padding(12.dp),
+                                                style = MaterialTheme.typography.bodySmall,
+                                                lineHeight = 21.sp,
+                                                color = MaterialTheme.colorScheme.onSurface
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        Row(
+                            Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                "互动小游戏",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Surface(
+                                onClick = {
+                                    selectedInteraction = null
+                                    interactionRound += 1
+                                },
+                                color = Color.Transparent
                             ) {
                                 Text(
-                                    item.answer,
-                                    modifier = Modifier.fillMaxWidth().padding(10.dp),
+                                    "再来一局",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = accent
+                                )
+                            }
+                        }
+                        Text(
+                            "${interaction.title} · ${interaction.description}",
+                            style = MaterialTheme.typography.bodySmall,
+                            lineHeight = 20.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            interaction.options.forEach { option ->
+                                Surface(
+                                    onClick = { selectedInteraction = option },
+                                    shape = RoundedCornerShape(999.dp),
+                                    color = if (selectedInteraction == option) {
+                                        accent
+                                    } else {
+                                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.48f)
+                                    }
+                                ) {
+                                    Text(
+                                        option.label,
+                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = if (selectedInteraction == option) {
+                                            Color.White
+                                        } else {
+                                            MaterialTheme.colorScheme.onSurfaceVariant
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                        AnimatedVisibility(visible = selectedInteraction != null) {
+                            Surface(
+                                Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(14.dp),
+                                color = accent.copy(alpha = 0.14f)
+                            ) {
+                                Text(
+                                    selectedInteraction?.feedback.orEmpty(),
+                                    modifier = Modifier.padding(12.dp),
                                     style = MaterialTheme.typography.bodySmall,
                                     lineHeight = 21.sp,
                                     color = MaterialTheme.colorScheme.onSurface
                                 )
                             }
                         }
+
                         Text(
                             current.signature,
                             style = MaterialTheme.typography.labelSmall,

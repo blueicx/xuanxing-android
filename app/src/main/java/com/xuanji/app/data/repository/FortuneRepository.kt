@@ -18,6 +18,7 @@ import com.xuanji.app.domain.CompositeFortuneGenerator
 import com.xuanji.app.domain.EasternFortuneGenerator
 import com.xuanji.app.domain.WesternFortuneGenerator
 import com.xuanji.app.domain.ZodiacCalculator
+import com.xuanji.app.domain.divination.TodayOracle
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -41,6 +42,7 @@ class FortuneRepository(private val context: Context) {
     private val gson = Gson()
     private val profileKey = stringPreferencesKey("user_profile")
     private val dailyReminderKey = booleanPreferencesKey("daily_reminder_on")
+    private val todayOracleKey = stringPreferencesKey("today_oracle_cache")
 
     /** 后台作用域：命盘重算放到 Default 调度器，避免主线程卡顿导致切换转场阻塞。
      *  挂 CoroutineExceptionHandler，任何命盘计算异常都只记日志，绝不杀进程。 */
@@ -96,6 +98,23 @@ class FortuneRepository(private val context: Context) {
 
     suspend fun setDailyReminderOn(enabled: Boolean) {
         context.dataStore.edit { it[dailyReminderKey] = enabled }
+    }
+
+    /** 今日签当天首抽固化；跨天重置，手动彩蛋不写回这里。 */
+    suspend fun getOrDrawTodayOracle(date: LocalDate): TodayOracle.OracleResult {
+        val dayKey = dateKey(date)
+        context.dataStore.data.map { it[todayOracleKey] }.first()?.let { json ->
+            runCatching { gson.fromJson(json, TodayOracleCache::class.java) }
+                .getOrNull()
+                ?.takeIf { it.dateKey == dayKey }
+                ?.let { return it.result }
+        }
+
+        val result = TodayOracle.randomDraw()
+        context.dataStore.edit {
+            it[todayOracleKey] = gson.toJson(TodayOracleCache(dayKey, result))
+        }
+        return result
     }
 
     suspend fun clearUserProfile() {
@@ -191,4 +210,9 @@ class FortuneRepository(private val context: Context) {
     private fun chartFingerprint(chart: BaziChart): String = chart.display.replace(" ", "_")
 
     private fun dateKey(date: LocalDate): String = date.format(DateTimeFormatter.ISO_LOCAL_DATE)
+
+    private data class TodayOracleCache(
+        val dateKey: String,
+        val result: TodayOracle.OracleResult
+    )
 }

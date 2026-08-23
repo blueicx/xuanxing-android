@@ -13,10 +13,12 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.xuanji.app.di.AppModule
 import com.xuanji.app.domain.divination.TodayOracle
 import com.xuanji.app.ui.components.FortuneCard
 import com.xuanji.app.ui.components.InfoRow
@@ -27,9 +29,12 @@ import java.time.LocalDate
 @Composable
 fun TodayOracleScreen() {
     val today = LocalDate.now()
-    val result = remember(today) { TodayOracle.generate(today) }
+    val dailyState = produceState<TodayOracle.OracleResult?>(initialValue = null, today) {
+        value = AppModule.repository.getOrDrawTodayOracle(today)
+    }
     val randomResult = remember { mutableStateOf<TodayOracle.OracleResult?>(null) }
-    val shown = randomResult.value ?: result
+    val taunt = remember { mutableStateOf("") }
+    val shown = dailyState.value
 
     Column(
         Modifier
@@ -43,32 +48,49 @@ fun TodayOracleScreen() {
         FortuneCard {
             SectionTitle("今日灵签 · ${today}")
             Spacer(Modifier.height(8.dp))
-            Text(shown.level, style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.secondary)
-            Spacer(Modifier.height(8.dp))
-            Text("「${shown.poem}」", style = MaterialTheme.typography.titleMedium)
-            Spacer(Modifier.height(12.dp))
-            InfoRow("幸运数字", "${shown.luckyNumber}")
-            InfoRow("幸运色", shown.luckyColor)
-            InfoRow("宜", shown.good)
-            InfoRow("忌", shown.avoid)
-            Spacer(Modifier.height(8.dp))
-            Text(shown.advice, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-
-        Button(
-            onClick = { randomResult.value = TodayOracle.randomDraw() },
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text("随机重抽一签")
-        }
-        if (randomResult.value != null) {
-            Button(
-                onClick = { randomResult.value = null },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("恢复今日签")
+            if (shown == null) {
+                Text("正在展开今日签……", style = MaterialTheme.typography.bodyMedium)
+            } else {
+                Text(shown.level, style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.secondary)
+                Spacer(Modifier.height(8.dp))
+                Text("「${shown.poem}」", style = MaterialTheme.typography.titleMedium)
+                Spacer(Modifier.height(12.dp))
+                InfoRow("幸运数字", "${shown.luckyNumber}")
+                InfoRow("幸运色", shown.luckyColor)
+                InfoRow("宜", shown.good)
+                InfoRow("忌", shown.avoid)
+                Spacer(Modifier.height(8.dp))
+                Text(shown.advice, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
+
+        if (shown != null) {
+            Button(
+                onClick = {
+                    randomResult.value = TodayOracle.randomDraw()
+                    taunt.value = TodayOracle.manualTaunt()
+                },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("手动彩蛋抽一签 · 不改今日")
+            }
+        }
+
+        randomResult.value?.let { extra ->
+            FortuneCard {
+                SectionTitle("手动彩蛋 · 不改今日签")
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    "半仙：${taunt.value}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.tertiary
+                )
+                Spacer(Modifier.height(12.dp))
+                Text(extra.level, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.secondary)
+                Text("「${extra.poem}」", style = MaterialTheme.typography.bodyMedium)
+            }
+        }
+
         SystemExplanation("today")
     }
 }

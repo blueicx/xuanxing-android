@@ -3,15 +3,14 @@ package com.xuanji.app.domain
 import com.xuanji.app.data.model.BaziFull
 import com.xuanji.app.data.model.CompositeDailyFortune
 import com.xuanji.app.data.model.TestRecord
-import com.xuanji.app.domain.divination.TodayOracle
 import kotlin.math.roundToInt
-import java.time.LocalDate
 
 data class MysticGuide(
     val mode: String,
     val topicKey: String,
     val roleName: String,
     val signature: String,
+    val arrival: String,
     val headline: String,
     val body: String,
     val evidence: List<String> = emptyList(),
@@ -22,6 +21,17 @@ data class MysticFollowUp(
     val key: String,
     val question: String,
     val answer: String
+)
+
+data class MysticInteractionOption(
+    val label: String,
+    val feedback: String
+)
+
+data class MysticInteraction(
+    val title: String,
+    val description: String,
+    val options: List<MysticInteractionOption>
 )
 
 /**
@@ -40,6 +50,12 @@ object MysticGuideGenerator {
     )
 
     fun topicLabels(): List<Pair<String, String>> = topics.map { it.key to it.value }
+
+    /** 同一天、同一话题、同一分数稳定“随机”；但好运坏运不预设谁来接话。 */
+    fun suggestedMode(topicKey: String, fortune: CompositeDailyFortune): String {
+        val seed = presenceSeed(topicKey, fortune)
+        return if (seed % 2L == 0L) "scholar" else "half"
+    }
 
     fun generate(
         mode: String,
@@ -75,7 +91,6 @@ object MysticGuideGenerator {
         }
         val high = fortune.dimensions.maxByOrNull { it.score } ?: focus
         val low = fortune.dimensions.minByOrNull { it.score } ?: focus
-        val oracle = TodayOracle.generate(LocalDate.now())
         val facts = buildList {
             add(
                 "东方盘：${bazi.chart.dayMaster.chinese}（${elementName(bazi.chart.dayMasterElement)}），" +
@@ -83,11 +98,12 @@ object MysticGuideGenerator {
             )
             add("西方盘：太阳${fortune.western.sign}，今日整体 ${fortune.western.overallScore} 分。")
             add("综合盘：${fortune.overallScore} 分；最强是${high.label} ${high.score}，最需照看是${low.label} ${low.score}。")
-            add("今日灵签：${oracle.level}·「${oracle.poem}」；宜${oracle.good}，忌${oracle.avoid}。")
+            add("今日开关：幸运数字 ${fortune.luckyNumber}，幸运色${fortune.luckyColor}，吉利方位${fortune.luckyDirection}。")
             if (!divinationSummary.isNullOrBlank()) add("占卜参照：${divinationSummary.trim()}")
             if (test != null) add("最近测试：${test.testName} → ${test.resultCode}（${test.resultName}）")
         }
         val scholar = mode != "half"
+        val arrival = arrivalLine(scholar, fortune.overallScore, presenceSeed(topicKey, fortune))
         val headline = if (scholar) {
             scholarHeadline(focus.score, label)
         } else {
@@ -143,11 +159,155 @@ object MysticGuideGenerator {
             topicKey = topicKey,
             roleName = if (scholar) "玄学家" else "半仙",
             signature = if (scholar) "只讲盘面依据 · 仅供娱乐参考" else "浮夸但讲逻辑 · 仅供娱乐参考",
+            arrival = arrival,
             headline = headline,
             body = body,
             evidence = facts,
             followUps = followUps
         )
+    }
+
+    /** 小互动也走稳定取样；“再来一局”通过 round 换到下一个可选局面。 */
+    fun interaction(
+        mode: String,
+        topicKey: String,
+        fortune: CompositeDailyFortune,
+        round: Int
+    ): MysticInteraction {
+        val scholar = mode != "half"
+        val games = if (scholar) {
+            listOf(
+                MysticInteraction(
+                    title = "六十秒校准",
+                    description = "先别改命盘，只给接下来一小时定一个方向。",
+                    options = listOf(
+                        MysticInteractionOption("写下最重要的一件", "好，把它放在视线里；其他事先排队。"),
+                        MysticInteractionOption("把干扰挪远一点", "对，给注意力留一条干净的通道。"),
+                        MysticInteractionOption("做三分钟热身", "很好，启动比完美更能带走停滞感。")
+                    )
+                ),
+                MysticInteraction(
+                    title = "可控分拣",
+                    description = "把心里盘旋的事放进三只匣子。",
+                    options = listOf(
+                        MysticInteractionOption("现在就能做", "这只匣子最轻，先从这里拿回掌控感。"),
+                        MysticInteractionOption("今晚再处理", "可以，给它一个具体时间就不算悬着。"),
+                        MysticInteractionOption("其实可以先放下", "承认不必做，也是一种很干净的整理。")
+                    )
+                ),
+                MysticInteraction(
+                    title = "最小一步",
+                    description = "为最需要照看的地方挑一件小事。",
+                    options = listOf(
+                        MysticInteractionOption("十分钟整理", "十分钟后停下即可；小承诺更容易守住。"),
+                        MysticInteractionOption("说一句真话", "表达清楚需求，关系里的雾会散掉一些。"),
+                        MysticInteractionOption("先休息一下", "低电量时，休息不是偷懒，是校准。")
+                    )
+                )
+            )
+        } else {
+            listOf(
+                MysticInteraction(
+                    title = "仙家三宝",
+                    description = "本半仙打开云柜，你只能摸一样！",
+                    options = listOf(
+                        MysticInteractionOption("摸锦囊", "锦囊里没有天机，只有一句话：先把最难的事啃一小口。"),
+                        MysticInteractionOption("摇小铃铛", "叮！这是提醒信号，不是催命符；该问就去问。"),
+                        MysticInteractionOption("抱云朵枕", "抱紧了。软一点没关系，今天允许你边回血边推进。")
+                    )
+                ),
+                MysticInteraction(
+                    title = "天庭弹幕",
+                    description = "选一条弹幕挂在你头顶护体。",
+                    options = listOf(
+                        MysticInteractionOption("稳住，能赢", "弹幕已置顶！但赢的定义由你来定，不用硬撑给别人看。"),
+                        MysticInteractionOption("退一步不丢人", "这条弹幕很贵。绕路不是输，是聪明的神仙都会用的导航。"),
+                        MysticInteractionOption("先吃口热的", "天庭认证！胃暖了，脑子的仙气才会通。")
+                    )
+                ),
+                MysticInteraction(
+                    title = "云朵点名",
+                    description = "点一位仙官来值班。",
+                    options = listOf(
+                        MysticInteractionOption("财神候场", "他只管机会，不管冲动账单；小额清醒花，别让他打瞌睡。"),
+                        MysticInteractionOption("月老探头", "他递来的不是红线，是话筒：把想要什么说清楚。"),
+                        MysticInteractionOption("太白记笔记", "老头子写下四个字：少开五个头。专一比热闹灵光。")
+                    )
+                )
+            )
+        }
+        val seed = interactionSeed(mode, topicKey, fortune, round)
+        return games[((seed / 19L) % games.size).toInt()]
+    }
+
+    /** DJB2 取样；两端用同一字符码与质数模，避免各端人设漂移。 */
+    private fun presenceSeed(topicKey: String, fortune: CompositeDailyFortune): Long {
+        val source = "${canonicalDateKey(fortune.dateKey)}|$topicKey|${fortune.overallScore}|${fortune.luckyNumber}"
+        var hash = 5381L
+        for (char in source) {
+            hash = (hash * 33L + char.code) % 2147483647L
+        }
+        return hash
+    }
+
+    private fun interactionSeed(
+        mode: String,
+        topicKey: String,
+        fortune: CompositeDailyFortune,
+        round: Int
+    ): Long {
+        val safeRound = round.coerceAtLeast(0)
+        val source = "${canonicalDateKey(fortune.dateKey)}|$mode|$topicKey|${fortune.overallScore}|$safeRound"
+        var hash = 52711L
+        for (char in source) {
+            hash = (hash * 37L + char.code) % 2147483647L
+        }
+        return hash
+    }
+
+    private fun canonicalDateKey(value: String): String {
+        val parts = value.split("-")
+        if (parts.size != 3) return value
+        val year = parts[0].toIntOrNull() ?: return value
+        val month = parts[1].toIntOrNull() ?: return value
+        val day = parts[2].toIntOrNull() ?: return value
+        return "$year-$month-$day"
+    }
+
+    private fun arrivalLine(scholar: Boolean, score: Int, seed: Long): String {
+        val lines = when {
+            scholar && score >= 65 -> listOf(
+                "我刚看完这页盘面。数不错，你可以少怀疑自己一点。",
+                "路过看见这个分，先坐下来替你说一句：它值得高兴。",
+                "今天这份势能是真的，不过别急着把它一天用完。"
+            )
+            scholar && score < 45 -> listOf(
+                "我在旁边看了一会儿。先别骂自己，这只是提醒，不是结论。",
+                "低分的意思是该收着走，不是你不行的证据。",
+                "我把盘面又核了一遍。慢一点，先把最要紧的一件事照顾好。"
+            )
+            scholar -> listOf(
+                "我刚好经过，看了一眼。平稳也是一种能继续走的状态。",
+                "不用逼它开花，今天的节奏适合把细节捋顺。",
+                "我在这里陪你看一会儿，有疑问就慢慢问。"
+            )
+            score >= 65 -> listOf(
+                "哟，这么体面？看来本半仙准备的符水要放凉了。",
+                "行啊你，这排面都敢摆出来；别得意，本半仙还盯着呢。",
+                "啧，好运用得挺熟练啊，记得留一点明天阴阳我。"
+            )
+            score < 45 -> listOf(
+                "咳，这盘面有点害羞。笑什么，本半仙又不是来收你加班费的。",
+                "别看我锣敲得响，今天只准你退三步，不准你认输。",
+                "这信号确实闹脾气了；听半仙一句，先躺平回血再说。"
+            )
+            else -> listOf(
+                "本半仙掐指一算：不惊不喜，适合把琐事一个个收拾掉。",
+                "温吞仙汤一碗，喝了不惊艳，但至少不会烫嘴。",
+                "我路过闻了闻，今天没有大雷，也没有免费馅饼。"
+            )
+        }
+        return lines[((seed / 11L) % lines.size).toInt()]
     }
 
     private fun scholarHeadline(score: Int, label: String): String = when {
