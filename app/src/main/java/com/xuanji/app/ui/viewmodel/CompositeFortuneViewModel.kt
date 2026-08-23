@@ -2,6 +2,7 @@ package com.xuanji.app.ui.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.xuanji.app.data.model.BaziFull
 import com.xuanji.app.data.model.CompositeDailyFortune
 import com.xuanji.app.data.repository.FortuneRepository
 import com.xuanji.app.domain.ZodiacCalculator
@@ -16,7 +17,11 @@ import java.time.LocalDate
 sealed interface CompositeUiState {
     data object Loading : CompositeUiState
     data object Empty : CompositeUiState
-    data class Ready(val fortune: CompositeDailyFortune, val period: String = "day") : CompositeUiState
+    data class Ready(
+        val bazi: BaziFull,
+        val fortune: CompositeDailyFortune,
+        val period: String = "day"
+    ) : CompositeUiState
 }
 
 class CompositeFortuneViewModel(private val repository: FortuneRepository) : ViewModel() {
@@ -34,6 +39,7 @@ class CompositeFortuneViewModel(private val repository: FortuneRepository) : Vie
                     _uiState.value = CompositeUiState.Empty
                 } else {
                     _uiState.value = CompositeUiState.Ready(
+                        bazi,
                         repository.getCompositeFortune(bazi.chart, ZodiacCalculator.detailFromChart(chart).sun, LocalDate.now(), currentPeriod),
                         currentPeriod
                     )
@@ -50,7 +56,7 @@ class CompositeFortuneViewModel(private val repository: FortuneRepository) : Vie
             val chart = repository.natalChartFlow.value
             if (bazi != null && chart != null) {
                 val composite = repository.getCompositeFortune(bazi.chart, ZodiacCalculator.detailFromChart(chart).sun, LocalDate.now(), period)
-                _uiState.value = CompositeUiState.Ready(composite, period)
+                _uiState.value = CompositeUiState.Ready(bazi, composite, period)
             }
         }
     }

@@ -1,8 +1,13 @@
 package com.xuanji.app.ui.eastern
 
+import android.graphics.Paint
+import android.graphics.Typeface
 import androidx.compose.foundation.background
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.border
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -21,14 +26,23 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.xuanji.app.data.model.BaziConclusion
 import com.xuanji.app.data.model.BaziFull
+import com.xuanji.app.data.model.Branch
 import com.xuanji.app.data.model.BranchRelation
 import com.xuanji.app.data.model.DaYun
 import com.xuanji.app.data.model.Element
@@ -41,6 +55,7 @@ import com.xuanji.app.data.model.TenGodItem
 import com.xuanji.app.data.model.YongJi
 import com.xuanji.app.di.AppModule
 import com.xuanji.app.domain.BaziCalculator
+import com.xuanji.app.domain.HourGuide
 import com.xuanji.app.domain.elementName
 import com.xuanji.app.ui.components.ElementBalance
 import com.xuanji.app.ui.components.FortuneCard
@@ -55,6 +70,9 @@ import com.xuanji.app.ui.components.WuxingWheel
 import com.xuanji.app.ui.viewmodel.EasternUiState
 import com.xuanji.app.ui.viewmodel.EasternViewModel
 import com.xuanji.app.ui.xuanjiViewModel
+import kotlin.math.atan2
+import kotlin.math.cos
+import kotlin.math.sin
 
 @Composable
 fun EasternScreen() {
@@ -78,6 +96,7 @@ fun EasternScreen() {
             is EasternUiState.Empty -> Text("尚未设置出生信息，请先到「我的」填写。")
             is EasternUiState.Ready -> {
                 PeriodToggleRow(s.period) { viewModel.setPeriod(it) }
+                HourGuideSection(s.hourGuides)
                 PillarSection(s.full.chart)
                 ConclusionSection(s.full.conclusion)
                 GejuSection(s.full.geju)
@@ -319,6 +338,143 @@ private fun RelationsSection(relations: List<BranchRelation>) {
             Spacer(Modifier.height(4.dp))
         }
     }
+}
+
+@Composable
+private fun HourGuideSection(guides: List<HourGuide>) {
+    val ordered = Branch.values().mapNotNull { branch -> guides.firstOrNull { it.pillar.branch == branch } }
+    var selectedBranch by remember(guides) { mutableStateOf(ordered.firstOrNull()?.pillar?.branch) }
+    val selected = ordered.firstOrNull { it.pillar.branch == selectedBranch } ?: ordered.firstOrNull()
+    val outline = MaterialTheme.colorScheme.outline
+
+    FortuneCard {
+        SectionTitle("今日吉时 · 五行择时")
+        Spacer(Modifier.height(6.dp))
+        Text(
+            "按五鼠遁推十二时辰干支，以日主生克与喜忌修正排序；点击圆盘查看时辰详情。",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(Modifier.height(10.dp))
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .aspectRatio(1f)
+        ) {
+            Canvas(
+                Modifier
+                    .fillMaxSize()
+                    .pointerInput(ordered) {
+                        detectTapGestures { offset ->
+                            val dx = offset.x - size.width / 2f
+                            val dy = offset.y - size.height / 2f
+                            val bearing = (Math.toDegrees(atan2(dy.toDouble(), dx.toDouble())) + 90.0 + 360.0) % 360.0
+                            val index = (((bearing + 15.0) / 30.0).toInt() % 12 + 12) % 12
+                            selectedBranch = Branch.values()[index]
+                        }
+                    }
+            ) {
+                val w = size.width
+                val cx = w / 2f
+                val cy = size.height / 2f
+                val ringR = w * 0.34f
+                drawCircle(
+                    color = Color.White.copy(alpha = 0.04f),
+                    radius = ringR + w * 0.10f,
+                    center = Offset(cx, cy)
+                )
+                drawCircle(
+                    color = outline.copy(alpha = 0.20f),
+                    radius = ringR + w * 0.10f,
+                    center = Offset(cx, cy),
+                    style = Stroke(1.dp.toPx())
+                )
+
+                val paint = Paint().apply {
+                    textAlign = Paint.Align.CENTER
+                    typeface = Typeface.DEFAULT_BOLD
+                    textSize = w * 0.052f
+                    color = android.graphics.Color.WHITE
+                }
+
+                ordered.forEachIndexed { i, guide ->
+                    val rad = Math.toRadians(-90.0 + i * 30.0)
+                    val center = Offset(
+                        cx + ringR * cos(rad).toFloat(),
+                        cy + ringR * sin(rad).toFloat()
+                    )
+                    val isSelected = guide.pillar.branch == selectedBranch
+                    val nodeR = if (isSelected) w * 0.075f else w * 0.058f
+                    val color = hourScoreColor(guide.score)
+
+                    drawLine(
+                        color = outline.copy(alpha = 0.12f),
+                        start = Offset(cx, cy),
+                        end = center,
+                        strokeWidth = 1.dp.toPx()
+                    )
+                    if (guide.isCurrent) {
+                        drawCircle(
+                            color = Color(0xFFE9D8A6),
+                            radius = nodeR + 4.dp.toPx(),
+                            center = center,
+                            style = Stroke(width = 1.6.dp.toPx(), pathEffect = PathEffect.dashPathEffect(floatArrayOf(8f, 7f)))
+                        )
+                    }
+                    drawCircle(color = color.copy(alpha = 0.18f), radius = nodeR, center = center)
+                    drawCircle(color = color, radius = nodeR * 0.68f, center = center)
+                    drawContext.canvas.nativeCanvas.drawText(
+                        guide.pillar.branch.chinese,
+                        center.x,
+                        center.y + paint.textSize * 0.35f,
+                        paint
+                    )
+                }
+
+                val hubPaint = Paint().apply {
+                    textAlign = Paint.Align.CENTER
+                    typeface = Typeface.DEFAULT_BOLD
+                    textSize = w * 0.072f
+                    color = android.graphics.Color.argb(255, 233, 216, 166)
+                }
+                drawContext.canvas.nativeCanvas.drawText(
+                    "${selected?.level ?: ""} ${selected?.score ?: ""}",
+                    cx,
+                    cy + hubPaint.textSize * 0.35f,
+                    hubPaint
+                )
+            }
+        }
+
+        if (selected != null) {
+            Spacer(Modifier.height(12.dp))
+            Surface(
+                Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(14.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
+            ) {
+                Column(Modifier.padding(14.dp)) {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text("${selected.pillar.display}时", style = MaterialTheme.typography.titleMedium)
+                        Text(selected.timeText, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.secondary)
+                    }
+                    Text(
+                        "${selected.level} · ${selected.relationSummary}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = hourScoreColor(selected.score)
+                    )
+                    Text(selected.advice, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        }
+    }
+}
+
+private fun hourScoreColor(score: Int): Color = when {
+    score >= 70 -> Color(0xFF66BB6A)
+    score >= 55 -> Color(0xFFA5D6A7)
+    score >= 40 -> Color(0xFFC8BEE8)
+    else -> Color(0xFFFF8A80)
 }
 
 @Composable

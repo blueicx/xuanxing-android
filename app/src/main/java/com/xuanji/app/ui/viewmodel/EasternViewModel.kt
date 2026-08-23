@@ -5,6 +5,8 @@ import androidx.lifecycle.viewModelScope
 import com.xuanji.app.data.model.BaziFull
 import com.xuanji.app.data.model.EasternDailyFortune
 import com.xuanji.app.data.repository.FortuneRepository
+import com.xuanji.app.domain.HourGuide
+import com.xuanji.app.domain.HourGuideGenerator
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.Dispatchers
@@ -15,7 +17,12 @@ import java.time.LocalDate
 sealed interface EasternUiState {
     data object Loading : EasternUiState
     data object Empty : EasternUiState
-    data class Ready(val full: BaziFull, val fortune: EasternDailyFortune, val period: String = "day") : EasternUiState
+    data class Ready(
+        val full: BaziFull,
+        val fortune: EasternDailyFortune,
+        val hourGuides: List<HourGuide>,
+        val period: String = "day"
+    ) : EasternUiState
 }
 
 class EasternViewModel(private val repository: FortuneRepository) : ViewModel() {
@@ -30,7 +37,9 @@ class EasternViewModel(private val repository: FortuneRepository) : ViewModel() 
                     _uiState.value = EasternUiState.Empty
                 } else {
                     val fortune = repository.getEasternFortune(full.chart, LocalDate.now(), currentPeriod)
-                    _uiState.value = EasternUiState.Ready(full, fortune, currentPeriod)
+                    _uiState.value = EasternUiState.Ready(
+                        full, fortune, HourGuideGenerator.generate(full.chart, LocalDate.now()), currentPeriod
+                    )
                 }
             }
         }
@@ -43,7 +52,12 @@ class EasternViewModel(private val repository: FortuneRepository) : ViewModel() 
             val full = repository.baziFullFlow.value
             if (full != null) {
                 val fortune = repository.getEasternFortune(full.chart, LocalDate.now(), period)
-                _uiState.value = EasternUiState.Ready(full, fortune, period)
+                _uiState.value = EasternUiState.Ready(
+                    full,
+                    fortune,
+                    HourGuideGenerator.generate(full.chart, LocalDate.now()),
+                    period
+                )
             }
         }
     }
