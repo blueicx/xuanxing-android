@@ -240,8 +240,7 @@ object ZodiacCalculator {
         return Triple(xE, yE, zE)
     }
 
-    // ===================== 出生地经纬度（用于精确上升点） =====================
-    // 仅收录常用城市；未命中则默认北京。时间统一按北京时间(UTC+8)换算。
+    // 旧档案兼容坐标；新版档案保存省/市/县区中心坐标。
     private val CITY_COORDS = mapOf(
         "宜兴" to Pair(31.36, 119.82),
         "无锡" to Pair(31.49, 120.31),
@@ -269,8 +268,13 @@ object ZodiacCalculator {
 
     /** 计算太阳 / 上升 / 月亮星座（精确上升，需出生地） */
     fun calculateDetail(
-        year: Int, month: Int, day: Int, hour: Int, minute: Int, locationName: String
-    ): WesternDetail = detailFromChart(calculateNatalChart(year, month, day, hour, minute, locationName))
+        year: Int, month: Int, day: Int, hour: Int, minute: Int,
+        locationName: String,
+        locationLat: Double? = null,
+        locationLng: Double? = null
+    ): WesternDetail = detailFromChart(
+        calculateNatalChart(year, month, day, hour, minute, locationName, locationLat, locationLng)
+    )
 
     /** 兼容旧调用（无地点时按北京推算） */
     fun calculateDetail(year: Int, month: Int, day: Int, hour: Int, minute: Int): WesternDetail =
@@ -297,9 +301,14 @@ object ZodiacCalculator {
      * - 北交：平均北交点长期回归近似
      */
     fun calculateNatalChart(
-        year: Int, month: Int, day: Int, hour: Int, minute: Int, locationName: String
+        year: Int, month: Int, day: Int, hour: Int, minute: Int,
+        locationName: String,
+        locationLat: Double? = null,
+        locationLng: Double? = null
     ): NatalChart {
-        val (lat, lon) = locationToCoords(locationName)
+        val legacy = locationToCoords(locationName)
+        val lat = locationLat ?: legacy.first
+        val lon = locationLng ?: legacy.second
         val utHours = (hour + minute / 60.0) - TZ_OFFSET_HOURS
         val jd = julianDate(year, month, day, utHours)
         val d = jd - 2451545.0

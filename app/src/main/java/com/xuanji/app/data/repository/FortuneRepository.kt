@@ -73,7 +73,8 @@ class FortuneRepository(private val context: Context) {
                         _baziFull.value = BaziCalculator.analyze(profile)
                         _natalChart.value = ZodiacCalculator.calculateNatalChart(
                             profile.birthYear, profile.birthMonth, profile.birthDay,
-                            profile.birthHour, profile.birthMinute, profile.locationName
+                            profile.birthHour, profile.birthMinute, profile.locationName,
+                            profile.locationLat, profile.locationLng
                         )
                     }
                 } catch (e: Exception) {

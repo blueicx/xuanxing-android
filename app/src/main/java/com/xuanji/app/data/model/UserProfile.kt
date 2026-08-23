@@ -11,5 +11,8 @@ data class UserProfile(
     val birthHour: Int,    // 0-23
     val birthMinute: Int,  // 0-59
     val locationName: String,
+    val locationCode: String? = null,
+    val locationLat: Double? = null,
+    val locationLng: Double? = null,
     val gender: String? = null
 )

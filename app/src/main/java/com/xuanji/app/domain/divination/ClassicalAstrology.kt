@@ -78,7 +78,8 @@ object ClassicalAstrology {
     fun cast(profile: UserProfile): ClassicalResult {
         val chart = ZodiacCalculator.calculateNatalChart(
             profile.birthYear, profile.birthMonth, profile.birthDay,
-            profile.birthHour, profile.birthMinute, profile.locationName
+            profile.birthHour, profile.birthMinute, profile.locationName,
+            profile.locationLat, profile.locationLng
         )
         val map = chart.planets.associateBy { it.name }
         val sun = map.getValue("太阳").longitude

@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.xuanji.app.data.model.UserProfile
 import com.xuanji.app.data.repository.FortuneRepository
+import com.xuanji.app.domain.SelectedLocation
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -25,12 +26,19 @@ class ProfileViewModel(private val repository: FortuneRepository) : ViewModel() 
         day: Int,
         hour: Int,
         minute: Int,
-        location: String,
+        location: SelectedLocation,
         gender: String
     ) {
         viewModelScope.launch {
             repository.saveUserProfile(
-                UserProfile(year, month, day, hour, minute, location, gender)
+                UserProfile(
+                    year, month, day, hour, minute,
+                    "${location.province.name} / ${location.city.name} / ${location.district.name}",
+                    location.district.code,
+                    location.district.lat,
+                    location.district.lng,
+                    gender
+                )
             )
         }
     }

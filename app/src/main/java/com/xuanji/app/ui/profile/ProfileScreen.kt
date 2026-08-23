@@ -15,12 +15,15 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -30,6 +33,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -40,6 +44,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.xuanji.app.R
 import com.xuanji.app.daily.ReminderScheduler
 import com.xuanji.app.di.AppModule
+import com.xuanji.app.domain.ChinaLocations
+import com.xuanji.app.domain.SelectedLocation
 import com.xuanji.app.ui.components.FortuneCard
 import com.xuanji.app.ui.components.SectionTitle
 import com.xuanji.app.ui.viewmodel.ProfileViewModel
@@ -50,6 +56,7 @@ fun ProfileScreen() {
     val viewModel = xuanjiViewModel { ProfileViewModel(AppModule.repository) }
     val profile by viewModel.profile.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    val locations = remember { ChinaLocations.load(context) }
 
     // 出生信息默认空白（由用户自行填写），避免预填他人/作者生日
     var birthYear by rememberSaveable { mutableStateOf<Int?>(null) }
@@ -57,9 +64,21 @@ fun ProfileScreen() {
     var birthDay by rememberSaveable { mutableStateOf<Int?>(null) }
     var birthHour by rememberSaveable { mutableStateOf<Int?>(null) }
     var birthMinute by rememberSaveable { mutableStateOf<Int?>(null) }
-    var location by rememberSaveable { mutableStateOf("") }
+    var provinceIndex by rememberSaveable { mutableStateOf(-1) }
+    var cityIndex by rememberSaveable { mutableStateOf(-1) }
+    var districtIndex by rememberSaveable { mutableStateOf(-1) }
+    var locationDialog by rememberSaveable { mutableStateOf<String?>(null) }
     var gender by rememberSaveable { mutableStateOf<String?>(null) }
     var showClearDialog by rememberSaveable { mutableStateOf(false) }
+
+    val selectedLocation = if (
+        provinceIndex >= 0 && cityIndex >= 0 && districtIndex >= 0 &&
+        provinceIndex < locations.provinces.size &&
+        cityIndex < locations.provinces[provinceIndex].cities.size &&
+        districtIndex < locations.provinces[provinceIndex].cities[cityIndex].districts.size
+    ) {
+        SelectedLocation(provinceIndex, cityIndex, districtIndex)
+    } else null
 
     LaunchedEffect(profile) {
         if (profile != null) {
@@ -68,18 +87,28 @@ fun ProfileScreen() {
             birthDay = profile?.birthDay
             birthHour = profile?.birthHour
             birthMinute = profile?.birthMinute
-            location = profile?.locationName ?: ""
             gender = profile?.gender
+            val saved = ChinaLocations.find(profile?.locationCode)
+                ?: ChinaLocations.findLegacyCity(profile?.locationName)
+            provinceIndex = saved?.provinceIndex ?: -1
+            cityIndex = saved?.cityIndex ?: -1
+            districtIndex = saved?.districtIndex ?: -1
         } else {
             birthYear = null
             birthMonth = null
             birthDay = null
             birthHour = null
             birthMinute = null
-            location = ""
+            provinceIndex = -1
+            cityIndex = -1
+            districtIndex = -1
             gender = null
         }
     }
+
+    val province = locations.provinces.getOrNull(provinceIndex)
+    val city = province?.cities?.getOrNull(cityIndex)
+    val district = city?.districts?.getOrNull(districtIndex)
 
     // 日期/时间选择器需要具体初值，用合理占位（仅作为打开选择器时的起点，未保存前仍是空白）
     val pickerYear = birthYear ?: 2000
@@ -143,13 +172,28 @@ fun ProfileScreen() {
                 )
             }
             Spacer(Modifier.height(8.dp))
-            OutlinedTextField(
-                value = location,
-                onValueChange = { location = it },
-                label = { Text("出生地点") },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true
-            )
+            OutlinedButton(
+                onClick = { locationDialog = "province" },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("省份：${province?.name ?: "请选择"}")
+            }
+            Spacer(Modifier.height(8.dp))
+            OutlinedButton(
+                onClick = { locationDialog = "city" },
+                enabled = province != null,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("市：${city?.name ?: "请先选择省份"}")
+            }
+            Spacer(Modifier.height(8.dp))
+            OutlinedButton(
+                onClick = { locationDialog = "district" },
+                enabled = city != null,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("县（区）：${district?.name ?: "请先选择市"}")
+            }
             Spacer(Modifier.height(8.dp))
             Row(
                 Modifier.fillMaxWidth(),
@@ -173,11 +217,12 @@ fun ProfileScreen() {
                 val d = birthDay ?: return@Button
                 val h = birthHour ?: return@Button
                 val min = birthMinute ?: return@Button
-                if (location.trim().isEmpty()) {
+                val selected = selectedLocation
+                if (selected == null) {
                     Toast.makeText(context, "请填写出生地点", Toast.LENGTH_SHORT).show()
                     return@Button
                 }
-                viewModel.save(y, m, d, h, min, location.trim(), gender ?: "男")
+                viewModel.save(y, m, d, h, min, selected, gender ?: "男")
                 Toast.makeText(context, context.getString(R.string.saved_toast), Toast.LENGTH_SHORT).show()
             },
             modifier = Modifier.fillMaxWidth()
@@ -202,6 +247,54 @@ fun ProfileScreen() {
                     color = MaterialTheme.colorScheme.error
                 )
             }
+        }
+
+        locationDialog?.let { level ->
+            AlertDialog(
+                onDismissRequest = { locationDialog = null },
+                confirmButton = {},
+                dismissButton = {
+                    TextButton(onClick = { locationDialog = null }) { Text("关闭") }
+                },
+                title = {
+                    Text(
+                        when (level) {
+                            "city" -> "选择市"
+                            "district" -> "选择县（区）"
+                            else -> "选择省 / 直辖市 / 自治区"
+                        }
+                    )
+                },
+                text = {
+                    LazyColumn(Modifier.height(360.dp)) {
+                        if (level == "province") {
+                            items(locations.provinces.size) { index ->
+                                LocationOption("${locations.provinces[index].name}（${locations.provinces[index].cities.size}市）") {
+                                    provinceIndex = index
+                                    cityIndex = -1
+                                    districtIndex = -1
+                                    locationDialog = null
+                                }
+                            }
+                        } else if (level == "city" && province != null) {
+                            items(province.cities.size) { index ->
+                                LocationOption(province.cities[index].name) {
+                                    cityIndex = index
+                                    districtIndex = -1
+                                    locationDialog = null
+                                }
+                            }
+                        } else if (level == "district" && city != null) {
+                            items(city.districts.size) { index ->
+                                LocationOption(city.districts[index].name) {
+                                    districtIndex = index
+                                    locationDialog = null
+                                }
+                            }
+                        }
+                    }
+                }
+            )
         }
         Spacer(Modifier.height(8.dp))
         Text(
@@ -275,5 +368,22 @@ fun ProfileScreen() {
                 }
             )
         }
+    }
+}
+
+@Composable
+private fun LocationOption(label: String, onClick: () -> Unit) {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+    ) {
+        Text(
+            label,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 8.dp, vertical = 12.dp)
+        )
+        HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.18f))
     }
 }
