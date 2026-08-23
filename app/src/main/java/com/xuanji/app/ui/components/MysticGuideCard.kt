@@ -20,6 +20,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -41,6 +42,13 @@ import com.xuanji.app.domain.MysticInteraction
 import com.xuanji.app.domain.MysticInteractionOption
 import com.xuanji.app.domain.MysticGuideGenerator
 
+private data class MysticTurn(
+    val key: String,
+    val question: String,
+    val answer: String,
+    val reaction: String = ""
+)
+
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun MysticGuideCard(
@@ -58,8 +66,10 @@ fun MysticGuideCard(
     }
     var selectedFollowUp by remember(guide) { mutableStateOf("") }
     var evidenceOpen by remember(guide) { mutableStateOf(false) }
-    val conversation = remember(guide) { mutableStateListOf<String>() }
+    val conversation = remember(guide) { mutableStateListOf<MysticTurn>() }
     var arrivalVisible by remember(guide) { mutableStateOf(false) }
+    var pendingFollowUp by remember(guide) { mutableStateOf<String?>(null) }
+    val askCounts = remember(guide) { mutableStateMapOf<String, Int>() }
     var interactionRound by remember(guide) { mutableStateOf(0) }
     var selectedInteraction by remember(guide, interactionRound) { mutableStateOf<MysticInteractionOption?>(null) }
     val interaction = remember(mode, topic, fortune, interactionRound) {
@@ -72,13 +82,36 @@ fun MysticGuideCard(
     }
 
     fun selectFollowUp(key: String) {
-        val branchIndex = conversation.indexOf(key)
-        if (branchIndex == conversation.lastIndex && key == selectedFollowUp) return
-        val kept = if (branchIndex >= 0) conversation.take(branchIndex) else conversation.toList()
+        if (guide.followUps.none { it.key == key } || pendingFollowUp != null) return
+        pendingFollowUp = key
+    }
+
+    LaunchedEffect(pendingFollowUp) {
+        val key = pendingFollowUp ?: return@LaunchedEffect
+        kotlinx.coroutines.delay(400)
+        val item = guide.followUps.firstOrNull { it.key == key } ?: run {
+            pendingFollowUp = null
+            return@LaunchedEffect
+        }
+        val askedCount = (askCounts[key] ?: 0) + 1
+        val action = when {
+            selectedFollowUp == key -> "repeat"
+            conversation.isNotEmpty() -> "branch"
+            else -> "ask"
+        }
+        val reactionLine = MysticGuideGenerator.reaction(mode, action, askedCount)
+        if (action == "repeat" && conversation.lastOrNull()?.key == key) {
+            conversation[conversation.lastIndex] = conversation.last().copy(reaction = reactionLine)
+        } else {
+            val branchIndex = conversation.indexOfFirst { it.key == key }
+            val kept = if (branchIndex >= 0) conversation.take(branchIndex) else conversation.toList()
+            conversation.clear()
+            conversation.addAll(kept.takeLast(3))
+            conversation.add(MysticTurn(key, item.question, item.answer, reactionLine))
+        }
+        askCounts[key] = askedCount
         selectedFollowUp = key
-        conversation.clear()
-        conversation.addAll(kept.takeLast(3))
-        conversation.add(key)
+        pendingFollowUp = null
     }
     val accent by animateColorAsState(
         targetValue = if (mode == "half") MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.primary,
@@ -244,6 +277,26 @@ fun MysticGuideCard(
                             }
                         }
 
+                        if (pendingFollowUp != null) {
+                            Row(
+                                Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    "${current.roleName}正在看盘",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Text(
+                                    "···",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = accent
+                                )
+                            }
+                        }
+
                         Row(
                             Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
@@ -259,6 +312,8 @@ fun MysticGuideCard(
                                     onClick = {
                                         conversation.clear()
                                         selectedFollowUp = ""
+                                        askCounts.clear()
+                                        pendingFollowUp = null
                                     },
                                     color = Color.Transparent
                                 ) {
@@ -277,7 +332,7 @@ fun MysticGuideCard(
                                 Surface(
                                     onClick = { selectFollowUp(item.key) },
                                     shape = RoundedCornerShape(999.dp),
-                                    color = if (conversation.lastOrNull() == item.key) {
+                                    color = if (conversation.lastOrNull()?.key == item.key) {
                                         accent
                                     } else {
                                         MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.48f)
@@ -287,7 +342,11 @@ fun MysticGuideCard(
                                         item.question,
                                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
                                         style = MaterialTheme.typography.labelMedium,
-                                        color = if (conversation.lastOrNull() == item.key) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
+                                        color = if (conversation.lastOrNull()?.key == item.key) {
+                                            Color.White
+                                        } else {
+                                            MaterialTheme.colorScheme.onSurfaceVariant
+                                        }
                                     )
                                 }
                             }
@@ -298,8 +357,8 @@ fun MysticGuideCard(
                                 Modifier.fillMaxWidth(),
                                 verticalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                conversation.forEach { key ->
-                                    current.followUps.firstOrNull { it.key == key }?.let { item ->
+                                conversation.forEach { turn ->
+                                    current.followUps.firstOrNull { it.key == turn.key }?.let { item ->
                                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                                             Surface(
                                                 shape = RoundedCornerShape(14.dp),
@@ -312,6 +371,14 @@ fun MysticGuideCard(
                                                     color = MaterialTheme.colorScheme.onSurface
                                                 )
                                             }
+                                        }
+                                        if (turn.reaction.isNotBlank()) {
+                                            Text(
+                                                turn.reaction,
+                                                style = MaterialTheme.typography.labelSmall,
+                                                lineHeight = 18.sp,
+                                                color = accent
+                                            )
                                         }
                                         Surface(
                                             shape = RoundedCornerShape(14.dp),

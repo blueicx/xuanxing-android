@@ -240,6 +240,41 @@ object MysticGuideGenerator {
         return games[((seed / 19L) % games.size).toInt()]
     }
 
+    /** 追问前的短反应；repeat 用次数递进，让连续追问像被同一个人记住了。 */
+    fun reaction(mode: String, action: String, askedCount: Int): String {
+        val scholar = mode != "half"
+        val count = askedCount.coerceAtLeast(1)
+        return if (scholar) {
+            when (action) {
+                "branch" -> "先接住刚才那句；这条我们分开看，不急着混在一起。"
+                "repeat" -> if (count == 2) {
+                    "你又问了一遍。我猜不是没听懂，是这句话还没落进心里。"
+                } else {
+                    "还在想这件事？那我们把入口再缩小一点。"
+                }
+                else -> when (count % 3) {
+                    0 -> "我把这一页又翻了一遍，你问到点子上了。"
+                    1 -> "好，这个问题可以慢慢拆。"
+                    else -> "嗯，我先看盘面，再照着你的处境说。"
+                }
+            }
+        } else {
+            when (action) {
+                "branch" -> "喂喂，话题拐弯也要给云朵一点反应时间！"
+                "repeat" -> if (count == 2) {
+                    "又问？行，本半仙就喜欢你这份不死心。"
+                } else {
+                    "还惦记着呢？好吧，仙界给你加播一次。"
+                }
+                else -> when (count % 3) {
+                    0 -> "这个问题有点锋利，本半仙先垫块云！"
+                    1 -> "好问题！本半仙袖子都撸起来了。"
+                    else -> "稍等，仙家客服正在翻盘面！"
+                }
+            }
+        }
+    }
+
     /** DJB2 取样；两端用同一字符码与质数模，避免各端人设漂移。 */
     private fun presenceSeed(topicKey: String, fortune: CompositeDailyFortune): Long {
         val source = "${canonicalDateKey(fortune.dateKey)}|$topicKey|${fortune.overallScore}|${fortune.luckyNumber}"
