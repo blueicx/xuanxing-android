@@ -384,6 +384,91 @@ object MysticGuideGenerator {
         }
     }
 
+    fun topicLabel(key: String): String = topics[key] ?: "综合"
+
+    /** 等待行也带作风，让“正在处理”像一个人手上的小动作。 */
+    fun thinkingLine(mode: String, styleKey: String, kind: String): String {
+        val scholar = mode != "half"
+        return if (scholar) {
+            when (styleKey) {
+                "archive" -> when (kind) {
+                    "game" -> "正在把你的选择抄进档案"
+                    "handoff" -> "正在把上一页夹好"
+                    else -> "正在翻对应的那一页"
+                }
+                "harbor" -> when (kind) {
+                    "game" -> "正在看你选出的那一步"
+                    "handoff" -> "正在给话题换个坐姿"
+                    else -> "先接住这句话"
+                }
+                else -> when (kind) {
+                    "game" -> "正在核对最小一步"
+                    "handoff" -> "罗盘准备只转一格"
+                    else -> "指针正在慢慢对齐"
+                }
+            }
+        } else {
+            when (styleKey) {
+                "herald" -> when (kind) {
+                    "game" -> "锣鼓小队正在验票"
+                    "handoff" -> "换场锣鼓正在调音"
+                    else -> "天庭司仪正翻到那一页"
+                }
+                "alley" -> when (kind) {
+                    "game" -> "半仙正在给你递签"
+                    "handoff" -> "大碗茶先挪个位置"
+                    else -> "街口半仙正在打听"
+                }
+                else -> when (kind) {
+                    "game" -> "云上工单正在登记"
+                    "handoff" -> "云端工单正在改派"
+                    else -> "实习生法术加载中"
+                }
+            }
+        }
+    }
+
+    fun handoffReaction(mode: String, styleKey: String): String {
+        val scholar = mode != "half"
+        return if (scholar) {
+            when (styleKey) {
+                "archive" -> "旧线索已夹进书页，不会丢。"
+                "harbor" -> "刚才的话题先放在垫子上，随时可以回来。"
+                else -> "方向记下了；现在只把指针转向新的一格。"
+            }
+        } else {
+            when (styleKey) {
+                "herald" -> "换场锣鼓已响，旧话题在后台候场！"
+                "alley" -> "行，大碗茶不撤；咱先聊新来的这摊。"
+                else -> "改派成功！旧话题挂起，新工单置顶。"
+            }
+        }
+    }
+
+    fun topicHandoff(
+        mode: String,
+        styleKey: String,
+        fromTopicKey: String,
+        toTopicKey: String
+    ): String {
+        val from = topicLabel(fromTopicKey)
+        val to = topicLabel(toTopicKey)
+        val scholar = mode != "half"
+        return if (scholar) {
+            when (styleKey) {
+                "archive" -> "我把「$from」那页先夹好，现在翻到「${to}」。两条线索可以互相参照。"
+                "harbor" -> "「${from}」先放在旁边歇一会儿；我们轻轻转到「${to}」，不用把它关门外。"
+                else -> "「${from}」的方向已经记下。罗盘只转一格，先看「${to}」最清楚的位置。"
+            }
+        } else {
+            when (styleKey) {
+                "herald" -> "换场！「${from}」先去后台候着，「${to}」带着盘面登台！"
+                "alley" -> "换得挺快啊？行，「${from}」的茶还温着；咱先看看「${to}」这摊。"
+                else -> "工单已改派：「${from}」暂时挂起，「${to}」置顶。实习生保证旧话题不弄丢！"
+            }
+        }
+    }
+
     /** DJB2 取样；两端用同一字符码与质数模，避免各端人设漂移。 */
     private fun presenceSeed(topicKey: String, fortune: CompositeDailyFortune): Long {
         val source = "${canonicalDateKey(fortune.dateKey)}|$topicKey|${fortune.overallScore}|${fortune.luckyNumber}"

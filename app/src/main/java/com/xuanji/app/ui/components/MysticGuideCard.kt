@@ -71,6 +71,7 @@ fun MysticGuideCard(
     var arrivalVisible by remember(guide) { mutableStateOf(false) }
     var pendingFollowUp by remember(guide) { mutableStateOf<String?>(null) }
     var pendingInteraction by remember(guide) { mutableStateOf<MysticInteractionOption?>(null) }
+    var pendingHandoff by remember { mutableStateOf<String?>(null) }
     var interactionCount by remember(guide) { mutableStateOf(0) }
     val askCounts = remember(guide) { mutableStateMapOf<String, Int>() }
     var interactionRound by remember(guide) { mutableStateOf(0) }
@@ -85,8 +86,44 @@ fun MysticGuideCard(
     }
 
     fun selectFollowUp(key: String) {
-        if (guide.followUps.none { it.key == key } || pendingFollowUp != null || pendingInteraction != null) return
+        if (
+            guide.followUps.none { it.key == key } ||
+            pendingFollowUp != null ||
+            pendingInteraction != null ||
+            pendingHandoff != null
+        ) return
         pendingFollowUp = key
+    }
+
+    fun selectTopic(key: String) {
+        if (key == topic || pendingFollowUp != null || pendingInteraction != null || pendingHandoff != null) return
+        val previousTopic = topic
+        selectedInteraction = null
+        pendingFollowUp = null
+        pendingInteraction = null
+        topic = key
+        pendingHandoff = previousTopic
+    }
+
+    LaunchedEffect(pendingHandoff, guide) {
+        val fromTopic = pendingHandoff ?: return@LaunchedEffect
+        kotlinx.coroutines.delay(420)
+        conversation.add(
+            MysticTurn(
+                key = "handoff-$fromTopic-${guide.topicKey}",
+                question = "刚才在看「${MysticGuideGenerator.topicLabel(fromTopic)}」",
+                answer = MysticGuideGenerator.topicHandoff(
+                    mode,
+                    guide.styleKey,
+                    fromTopic,
+                    guide.topicKey
+                ),
+                reaction = MysticGuideGenerator.handoffReaction(mode, guide.styleKey),
+                kind = "handoff"
+            )
+        )
+        while (conversation.size > 5) conversation.removeAt(0)
+        pendingHandoff = null
     }
 
     LaunchedEffect(pendingInteraction) {
@@ -218,7 +255,7 @@ fun MysticGuideCard(
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 MysticGuideGenerator.topicLabels().forEach { (key, label) ->
                     Surface(
-                        onClick = { topic = key },
+                        onClick = { selectTopic(key) },
                         shape = RoundedCornerShape(999.dp),
                         color = if (topic == key) accent.copy(alpha = 0.20f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
                     ) {
@@ -297,14 +334,22 @@ fun MysticGuideCard(
                             }
                         }
 
-                        if (pendingFollowUp != null || pendingInteraction != null) {
+                        if (pendingFollowUp != null || pendingInteraction != null || pendingHandoff != null) {
                             Row(
                                 Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
-                                    "${current.roleName}正在看盘",
+                                    MysticGuideGenerator.thinkingLine(
+                                        current.mode,
+                                        current.styleKey,
+                                        when {
+                                            pendingInteraction != null -> "game"
+                                            pendingHandoff != null -> "handoff"
+                                            else -> "ask"
+                                        }
+                                    ),
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -336,6 +381,7 @@ fun MysticGuideCard(
                                         askCounts.clear()
                                         pendingFollowUp = null
                                         pendingInteraction = null
+                                        pendingHandoff = null
                                     },
                                     color = Color.Transparent
                                 ) {
@@ -458,7 +504,7 @@ fun MysticGuideCard(
                             interaction.options.forEach { option ->
                                 Surface(
                                     onClick = {
-                                        if (pendingFollowUp == null && pendingInteraction == null) {
+                                        if (pendingFollowUp == null && pendingInteraction == null && pendingHandoff == null) {
                                             selectedInteraction = option
                                             pendingInteraction = option
                                         }
