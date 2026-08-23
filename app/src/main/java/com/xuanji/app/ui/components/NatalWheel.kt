@@ -3,22 +3,38 @@ package com.xuanji.app.ui.components
 import android.graphics.Paint
 import android.graphics.Typeface
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.unit.dp
 import com.xuanji.app.domain.ZodiacCalculator
 import kotlin.math.cos
+import kotlin.math.hypot
 import kotlin.math.sin
 
 private val SIGN_NAMES = listOf(
@@ -61,19 +77,66 @@ private fun Color.toNative(): Int = android.graphics.Color.argb(
 @Composable
 fun NatalWheelChart(chart: ZodiacCalculator.NatalChart) {
     val asc = chart.ascendant
+    var selected by remember(chart) { mutableStateOf<ZodiacCalculator.PlanetPosition?>(null) }
+    val planetMeanings = remember(chart) { ZodiacCalculator.interpretChart(chart).planets }
     val colorSurface = MaterialTheme.colorScheme.surface
     val colorOnSurface = MaterialTheme.colorScheme.onSurface
     val colorVariant = MaterialTheme.colorScheme.surfaceVariant
     val colorPrimary = MaterialTheme.colorScheme.primary
     val colorSecondary = MaterialTheme.colorScheme.secondary
 
-    Box(
-        Modifier
-            .fillMaxWidth()
-            .aspectRatio(1f)
-            .padding(8.dp)
+    Column(
+        Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Canvas(Modifier.fillMaxSize()) {
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .aspectRatio(1f)
+                .padding(8.dp)
+        ) {
+            Canvas(
+                Modifier
+                    .fillMaxSize()
+                    .pointerInput(chart) {
+                        detectTapGestures { tapOffset ->
+                            val canvasWidth = size.width.toFloat()
+                            val centerX = canvasWidth / 2f
+                            val centerY = canvasWidth / 2f
+                            val outerRadius = canvasWidth / 2f - 4.dp.toPx()
+                            val innerRadius = outerRadius * 0.80f
+                            val hubRadius = outerRadius * 0.17f
+                            val planetRing = (hubRadius + innerRadius) / 2f
+
+                            fun angleFor(lon: Double): Double {
+                                val normalized = (((lon - asc) % 360.0) + 360.0) % 360.0
+                                return Math.toRadians(270.0 - normalized)
+                            }
+                            fun positionAt(lon: Double): Offset {
+                                val angle = angleFor(lon)
+                                return Offset(
+                                    centerX + planetRing * sin(angle).toFloat(),
+                                    centerY - planetRing * cos(angle).toFloat()
+                                )
+                            }
+
+                            var hitName = ""
+                            var nearestDistance = canvasWidth * 0.055f
+                            chart.planets.forEach { planet ->
+                                val point = positionAt(planet.longitude)
+                                val distance = hypot(
+                                    tapOffset.x - point.x,
+                                    tapOffset.y - point.y
+                                )
+                                if (distance < nearestDistance) {
+                                    nearestDistance = distance
+                                    hitName = planet.name
+                                }
+                            }
+                            selected = chart.planets.firstOrNull { it.name == hitName }
+                        }
+                    }
+            ) {
             val w = size.width
             val cx = w / 2f
             val cy = w / 2f
@@ -193,6 +256,17 @@ fun NatalWheelChart(chart: ZodiacCalculator.NatalChart) {
                     val offset = if (g.size == 1) 0f else (idx - (g.size - 1) / 2f) * (w * 0.05f)
                     val r = (planetR + offset).coerceIn(hub + w * 0.05f, houseOuter - w * 0.05f)
                     val pp = pt(r, p.longitude)
+                    if (selected?.name == p.name) {
+                        drawCircle(
+                            color = colorSecondary,
+                            style = Stroke(
+                                width = 1.6.dp.toPx(),
+                                pathEffect = PathEffect.dashPathEffect(floatArrayOf(7f, 5f))
+                            ),
+                            radius = w * 0.042f,
+                            center = pp
+                        )
+                    }
                     drawContext.canvas.nativeCanvas.drawText(
                         PLANET_SHORT[p.name] ?: p.name, pp.x, pp.y + planetPaint.textSize / 3, planetPaint
                     )
@@ -219,5 +293,37 @@ fun NatalWheelChart(chart: ZodiacCalculator.NatalChart) {
             val mcP = pt(outer - 2.dp.toPx(), chart.midheaven)
             drawContext.canvas.nativeCanvas.drawText("MC", mcP.x, mcP.y, markPaint)
         }
+
+        selected?.let { planet ->
+            val meaning = planetMeanings.firstOrNull { it.name == planet.name }
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f))
+                    .padding(14.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        "${planet.name} · ${planet.sign} ${planet.degreeInSign}°",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.secondary,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        "第 ${planet.house} 宫",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.68f)
+                    )
+                }
+                Text(
+                    meaning?.text ?: "行星揭示该领域的心理功能与现实课题；结合星座与宫位理解它的表达方式。",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.82f)
+                )
+            }
+        }
     }
+}
 }

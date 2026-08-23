@@ -4,6 +4,7 @@ import android.graphics.Paint
 import android.graphics.Typeface
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,9 +21,14 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
@@ -62,6 +68,7 @@ private val KE_COLOR = Color(0xFFE0594E)
  */
 @Composable
 fun WuxingWheel(counts: Map<Element, Int>) {
+    var selected by remember(counts) { mutableStateOf<Element?>(null) }
     val total = CYCLE.sumOf { counts[it] ?: 0 }.coerceAtLeast(1)
     val maxV = (CYCLE.maxOf { counts[it] ?: 0 }).coerceAtLeast(1)
     val onSurface = MaterialTheme.colorScheme.onSurface
@@ -69,13 +76,44 @@ fun WuxingWheel(counts: Map<Element, Int>) {
     val surfaceVariant = MaterialTheme.colorScheme.surfaceVariant
     val elemColors = CYCLE.associateWith { elementColorCompose(it) }
 
-    Box(
-        Modifier
-            .fillMaxWidth()
-            .aspectRatio(1f)
-            .padding(4.dp)
+    Column(
+        Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Canvas(Modifier.fillMaxSize()) {
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .aspectRatio(1f)
+                .padding(4.dp)
+        ) {
+            Canvas(
+                Modifier
+                    .fillMaxSize()
+                    .pointerInput(counts) {
+                        detectTapGestures { offset ->
+                            val w = size.width.toFloat()
+                            val cx = w / 2f
+                            val cy = w / 2f
+                            val ringR = w * 0.33f
+                            val maxNode = w * 0.115f
+                            val minNode = w * 0.048f
+                            val maxV = (CYCLE.maxOf { counts[it] ?: 0 }).coerceAtLeast(1)
+
+                            val hit = CYCLE.indexOfFirst { element ->
+                                val index = CYCLE.indexOf(element)
+                                val angle = Math.toRadians(-90.0 + index * 72.0)
+                                val center = Offset(
+                                    cx + ringR * cos(angle).toFloat(),
+                                    cy + ringR * sin(angle).toFloat()
+                                )
+                                val value = counts[element] ?: 0
+                                val radius = minNode + (maxNode - minNode) * (value.toFloat() / maxV)
+                                hypot(offset.x - center.x, offset.y - center.y) <= radius + 14.dp.toPx()
+                            }
+                            selected = if (hit >= 0) CYCLE[hit] else null
+                        }
+                    }
+            ) {
             val w = size.width
             val cx = w / 2f
             val cy = w / 2f
@@ -170,6 +208,14 @@ fun WuxingWheel(counts: Map<Element, Int>) {
                     style = Stroke(1.6.dp.toPx()),
                     radius = r, center = c
                 )
+                if (e == selected) {
+                    drawCircle(
+                        color = Color(0xFFE9D8A6),
+                        style = Stroke(1.6.dp.toPx(), pathEffect = PathEffect.dashPathEffect(floatArrayOf(7f, 5f))),
+                        radius = r + 5.dp.toPx(),
+                        center = c
+                    )
+                }
                 drawContext.canvas.nativeCanvas.drawText(
                     elementName(e), c.x, c.y + namePaint.textSize * 0.35f, namePaint
                 )
@@ -194,6 +240,46 @@ fun WuxingWheel(counts: Map<Element, Int>) {
             drawContext.canvas.nativeCanvas.drawText("相克 ⤫", cx, cy + w * 0.038f, hubPaint)
         }
     }
+
+        selected?.let { element ->
+            val value = counts[element] ?: 0
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(surfaceVariant.copy(alpha = 0.45f))
+                    .padding(14.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        elementName(element),
+                        style = MaterialTheme.typography.titleMedium,
+                        color = elemColors.getValue(element),
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        "${ratioTag(value, total)} · $value",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = onSurface.copy(alpha = 0.68f)
+                    )
+                }
+                Text(
+                    wuxingMeaning(element),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = onSurface.copy(alpha = 0.82f)
+                )
+            }
+        }
+    }
+}
+
+private fun wuxingMeaning(element: Element): String = when (element) {
+    Element.WOOD -> "生长、升发、条达。木旺者多主创造与行动力，偏弱时宜舒展情绪、规律运动；缺木时可借绿色、春季作息与规划感补足节奏。"
+    Element.FIRE -> "温热、光明、向上。火旺者表达力和感染力强，过旺则易急躁；偏弱时宜增加社交光照与专注热情，避免过度克制自己。"
+    Element.EARTH -> "承载、生化、稳定。土旺者务实可靠、善于积累，过重则易固守；偏弱时宜建立稳定作息与边界感，从小目标开始落地。"
+    Element.METAL -> "收敛、清肃、秩序。金旺者决断清晰、重视规则，过强则易刚硬；偏弱时可通过整理、复盘和明确原则增强判断力。"
+    Element.WATER -> "滋润、闭藏、智慧。水旺者感知细腻、适应力强，过旺则易多思；偏弱时宜保证休息、补充灵感，并给情绪留出流动空间。"
 }
 
 /** 由 a 指向 b 的方向上，从 a 前进 d 距离得到的点 */
