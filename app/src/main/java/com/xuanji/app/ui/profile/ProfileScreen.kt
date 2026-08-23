@@ -19,11 +19,13 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -36,6 +38,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.xuanji.app.R
+import com.xuanji.app.daily.ReminderScheduler
 import com.xuanji.app.di.AppModule
 import com.xuanji.app.ui.components.FortuneCard
 import com.xuanji.app.ui.components.SectionTitle
@@ -56,16 +59,25 @@ fun ProfileScreen() {
     var birthMinute by rememberSaveable { mutableStateOf<Int?>(null) }
     var location by rememberSaveable { mutableStateOf("") }
     var gender by rememberSaveable { mutableStateOf<String?>(null) }
+    var showClearDialog by rememberSaveable { mutableStateOf(false) }
 
     LaunchedEffect(profile) {
-        profile?.let {
-            birthYear = it.birthYear
-            birthMonth = it.birthMonth
-            birthDay = it.birthDay
-            birthHour = it.birthHour
-            birthMinute = it.birthMinute
-            location = it.locationName
-            gender = it.gender
+        if (profile != null) {
+            birthYear = profile?.birthYear
+            birthMonth = profile?.birthMonth
+            birthDay = profile?.birthDay
+            birthHour = profile?.birthHour
+            birthMinute = profile?.birthMinute
+            location = profile?.locationName ?: ""
+            gender = profile?.gender
+        } else {
+            birthYear = null
+            birthMonth = null
+            birthDay = null
+            birthHour = null
+            birthMinute = null
+            location = ""
+            gender = null
         }
     }
 
@@ -172,11 +184,25 @@ fun ProfileScreen() {
         ) {
             Text("保存命盘")
         }
-        Text(
-            "提示：命盘用于推算八字与每日运势，所有数据仅保存在本机，完全离线可用。",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
+        FortuneCard {
+            SectionTitle("隐私与数据")
+            Spacer(Modifier.height(8.dp))
+            Text(
+                "玄星不联网、不登录、不上传或统计你的个人数据。出生档案和测试记录只保存在这台设备上，可随时清除。",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(Modifier.height(12.dp))
+            OutlinedButton(
+                onClick = { showClearDialog = true },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    "清除全部本地数据",
+                    color = MaterialTheme.colorScheme.error
+                )
+            }
+        }
         Spacer(Modifier.height(8.dp))
         Text(
             "作者：吴家希（WJX）",
@@ -223,6 +249,31 @@ fun ProfileScreen() {
                         )
                 )
             }
+        }
+
+        if (showClearDialog) {
+            AlertDialog(
+                onDismissRequest = { showClearDialog = false },
+                title = { Text("清除全部本地数据") },
+                text = { Text("将删除本机的出生档案和心理测试记录，且无法恢复。") },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            showClearDialog = false
+                            viewModel.clearAllLocalData()
+                            ReminderScheduler.cancel(context)
+                            Toast.makeText(context, "已全部清除", Toast.LENGTH_SHORT).show()
+                        }
+                    ) {
+                        Text("清除", color = MaterialTheme.colorScheme.error)
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showClearDialog = false }) {
+                        Text("取消")
+                    }
+                }
+            )
         }
     }
 }

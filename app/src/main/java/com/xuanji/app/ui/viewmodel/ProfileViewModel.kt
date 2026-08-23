@@ -34,4 +34,10 @@ class ProfileViewModel(private val repository: FortuneRepository) : ViewModel() 
             )
         }
     }
+
+    fun clearAllLocalData() {
+        viewModelScope.launch {
+            repository.clearAllLocalData()
+        }
+    }
 }

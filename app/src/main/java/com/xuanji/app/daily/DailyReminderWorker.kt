@@ -6,20 +6,30 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.core.app.NotificationCompat
 import androidx.work.CoroutineWorker
 import androidx.work.ListenableWorker
 import androidx.work.WorkerParameters
+import com.xuanji.app.data.local.dataStore
 import com.xuanji.app.MainActivity
 import com.xuanji.app.R
+import kotlinx.coroutines.flow.first
 
 class DailyReminderWorker(context: Context, params: WorkerParameters) :
     CoroutineWorker(context, params) {
 
     override suspend fun doWork(): Result {
-        showNotification()
+        if (hasProfile()) {
+            showNotification()
+        }
+        // 无命盘（例如用户已一键清除）则静默跳过，不再打扰
         return ListenableWorker.Result.success()
     }
+
+    private suspend fun hasProfile(): Boolean =
+        applicationContext.dataStore.data
+            .first()[stringPreferencesKey("user_profile")] != null
 
     private fun showNotification() {
         val ctx = applicationContext

@@ -87,6 +87,11 @@ class FortuneRepository(private val context: Context) {
         context.dataStore.edit { it[profileKey] = gson.toJson(profile) }
     }
 
+    /** 用户主动清除本机 DataStore 中的命盘、缓存与测试记录 */
+    suspend fun clearAllLocalData() {
+        context.dataStore.edit { it.clear() }
+    }
+
     /** 首次启动写入默认命盘（用户的生日），保证开屏即有内容 */
     suspend fun seedDefaultIfEmpty(default: UserProfile) {
         val existing = context.dataStore.data.map { it[profileKey] }.first()
