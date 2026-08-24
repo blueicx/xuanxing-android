@@ -44,6 +44,7 @@ import com.xuanji.app.domain.MysticInteractionOption
 import com.xuanji.app.domain.MysticGuideGenerator
 import com.xuanji.app.domain.MysticOpeningCheckin
 import com.xuanji.app.domain.MysticOpeningOption
+import com.xuanji.app.domain.MysticGuestCameo
 import com.xuanji.app.domain.MysticRhythmCheckin
 
 private data class MysticTurn(
@@ -62,6 +63,7 @@ private class MysticCompanionState(initialMode: String, initialTopic: String) {
     var pendingHandoffEcho by mutableStateOf<String?>(null)
     var rhythmAnswered by mutableStateOf(false)
     var completedRhythmKey by mutableStateOf<String?>(null)
+    var guestCameo by mutableStateOf<MysticGuestCameo?>(null)
 }
 
 private val mysticCompanionStates = mutableMapOf<String, MysticCompanionState>()
@@ -90,6 +92,7 @@ fun MysticGuideCard(
     var pendingHandoffEcho by remember(companion) { companion::pendingHandoffEcho }
     var rhythmAnswered by remember(companion) { companion::rhythmAnswered }
     var completedRhythmKey by remember(companion) { companion::completedRhythmKey }
+    var guestCameo by remember(companion) { companion::guestCameo }
     val latestTest = records.maxByOrNull { it.date }
     val guide = remember(mode, topic, bazi, fortune, latestTest) {
         MysticGuideGenerator.generate(mode, topic, bazi, fortune, latestTest)
@@ -135,6 +138,10 @@ fun MysticGuideCard(
         if (pendingHandoff == null) {
             interactionCarryoverOption = null
         }
+    }
+
+    LaunchedEffect(guide) {
+        guestCameo = null
     }
 
     LaunchedEffect(guide) {
@@ -334,6 +341,12 @@ fun MysticGuideCard(
         while (conversation.size > 5) conversation.removeAt(0)
         completedRhythmKey = key
         rhythmAnswered = true
+        guestCameo = guestCameo ?: MysticGuideGenerator.guestCameo(
+            mode,
+            guide.topicKey,
+            fortune,
+            key
+        )
         pendingRhythm = null
     }
 
@@ -519,6 +532,43 @@ fun MysticGuideCard(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
+                    }
+                }
+            }
+
+            guestCameo?.let { cameo ->
+                Surface(
+                    Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.32f)
+                ) {
+                    Column(
+                        Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Row(
+                            Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                cameo.roleName,
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                "路过 · 客串一句",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = accent.copy(alpha = 0.86f)
+                            )
+                        }
+                        Text(
+                            cameo.line,
+                            style = MaterialTheme.typography.bodySmall,
+                            lineHeight = 20.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
                 }
             }
@@ -744,6 +794,7 @@ fun MysticGuideCard(
                                         pendingRhythm = null
                                         completedRhythmKey = null
                                         rhythmAnswered = false
+                                        guestCameo = null
                                         customQuestion = ""
                                     },
                                     color = Color.Transparent

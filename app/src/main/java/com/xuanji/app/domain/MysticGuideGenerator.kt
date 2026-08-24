@@ -59,6 +59,11 @@ data class MysticRhythmCheckin(
     val options: List<MysticRhythmOption>
 )
 
+data class MysticGuestCameo(
+    val roleName: String,
+    val line: String
+)
+
 /**
  * 双面灵语：玄学家负责基于现有算法结果做心理按摩，半仙负责浮夸调侃。
  * 不使用随机数；同一个人、同一天、同一问题、同一模式必然得到同一回答。
@@ -352,6 +357,86 @@ object MysticGuideGenerator {
                 }
             }
         }
+    }
+
+    /** 另一位角色只在节奏签到后探一次头；判定与文案都由盘面稳定取样。 */
+    fun guestCameo(
+        mode: String,
+        topicKey: String,
+        fortune: CompositeDailyFortune,
+        rhythmKey: String = ""
+    ): MysticGuestCameo? {
+        if (fortune.dimensions.isEmpty()) return null
+        val source = listOf(
+            canonicalDateKey(fortune.dateKey),
+            "guest",
+            mode,
+            topicKey,
+            fortune.overallScore,
+            fortune.luckyNumber,
+            rhythmKey
+        ).joinToString("|")
+        var hash = 733L
+        for (char in source) {
+            hash = (hash * 41L + char.code) % 2147483647L
+        }
+        if (hash % 5L != 0L) return null
+
+        val high = fortune.dimensions.maxByOrNull { it.score } ?: fortune.dimensions.first()
+        val low = fortune.dimensions.minByOrNull { it.score } ?: fortune.dimensions.first()
+        val focus = if (topicKey == "test") {
+            high
+        } else {
+            fortune.dimensions.firstOrNull { it.key == topicKey }
+                ?: fortune.dimensions.firstOrNull { it.key == "emotion" && topicKey == "love" }
+                ?: fortune.dimensions.first()
+        }
+        val score = fortune.overallScore
+        val useColor = score % 2 == 0
+        val value = if (useColor) fortune.luckyColor else fortune.luckyDirection
+        val sourceName = if (useColor) "幸运色" else "吉利方位"
+        val scholarMain = mode != "half"
+        val lines = if (scholarMain) {
+            when {
+                score >= 65 -> listOf(
+                    "哟，「${focus.label}」 ${focus.score} 分？行，今天不用本半仙救场，我就在旁边看你得意。",
+                    "好家伙，「${high.label}」 ${high.score} 都冒仙气了！先别谢天，明天记得也这么精神。",
+                    "${sourceName}「$value」都来捧场了；小心走太快，仙鹤也要看红绿灯。"
+                )
+                score < 45 -> listOf(
+                    "咳，「${low.label}」 ${low.score} 是有点蔫；本半仙不吓你，先把饭吃热、觉睡够。",
+                    "别硬撑，「${low.label}」 ${low.score} 只是让你收着走；留三分力气，明天还能翻云。",
+                    "这页我看过了，不算完蛋。「${low.label}」要小步走，${sourceName}「$value」就当个提醒。"
+                )
+                else -> listOf(
+                    "我探头看了看，「${focus.label}」 ${focus.score} 分；温吞也有温吞的走法，别自己吓自己。",
+                    "这盘不惊不喜，「${low.label}」 ${low.score} 先照顾好；大戏改天再唱。",
+                    "${sourceName}「$value」路过递个提醒：今天把琐事收拾干净就够体面了。"
+                )
+            }
+        } else {
+            when {
+                score >= 65 -> listOf(
+                    "我从旁边瞄了一眼：「${focus.label}」 ${focus.score} 分，确实值得高兴；别把这份稳当成必须表演的戏。",
+                    "路过替你记一笔：「${high.label}」 ${high.score} 在线。锣鼓可以听，别跟着把自己催热。",
+                    "这盘面不算差。${sourceName}「$value」只是提醒，你已经有能接住它的节奏。"
+                )
+                score < 45 -> listOf(
+                    "我在旁边看了一会儿：「${low.label}」 ${low.score} 分只是提醒，不是给你定性的结论。",
+                    "路过核对了一遍，「${low.label}」 ${low.score} 要收着照顾；先做最小的一件就好。",
+                    "${sourceName}「$value」可以当停顿记号；「${low.label}」需要休息，不需要责备。"
+                )
+                else -> listOf(
+                    "我看了一眼这页：「${focus.label}」 ${focus.score} 分，适合慢慢整理，不必逼它立刻开花。",
+                    "路过留下一句：「${low.label}」 ${low.score} 分值得照看；小事做完就可以停下。",
+                    "这盘面平稳。${sourceName}「$value」当提醒就好，路线还是由你定。"
+                )
+            }
+        }
+        return MysticGuestCameo(
+            roleName = if (scholarMain) "半仙" else "玄学家",
+            line = lines[((hash / 13L) % lines.size).toInt()]
+        )
     }
 
     private fun rhythmPrompt(scholar: Boolean, styleKey: String, topicKey: String): String {
