@@ -28,9 +28,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.Canvas
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Icon
@@ -49,7 +49,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.xuanji.app.data.model.BaziFull
@@ -86,6 +90,7 @@ fun MysticFloatingGuide(
             MysticOrb(
                 roleName = if (mode == "half") "半仙" else "玄学家",
                 skinLabel = skin.label,
+                skinId = skin.id,
                 color = Color(skin.garment),
                 backColor = Color(skin.back),
                 trimColor = Color(skin.trim),
@@ -142,6 +147,7 @@ fun MysticFloatingGuide(
 private fun MysticOrb(
     roleName: String,
     skinLabel: String,
+    skinId: String,
     color: Color,
     backColor: Color,
     trimColor: Color,
@@ -164,8 +170,9 @@ private fun MysticOrb(
         modifier
             .offset {
                 IntOffset(
-                    (Math.sin(wave.toDouble()) * 5).roundToInt(),
-                    -(scrollValue * 0.035f).roundToInt() + (Math.cos(wave.toDouble()) * 3).roundToInt()
+                    (Math.sin(wave.toDouble()) * 3).roundToInt(),
+                    (Math.sin(scrollValue / 72.0) * 5).roundToInt() +
+                        (Math.cos(wave.toDouble()) * 2).roundToInt()
                 )
             }
             .padding(18.dp),
@@ -174,38 +181,19 @@ private fun MysticOrb(
     ) {
         Box(
             Modifier
-                .size(62.dp)
-                .shadow(14.dp, CircleShape)
-                .clip(CircleShape)
+                .size(60.dp, 74.dp)
+                .shadow(14.dp, RoundedCornerShape(topEnd = 28.dp, topStart = 28.dp, bottomEnd = 22.dp, bottomStart = 22.dp))
+                .clip(RoundedCornerShape(topEnd = 28.dp, topStart = 28.dp, bottomEnd = 22.dp, bottomStart = 22.dp))
                 .background(backColor)
-                .border(1.5.dp, trimColor.copy(alpha = 0.75f), CircleShape)
+                .border(1.5.dp, trimColor.copy(alpha = 0.75f), RoundedCornerShape(topEnd = 28.dp, topStart = 28.dp, bottomEnd = 22.dp, bottomStart = 22.dp))
                 .clickable(onClick = onClick),
             contentAlignment = Alignment.Center
         ) {
-            Box(
-                Modifier
-                    .align(Alignment.BottomCenter)
-                    .fillMaxWidth()
-                    .height(28.dp)
-                    .background(color)
-            )
-            Box(
-                Modifier
-                    .align(Alignment.BottomCenter)
-                    .fillMaxWidth()
-                    .padding(bottom = 19.dp)
-                    .height(2.dp)
-                    .background(trimColor)
-            )
-            Text(
-                if (roleName == "半仙") "半" else "玄",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
-                color = if (roleName == "半仙") {
-                    MaterialTheme.colorScheme.tertiary
-                } else {
-                    MaterialTheme.colorScheme.primary
-                }
+            MysticFigure(
+                half = roleName == "半仙",
+                skinId = skinId,
+                garment = color,
+                trim = trimColor
             )
         }
         Surface(
@@ -214,10 +202,110 @@ private fun MysticOrb(
             contentColor = MaterialTheme.colorScheme.onSurface
         ) {
             Text(
-                "$skinLabel · 对话",
+                "$roleName · $skinLabel · 对话",
                 Modifier.padding(horizontal = 9.dp, vertical = 3.dp),
                 style = MaterialTheme.typography.labelSmall
             )
         }
     }
+}
+
+@Composable
+private fun MysticFigure(
+    half: Boolean,
+    skinId: String,
+    garment: Color,
+    trim: Color
+) {
+    Canvas(Modifier.fillMaxSize()) {
+        drawMysticFigure(half, skinId, garment, trim)
+    }
+}
+
+private fun DrawScope.drawMysticFigure(
+    half: Boolean,
+    skinId: String,
+    garment: Color,
+    trim: Color
+) {
+    val ink = Color(0xFF2C2137)
+    val skinTone = Color(0xFFF6EDE2)
+    val width = size.width
+    val height = size.height
+
+    drawRoundRect(
+        color = garment,
+        topLeft = Offset(width * .16f, height * .52f),
+        size = Size(width * .68f, height * .42f),
+        cornerRadius = CornerRadius(width * .20f, width * .20f)
+    )
+    drawRoundRect(
+        color = ink,
+        topLeft = Offset(width * .24f, height * .08f),
+        size = Size(width * .52f, height * .13f),
+        cornerRadius = CornerRadius(width * .08f, width * .08f)
+    )
+    drawOval(
+        color = skinTone,
+        topLeft = Offset(width * .27f, height * .11f),
+        size = Size(width * .46f, height * .43f)
+    )
+
+    if (half) {
+        drawCircle(ink, radius = width * .055f, center = Offset(width * .50f, height * .06f))
+    }
+
+    val eyeY = height * .30f
+    drawCircle(ink, radius = width * .025f, center = Offset(width * .40f, eyeY))
+    drawCircle(ink, radius = width * .025f, center = Offset(width * .60f, eyeY))
+    drawArc(
+        color = ink,
+        startAngle = if (half) 25f else 205f,
+        sweepAngle = 130f,
+        useCenter = false,
+        style = Stroke(width * .025f),
+        topLeft = Offset(width * .42f, height * .31f),
+        size = Size(width * .16f, height * .10f)
+    )
+
+    when (skinId) {
+        "academy-gown" -> {
+            drawLine(trim, Offset(width * .23f, height * .15f), Offset(width * .77f, height * .15f), width * .05f)
+            drawLine(trim, Offset(width * .74f, height * .15f), Offset(width * .74f, height * .27f), width * .03f)
+        }
+        "silkroad-robe" -> {
+            drawArc(trim, startAngle = 190f, sweepAngle = 160f, useCenter = true,
+                topLeft = Offset(width * .21f, height * .04f), size = Size(width * .58f, height * .29f))
+        }
+        "northland-mantle" -> {
+            drawArc(garment, startAngle = 180f, sweepAngle = 180f, useCenter = true,
+                topLeft = Offset(width * .18f, height * .06f), size = Size(width * .64f, height * .48f))
+            repeat(4) { index ->
+                drawCircle(trim, radius = width * .025f, center = Offset(width * (.26f + index * .16f), height * .53f))
+            }
+        }
+        "street-jacket" -> {
+            drawLine(trim, Offset(width * .34f, height * .56f), Offset(width * .66f, height * .56f), width * .04f)
+            drawCircle(trim, radius = width * .03f, center = Offset(width * .50f, height * .65f))
+        }
+        "desert-traveler" -> {
+            drawArc(trim, startAngle = 170f, sweepAngle = 200f, useCenter = false, style = Stroke(width * .05f),
+                topLeft = Offset(width * .22f, height * .05f), size = Size(width * .56f, height * .33f))
+        }
+        "festival-costume" -> {
+            drawRoundRect(
+                color = trim,
+                topLeft = Offset(width * .32f, height * .02f),
+                size = Size(width * .36f, height * .12f),
+                cornerRadius = CornerRadius(width * .05f, width * .05f)
+            )
+            drawCircle(trim, radius = width * .04f, center = Offset(width * .50f, height * .01f))
+        }
+        else -> {
+            drawLine(trim, Offset(width * .36f, height * .54f), Offset(width * .64f, height * .54f), width * .04f)
+            drawCircle(trim, radius = width * .035f, center = Offset(width * .50f, height * .10f))
+        }
+    }
+
+    drawLine(trim, Offset(width * .34f, height * .60f), Offset(width * .66f, height * .60f), width * .035f)
 }
