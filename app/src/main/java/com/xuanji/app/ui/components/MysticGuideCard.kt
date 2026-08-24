@@ -1902,9 +1902,10 @@ fun MysticGuideCard(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
-                                    MysticGuideGenerator.thinkingLine(
-                                        current.mode,
+                                    MysticGuideGenerator.thinkingBeat(
+                                        mode,
                                         current.styleKey,
+                                        companion.skinId,
                                         when {
                                             pendingInteraction != null -> "game"
                                             pendingHandoff != null -> "handoff"
@@ -1912,7 +1913,8 @@ fun MysticGuideCard(
                                             pendingRhythm != null -> "rhythm"
                                             pendingClarify != null -> "ask"
                                             else -> "ask"
-                                        }
+                                        },
+                                        conversation.size
                                     ),
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant

@@ -2245,6 +2245,75 @@ object MysticGuideGenerator {
         }
     }
 
+    /** 服饰专属的现场小动作；同一服饰和对话进度永远得到同一段。 */
+    fun skinThinkingAction(mode: String, skinId: String, exchangeCount: Int = 0): String {
+        val count = exchangeCount.coerceAtLeast(0)
+        val band = count % 3
+        val scholar = mode != "half"
+        return if (scholar) {
+            when (skinId) {
+                "jiangnan-robe" -> when (band) {
+                    0 -> "把茶盏挪开半寸"
+                    1 -> "用书签压住页角"
+                    else -> "把素袖拢到手肘"
+                }
+                "academy-gown" -> when (band) {
+                    0 -> "把星扣对齐领口"
+                    1 -> "把披巾搭上椅背"
+                    else -> "把记录板转过来"
+                }
+                "silkroad-robe" -> when (band) {
+                    0 -> "把腰带铜扣转半圈"
+                    1 -> "摊开驿站的旧图"
+                    else -> "把缠巾往上拢了拢"
+                }
+                "northland-mantle" -> when (band) {
+                    0 -> "按了按斗篷银扣"
+                    1 -> "拂掉毛边上的风尘"
+                    else -> "把帐篷绳结收紧半分"
+                }
+                else -> ""
+            }
+        } else {
+            when (skinId) {
+                "cloud-daoist" -> when (band) {
+                    0 -> "抚平云纹补子"
+                    1 -> "把朱砂绦绕上腕子"
+                    else -> "朝云柜里看了一眼"
+                }
+                "street-jacket" -> when (band) {
+                    0 -> "抖了抖铜铃袖口"
+                    1 -> "拿布扣敲了敲桌面"
+                    else -> "把茶碗往前推半寸"
+                }
+                "desert-traveler" -> when (band) {
+                    0 -> "把铜镜腰牌翻过来"
+                    1 -> "掸了掸沙金披肩"
+                    else -> "把旅靴上的沙磕掉"
+                }
+                "festival-costume" -> when (band) {
+                    0 -> "理了理撞色滚边"
+                    1 -> "把纸符袋捏出一道折"
+                    else -> "用戏腔清了个嗓"
+                }
+                else -> ""
+            }
+        }
+    }
+
+    /** 把服饰小动作接在原等待行前；非法服饰安全退回原行。 */
+    fun thinkingBeat(
+        mode: String,
+        styleKey: String,
+        skinId: String,
+        kind: String,
+        exchangeCount: Int = 0
+    ): String {
+        val base = thinkingLine(mode, styleKey, kind)
+        val action = skinThinkingAction(mode, skinId, exchangeCount)
+        return if (action.isBlank()) base else "$action；$base"
+    }
+
     fun handoffReaction(mode: String, styleKey: String): String {
         val scholar = mode != "half"
         return if (scholar) {
