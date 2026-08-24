@@ -1509,6 +1509,33 @@ object MysticGuideGenerator {
                         MysticInteractionOption("最常打开的软件", "看清注意力的去向，不做批评，只做记录。"),
                         MysticInteractionOption("今天的低电量时刻", "找到它，明天就能提前设一个休息点。")
                     )
+                ),
+                MysticInteraction(
+                    title = "三格沙盘",
+                    description = "把眼前的事分成启动、等待、收尾三格。",
+                    options = listOf(
+                        MysticInteractionOption("放入启动格", "好，就给它一个明确的开始时间；别让准备变成新任务。"),
+                        MysticInteractionOption("放入等待格", "写清在等谁、等到什么时候；悬着的事有了坐标会轻很多。"),
+                        MysticInteractionOption("放入收尾格", "收尾最容易被忘掉。补上最后一步，才算真正腾出手。")
+                    )
+                ),
+                MysticInteraction(
+                    title = "回声提问",
+                    description = "挑一句今天最常在心里响起的话。",
+                    options = listOf(
+                        MysticInteractionOption("“我必须快点”", "先把“快”换成“下一步”。速度是结果，不必硬逼成前提。"),
+                        MysticInteractionOption("“我还没准备好”", "那就列出最小装备。准备好不是感觉，是能拿出来的东西。"),
+                        MysticInteractionOption("“别人会怎么看”", "把观众缩小到一个真正相关的人；他的具体需求更值得听。")
+                    )
+                ),
+                MysticInteraction(
+                    title = "边界清点",
+                    description = "为今天的注意力画一条干净的边界。",
+                    options = listOf(
+                        MysticInteractionOption("保留一件事", "对，主线只留一件；其余的事可以排队，不用同时喊话。"),
+                        MysticInteractionOption("延后一件事", "延后要落到时间点。这样它不会被丢掉，也不会一直追着你。"),
+                        MysticInteractionOption("拒绝一件事", "拒绝可以很轻：“这次先不接。”留出的空间就是今天的余地。")
+                    )
                 )
             )
         } else {
@@ -1557,12 +1584,49 @@ object MysticGuideGenerator {
                         MysticInteractionOption("一条边界", "签收成功。今天可以对多余的任务说：仙鹤也要下班。"),
                         MysticInteractionOption("十分钟安静", "包裹有点轻，效果不小；安静完记得回来。")
                     )
+                ),
+                MysticInteraction(
+                    title = "仙气盲盒",
+                    description = "本半仙摇了摇云柜，先摸一个状态！",
+                    options = listOf(
+                        MysticInteractionOption("摸到小锣鼓", "开场锣响！先做五分钟，别等仙气排面齐了才动。"),
+                        MysticInteractionOption("摸到云朵毯", "充电令已下！歇十分钟，起来时只带一件事回去。"),
+                        MysticInteractionOption("摸到小算盘", "算盘说了：把大目标切成三小块，神仙也怕一口吞桌。")
+                    )
+                ),
+                MysticInteraction(
+                    title = "云上账房",
+                    description = "报出今天最占心思的一笔，账房先生帮你分账！",
+                    options = listOf(
+                        MysticInteractionOption("记成精力账", "入账！先问它给你耗多少、回多少；亏本的事要设个止损点。"),
+                        MysticInteractionOption("记成时间账", "记账成功！给它一个钟点，别让这件事偷偷包场。"),
+                        MysticInteractionOption("记成人情账", "记下了！该说清楚就说清楚，人情不能全靠猜谜维持。")
+                    )
+                ),
+                MysticInteraction(
+                    title = "小道消息分拣",
+                    description = "云外传来三条消息，你只能带走一条！",
+                    options = listOf(
+                        MysticInteractionOption("带走“先落地”", "这条灵！想法落成一个动作，比再想十遍都有仙效。"),
+                        MysticInteractionOption("带走“别贪多”", "盖章！三个开头不如一个完成；剩下的先封进云罐。"),
+                        MysticInteractionOption("带走“留证据”", "妙啊！做完随手记一笔，回头就不用靠仙忆硬猜。")
+                    )
                 )
             )
         }
         val games = staticGames + contextualGames(scholar, fortune)
         val seed = interactionSeed(mode, topicKey, fortune, 0)
-        val picked = ((seed / 19L).toInt() + round.coerceAtLeast(0)) % games.size
+        val safeRound = round.coerceAtLeast(0)
+
+        // 固定互质步长让每次换局都换内容，且完整轮转后才回到起点。
+        var picked = ((seed / 19L) % games.size).toInt()
+        var stride = (seed % (games.size - 1L)).toInt() + 1
+        while (greatestCommonDivisor(stride, games.size) != 1) {
+            stride = (stride % (games.size - 1)) + 1
+        }
+        repeat(safeRound) {
+            picked = (picked + stride) % games.size
+        }
         return games[picked]
     }
 
@@ -1933,6 +1997,17 @@ object MysticGuideGenerator {
             hash = (hash * 37L + char.code) % 2147483647L
         }
         return hash
+    }
+
+    private fun greatestCommonDivisor(a: Int, b: Int): Int {
+        var left = a
+        var right = b
+        while (right != 0) {
+            val next = left % right
+            left = right
+            right = next
+        }
+        return left
     }
 
     private fun canonicalDateKey(value: String): String {
