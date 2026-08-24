@@ -9,8 +9,10 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
@@ -64,6 +66,8 @@ private class MysticCompanionState(initialMode: String, initialTopic: String) {
     var rhythmAnswered by mutableStateOf(false)
     var completedRhythmKey by mutableStateOf<String?>(null)
     var guestCameo by mutableStateOf<MysticGuestCameo?>(null)
+    var guestReply by mutableStateOf("")
+    var pendingGuest by mutableStateOf(false)
 }
 
 private val mysticCompanionStates = mutableMapOf<String, MysticCompanionState>()
@@ -93,6 +97,8 @@ fun MysticGuideCard(
     var rhythmAnswered by remember(companion) { companion::rhythmAnswered }
     var completedRhythmKey by remember(companion) { companion::completedRhythmKey }
     var guestCameo by remember(companion) { companion::guestCameo }
+    var guestReply by remember(companion) { companion::guestReply }
+    var pendingGuest by remember(companion) { companion::pendingGuest }
     val latestTest = records.maxByOrNull { it.date }
     val guide = remember(mode, topic, bazi, fortune, latestTest) {
         MysticGuideGenerator.generate(mode, topic, bazi, fortune, latestTest)
@@ -142,6 +148,8 @@ fun MysticGuideCard(
 
     LaunchedEffect(guide) {
         guestCameo = null
+        guestReply = ""
+        pendingGuest = false
     }
 
     LaunchedEffect(guide) {
@@ -157,7 +165,8 @@ fun MysticGuideCard(
             pendingHandoff != null ||
             pendingCustom != null ||
             pendingOpening != null ||
-            pendingRhythm != null
+            pendingRhythm != null ||
+            pendingGuest
         ) return
         pendingFollowUp = key
     }
@@ -169,7 +178,8 @@ fun MysticGuideCard(
             pendingHandoff != null ||
             pendingCustom != null ||
             pendingOpening != null ||
-            pendingRhythm != null
+            pendingRhythm != null ||
+            pendingGuest
         ) return
         val cleanQuestion = customQuestion.trim().take(60)
         if (cleanQuestion.isEmpty()) return
@@ -184,7 +194,8 @@ fun MysticGuideCard(
             pendingHandoff != null ||
             pendingCustom != null ||
             pendingOpening != null ||
-            pendingRhythm != null
+            pendingRhythm != null ||
+            pendingGuest
         ) return
         interactionCarryoverOption = null
         mode = targetMode
@@ -198,7 +209,8 @@ fun MysticGuideCard(
             pendingHandoff != null ||
             pendingCustom != null ||
             pendingOpening != null ||
-            pendingRhythm != null
+            pendingRhythm != null ||
+            pendingGuest
         ) return
         val previousTopic = topic
         val carryover = MysticGuideGenerator.interactionCarryover(
@@ -259,6 +271,7 @@ fun MysticGuideCard(
             pendingCustom != null ||
             pendingOpening != null ||
             pendingRhythm != null ||
+            pendingGuest ||
             opening?.options?.none { it.key == option.key } != false
         ) return
         pendingOpening = option
@@ -305,7 +318,8 @@ fun MysticGuideCard(
             pendingHandoff != null ||
             pendingCustom != null ||
             pendingOpening != null ||
-            pendingRhythm != null
+            pendingRhythm != null ||
+            pendingGuest
         ) return
         selectedRhythm = key
         pendingRhythm = key
@@ -348,6 +362,24 @@ fun MysticGuideCard(
             key
         )
         pendingRhythm = null
+    }
+
+    fun requestGuestReply() {
+        if (guestCameo == null || guestReply.isNotBlank() || pendingGuest) return
+        pendingGuest = true
+    }
+
+    LaunchedEffect(pendingGuest, guestCameo, guide) {
+        if (!pendingGuest || guestCameo == null) return@LaunchedEffect
+        kotlinx.coroutines.delay(320)
+        if (!pendingGuest || guestCameo == null) return@LaunchedEffect
+        guestReply = MysticGuideGenerator.guestReply(
+            mode,
+            guide.topicKey,
+            fortune,
+            completedRhythmKey.orEmpty()
+        )
+        pendingGuest = false
     }
 
     LaunchedEffect(pendingCustom, guide) {
@@ -569,6 +601,31 @@ fun MysticGuideCard(
                             lineHeight = 20.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
+
+                        if (guestReply.isBlank()) {
+                            OutlinedButton(
+                                onClick = ::requestGuestReply,
+                                enabled = !pendingGuest,
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
+                                modifier = Modifier
+                                    .padding(top = 6.dp)
+                                    .heightIn(min = 30.dp)
+                            ) {
+                                Text(
+                                    if (pendingGuest) "客串正在接话" else "回一句",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    lineHeight = 15.sp
+                                )
+                            }
+                        } else {
+                            Text(
+                                guestReply,
+                                modifier = Modifier.padding(top = 8.dp),
+                                style = MaterialTheme.typography.bodySmall,
+                                lineHeight = 19.sp,
+                                color = accent.copy(alpha = 0.90f)
+                            )
+                        }
                     }
                 }
             }
@@ -774,7 +831,8 @@ fun MysticGuideCard(
                                 pendingHandoff != null ||
                                 pendingCustom != null ||
                                 pendingOpening != null ||
-                                pendingRhythm != null
+                                pendingRhythm != null ||
+                                pendingGuest
                             ) {
                                 Surface(
                                     onClick = {
@@ -795,6 +853,8 @@ fun MysticGuideCard(
                                         completedRhythmKey = null
                                         rhythmAnswered = false
                                         guestCameo = null
+                                        guestReply = ""
+                                        pendingGuest = false
                                         customQuestion = ""
                                     },
                                     color = Color.Transparent
@@ -855,7 +915,8 @@ fun MysticGuideCard(
                                     pendingHandoff == null &&
                                     pendingCustom == null &&
                                     pendingOpening == null &&
-                                    pendingRhythm == null
+                                    pendingRhythm == null &&
+                                    !pendingGuest
                             ) {
                                 Text("问")
                             }
@@ -964,7 +1025,8 @@ fun MysticGuideCard(
                                         pendingHandoff != null ||
                                         pendingCustom != null ||
                                         pendingOpening != null ||
-                                        pendingRhythm != null
+                                        pendingRhythm != null ||
+                                        pendingGuest
                                     ) {
                                         // Keep the current game visible until its pending reply lands.
                                     } else {
@@ -999,7 +1061,8 @@ fun MysticGuideCard(
                                             pendingHandoff == null &&
                                             pendingCustom == null &&
                                             pendingOpening == null &&
-                                            pendingRhythm == null
+                                            pendingRhythm == null &&
+                                            !pendingGuest
                                         ) {
                                             selectedInteraction = option
                                             pendingInteraction = option

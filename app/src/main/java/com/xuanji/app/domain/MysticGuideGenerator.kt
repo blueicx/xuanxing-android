@@ -439,6 +439,88 @@ object MysticGuideGenerator {
         )
     }
 
+    /** 客串出现后的唯一追问；只复述盘面线索和节奏语义，不追加命运判断。 */
+    fun guestReply(
+        mode: String,
+        topicKey: String,
+        fortune: CompositeDailyFortune,
+        rhythmKey: String = ""
+    ): String {
+        if (fortune.dimensions.isEmpty()) return ""
+        val source = listOf(
+            canonicalDateKey(fortune.dateKey),
+            "guest-reply",
+            mode,
+            topicKey,
+            fortune.overallScore,
+            fortune.luckyNumber,
+            rhythmKey
+        ).joinToString("|")
+        var hash = 937L
+        for (char in source) {
+            hash = (hash * 43L + char.code) % 2147483647L
+        }
+
+        val high = fortune.dimensions.maxByOrNull { it.score } ?: fortune.dimensions.first()
+        val low = fortune.dimensions.minByOrNull { it.score } ?: fortune.dimensions.first()
+        val focus = if (topicKey == "test") {
+            high
+        } else {
+            fortune.dimensions.firstOrNull { it.key == topicKey }
+                ?: fortune.dimensions.firstOrNull { it.key == "emotion" && topicKey == "love" }
+                ?: fortune.dimensions.first()
+        }
+        val score = fortune.overallScore
+        val useColor = score % 2 == 0
+        val value = if (useColor) fortune.luckyColor else fortune.luckyDirection
+        val sourceName = if (useColor) "幸运色" else "吉利方位"
+        val rhythmNote = when (rhythmKey) {
+            "steady" -> "你选的稳速还摆在桌上"
+            "tired" -> "你说过的累也摆在桌上"
+            "rushed" -> "你说的被催着走也摆在桌上"
+            else -> "节奏先按刚才那页记着"
+        }
+        val scholarMain = mode != "half"
+        val lines = if (scholarMain) {
+            when {
+                score >= 65 -> listOf(
+                    "行，「${focus.label}」 ${focus.score} 分确实能打；${rhythmNote}，${sourceName}「$value」就当个路标。",
+                    "本半仙再瞄一眼：「${high.label}」 ${high.score} 是排面，「${low.label}」别忘照看；${rhythmNote}。",
+                    "好运不用我盖章。「${focus.label}」有 ${focus.score} 分，${sourceName}「$value」只是提醒；${rhythmNote}。"
+                )
+                score < 45 -> listOf(
+                    "「${low.label}」 ${low.score} 分是提醒，不是判决；${rhythmNote}，先做最小一件。",
+                    "我还在旁边。「${focus.label}」 ${focus.score} 分要省着用，${sourceName}「$value」别当成命令。",
+                    "这页不算塌。「${low.label}」需要休息，${sourceName}「$value」可以帮你停一下；${rhythmNote}。"
+                )
+                else -> listOf(
+                    "再看一遍：「${focus.label}」 ${focus.score} 分适合小步走；${rhythmNote}，${sourceName}「$value」当便签。",
+                    "温吞不是坏事。「${high.label}」 ${high.score} 能借力，「${low.label}」 ${low.score} 要照顾。",
+                    "我把分数摆平了：「${focus.label}」 ${focus.score} 分；${sourceName}「$value」只作参照；${rhythmNote}。"
+                )
+            }
+        } else {
+            when {
+                score >= 65 -> listOf(
+                    "好兆头我不抢功。「${focus.label}」 ${focus.score} 分在线；${rhythmNote}，${sourceName}「$value」当提醒就好。",
+                    "「${high.label}」 ${high.score} 确实亮；可「${low.label}」也要留口气，${rhythmNote}。",
+                    "我从旁核对过：「${focus.label}」有 ${focus.score} 分，${sourceName}「$value」不是护身符；${rhythmNote}。"
+                )
+                score < 45 -> listOf(
+                    "「${low.label}」 ${low.score} 分看着低，但只是今天的状态页；${rhythmNote}，先吃饭睡觉。",
+                    "别急着定性。「${focus.label}」 ${focus.score} 分要收着走，${sourceName}「$value」当暂停记号。",
+                    "这一页不吓人。「${low.label}」需要照看，${sourceName}「$value」只是提示；${rhythmNote}。"
+                )
+                else -> listOf(
+                    "「${focus.label}」 ${focus.score} 分不急不缓；${rhythmNote}，${sourceName}「$value」放在手边即可。",
+                    "这盘面像温水。「${high.label}」能搭把手，「${low.label}」 ${low.score} 别硬压。",
+                    "我替你把线捋了捋：「${focus.label}」 ${focus.score} 分；${sourceName}「$value」只作参照；${rhythmNote}。"
+                )
+            }
+        }
+        return lines[((hash / 17L) % lines.size).toInt()]
+    }
+
     private fun rhythmPrompt(scholar: Boolean, styleKey: String, topicKey: String): String {
         val topic = topicLabel(topicKey)
         return if (scholar) {
