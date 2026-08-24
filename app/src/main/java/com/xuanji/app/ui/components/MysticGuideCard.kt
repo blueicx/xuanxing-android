@@ -93,6 +93,7 @@ private class MysticCompanionState(initialMode: String, initialTopic: String) {
     var memoryNotes by mutableStateOf(emptyList<MysticMemoryNote>())
     var memorySequence by mutableStateOf(0)
     var memoryExpanded by mutableStateOf(false)
+    var skinId by mutableStateOf("")
 }
 
 private val mysticCompanionStates = mutableMapOf<String, MysticCompanionState>()
@@ -102,7 +103,9 @@ private fun mysticCompanionState(
     fortune: CompositeDailyFortune
 ): MysticCompanionState = mysticCompanionStates.getOrPut(key) {
     val topic = "composite"
-    MysticCompanionState(MysticGuideGenerator.suggestedMode(topic, fortune), topic)
+    MysticCompanionState(MysticGuideGenerator.suggestedMode(topic, fortune), topic).also {
+        it.skinId = MysticGuideGenerator.defaultMysticSkin(it.mode, fortune).id
+    }
 }
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -161,8 +164,14 @@ fun MysticGuideCard(
     var selectedInteraction by remember(guide, interactionRound) { mutableStateOf<MysticInteractionOption?>(null) }
     var selectedClarifier by remember(guide) { mutableStateOf<String?>(null) }
     var pendingClarify by remember(guide) { mutableStateOf<MysticClarifierOption?>(null) }
-    val interaction = remember(mode, topic, fortune, interactionRound) {
-        MysticGuideGenerator.interaction(mode, topic, fortune, interactionRound)
+    val interaction = remember(mode, topic, fortune, interactionRound, companion.skinId) {
+        MysticGuideGenerator.interaction(
+            mode,
+            topic,
+            fortune,
+            interactionRound,
+            companion.skinId
+        )
     }
     val opening: MysticOpeningCheckin? = remember(mode, guide.topicKey, guide.styleKey, fortune) {
         MysticGuideGenerator.openingCheckin(
@@ -669,7 +678,11 @@ fun MysticGuideCard(
                                 guide.styleKey,
                                 guestChoiceCarryoverKey.orEmpty()
                             ),
-                            MysticGuideGenerator.interactionReaction(mode, guide.styleKey)
+                            MysticGuideGenerator.interactionReaction(
+                                mode,
+                                guide.styleKey,
+                                companion.skinId
+                            )
                         )
                     )
                 ),
@@ -746,6 +759,10 @@ fun MysticGuideCard(
     var skinIndex by remember(mode, fortune) {
         mutableStateOf(skins.indexOf(MysticGuideGenerator.defaultMysticSkin(mode, fortune)))
     }
+    var skinSource by remember(mode, fortune) { mutableStateOf("daily") }
+    LaunchedEffect(skinIndex) {
+        companion.skinId = skins.getOrNull(skinIndex)?.id.orEmpty()
+    }
     val skin = skins[skinIndex.coerceIn(skins.indices)]
 
     Card(Modifier.fillMaxWidth()) {
@@ -804,6 +821,11 @@ fun MysticGuideCard(
                         color = accent.copy(alpha = 0.86f)
                     )
                     Text(
+                        "口吻 · ${skin.voiceLabel} · ${skin.voiceIntro}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = accent.copy(alpha = 0.86f)
+                    )
+                    Text(
                         "现场 · ${MysticGuideGenerator.presenceState(mode, guide.styleKey, conversation.size)}",
                         style = MaterialTheme.typography.labelSmall,
                         color = accent.copy(alpha = 0.86f)
@@ -829,6 +851,37 @@ fun MysticGuideCard(
                             )
                             .clickable { skinIndex = index }
                     )
+                }
+            }
+
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                listOf("daily" to "今日随机", "custom" to "指定服饰").forEach { (source, label) ->
+                    Surface(
+                        onClick = {
+                            if (source == "daily") {
+                                skinIndex = skins.indexOf(
+                                    MysticGuideGenerator.defaultMysticSkin(mode, fortune)
+                                )
+                            }
+                            skinSource = source
+                        },
+                        shape = RoundedCornerShape(999.dp),
+                        color = if (skinSource == source) {
+                            accent.copy(alpha = 0.20f)
+                        } else {
+                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.42f)
+                        }
+                    ) {
+                        Text(
+                            label,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = if (skinSource == source) accent else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
             }
 

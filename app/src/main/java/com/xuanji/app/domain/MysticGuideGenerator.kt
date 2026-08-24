@@ -92,7 +92,11 @@ data class MysticSkin(
     val detail: String,
     val back: Long,
     val garment: Long,
-    val trim: Long
+    val trim: Long,
+    val voiceLabel: String,
+    val voiceIntro: String,
+    val gameLead: String,
+    val reactionTail: String
 )
 
 /**
@@ -100,6 +104,17 @@ data class MysticSkin(
  * 不使用随机数；同一个人、同一天、同一问题、同一模式必然得到同一回答。
  */
 object MysticGuideGenerator {
+    private val skinGameOrder = mapOf(
+        "jiangnan-robe" to listOf("最小一步", "回声提问", "强弱接力"),
+        "academy-gown" to listOf("六十秒校准", "两栏笔记", "开关实验"),
+        "silkroad-robe" to listOf("可控分拣", "三分钟观察站", "强弱接力"),
+        "northland-mantle" to listOf("三格沙盘", "边界清点", "开关实验"),
+        "cloud-daoist" to listOf("仙家三宝", "云上签筒", "仙家调配室"),
+        "street-jacket" to listOf("天庭弹幕", "小道消息分拣", "幸运快递·定制"),
+        "desert-traveler" to listOf("仙气盲盒", "仙界快递", "仙家调配室"),
+        "festival-costume" to listOf("云朵点名", "天庭弹幕", "幸运快递·定制")
+    )
+
     private val topics = linkedMapOf(
         "composite" to "综合",
         "career" to "事业",
@@ -114,18 +129,54 @@ object MysticGuideGenerator {
 
     fun mysticSkins(mode: String): List<MysticSkin> = if (mode == "half") {
         listOf(
-            MysticSkin("cloud-daoist", "云纹道袍", "朱砂绦 · 金云补子", 0xFFF5E3D4, 0xFF97654A, 0xFFD89B62),
-            MysticSkin("street-jacket", "街口短打", "铜铃袖口 · 布扣", 0xFFF0E4DA, 0xFF84604F, 0xFFCBA96C),
-            MysticSkin("desert-traveler", "流沙旅袍", "铜镜腰牌 · 沙金披肩", 0xFFF3E6CB, 0xFFA87C4F, 0xFFE4C57C),
-            MysticSkin("festival-costume", "节庆戏袍", "纸符袋 · 撞色滚边", 0xFFF4DBD8, 0xFFA05F63, 0xFFD9A05B)
+            MysticSkin(
+                "cloud-daoist", "云纹道袍", "朱砂绦 · 金云补子", 0xFFF5E3D4, 0xFF97654A, 0xFFD89B62,
+                "云雾仙腔", "天机不急，咱先把它翻译成人话。", "云柜开了一条缝——", "仙气登记完毕！"
+            ),
+            MysticSkin(
+                "street-jacket", "街口短打", "铜铃袖口 · 布扣", 0xFFF0E4DA, 0xFF84604F, 0xFFCBA96C,
+                "街口直给", "咱不绕弯子，说完就去做。", "茶碗一放，", "成，这事就这么办！"
+            ),
+            MysticSkin(
+                "desert-traveler", "流沙旅袍", "铜镜腰牌 · 沙金披肩", 0xFFF3E6CB, 0xFFA87C4F, 0xFFE4C57C,
+                "流沙慢热", "沙子里走路，先试一步再落脚。", "风把签筒推过来——", "嗯，脚印留下了。"
+            ),
+            MysticSkin(
+                "festival-costume", "节庆戏袍", "纸符袋 · 撞色滚边", 0xFFF4DBD8, 0xFFA05F63, 0xFFD9A05B,
+                "锣鼓戏腔", "好戏开场，但台词都从盘面里来！", "锣鼓点起——", "漂亮！这一幕记进戏折！"
+            )
         )
     } else {
         listOf(
-            MysticSkin("jiangnan-robe", "江南书生袍", "青玉襟 · 素袖", 0xFFDCEAE4, 0xFF6F9C90, 0xFFD9C58B),
-            MysticSkin("academy-gown", "星港学士服", "星扣领 · 深灰披巾", 0xFFDFE5F3, 0xFF77809F, 0xFFE2C275),
-            MysticSkin("silkroad-robe", "丝路学者袍", "藏书腰带 · 松石缠巾", 0xFFDCEDEA, 0xFF48948F, 0xFFE7BE68),
-            MysticSkin("northland-mantle", "北地游学斗篷", "银扣 · 苔绿毛边", 0xFFE1EBDC, 0xFF799458, 0xFFD7E0C6)
+            MysticSkin(
+                "jiangnan-robe", "江南书生袍", "青玉襟 · 素袖", 0xFFDCEAE4, 0xFF6F9C90, 0xFFD9C58B,
+                "温润书卷", "我把话说软一点，但依据不会少。", "先把茶放稳——", "这一步选得妥帖。"
+            ),
+            MysticSkin(
+                "academy-gown", "星港学士服", "星扣领 · 深灰披巾", 0xFFDFE5F3, 0xFF77809F, 0xFFE2C275,
+                "清朗学理", "我们按证据走，一句一句对齐。", "先立个假设：", "记录已入册，结论留给你验证。"
+            ),
+            MysticSkin(
+                "silkroad-robe", "丝路学者袍", "藏书腰带 · 松石缠巾", 0xFFDCEDEA, 0xFF48948F, 0xFFE7BE68,
+                "远行务实", "路要分段走，盘面也按驿站看。", "换到下一站前，", "好，这匹骆驼先驮这一件。"
+            ),
+            MysticSkin(
+                "northland-mantle", "北地游学斗篷", "银扣 · 苔绿毛边", 0xFFE1EBDC, 0xFF799458, 0xFFD7E0C6,
+                "稳拙守边", "风大的时候，边界比速度更要紧。", "先扎稳帐篷：", "行，这一步踩得实。"
+            )
         )
+    }
+
+    fun mysticSkinVoice(mode: String, skinId: String): MysticSkin? =
+        mysticSkins(mode).firstOrNull { it.id == skinId }
+
+    private fun orderedInteractionGames(
+        games: List<MysticInteraction>,
+        skinId: String
+    ): List<MysticInteraction> {
+        val preferredTitles = skinGameOrder[skinId].orEmpty()
+        val preferred = preferredTitles.mapNotNull { title -> games.firstOrNull { it.title == title } }
+        return preferred + games.filter { game -> preferred.none { it.title == game.title } }
     }
 
     fun defaultMysticSkin(mode: String, fortune: CompositeDailyFortune): MysticSkin {
@@ -1501,7 +1552,8 @@ object MysticGuideGenerator {
         mode: String,
         topicKey: String,
         fortune: CompositeDailyFortune,
-        round: Int
+        round: Int,
+        skinId: String = ""
     ): MysticInteraction {
         val scholar = mode != "half"
         val staticGames = if (scholar) {
@@ -1655,8 +1707,9 @@ object MysticGuideGenerator {
                 )
             )
         }
-        val games = staticGames + contextualGames(scholar, fortune)
-        val seed = interactionSeed(mode, topicKey, fortune, 0)
+        val knownSkin = mysticSkinVoice(mode, skinId)
+        val games = orderedInteractionGames(staticGames + contextualGames(scholar, fortune), skinId)
+        val seed = interactionSeed(mode, topicKey, fortune, 0, knownSkin?.id.orEmpty())
         val safeRound = round.coerceAtLeast(0)
 
         // 固定互质步长让每次换局都换内容，且完整轮转后才回到起点。
@@ -1668,7 +1721,12 @@ object MysticGuideGenerator {
         repeat(safeRound) {
             picked = (picked + stride) % games.size
         }
-        return games[picked]
+        val pickedGame = games[picked]
+        return if (knownSkin == null) {
+            pickedGame
+        } else {
+            pickedGame.copy(description = "${knownSkin.gameLead}${pickedGame.description}")
+        }
     }
 
     /** 追问前的短反应；repeat 用次数递进，让连续追问像被同一个人记住了。 */
@@ -1736,19 +1794,20 @@ object MysticGuideGenerator {
     }
 
     /** 小游戏选择也会被当作一句“用户发言”，玄师按自己的作风先接一句。 */
-    fun interactionReaction(mode: String, styleKey: String): String {
+    fun interactionReaction(mode: String, styleKey: String, skinId: String = ""): String {
         val scholar = mode != "half"
+        val tail = mysticSkinVoice(mode, skinId)?.let { " ${it.reactionTail}" } ?: ""
         return if (scholar) {
             when (styleKey) {
-                "archive" -> "我先把这项记在旁边；做法比说法更重要。"
-                "harbor" -> "好，你选的这一步我已经接住了。"
-                else -> "这个方向够小，适合真的走一步。"
+                "archive" -> "我先把这项记在旁边；做法比说法更重要。$tail"
+                "harbor" -> "好，你选的这一步我已经接住了。$tail"
+                else -> "这个方向够小，适合真的走一步。$tail"
             }
         } else {
             when (styleKey) {
-                "herald" -> "恭喜！这条选择已经敲锣送进云海！"
-                "alley" -> "行，就按这个来；咱不整虚的。"
-                else -> "已登记工单！实习生保证不把它弄丢。"
+                "herald" -> "恭喜！这条选择已经敲锣送进云海！$tail"
+                "alley" -> "行，就按这个来；咱不整虚的。$tail"
+                else -> "已登记工单！实习生保证不把它弄丢。$tail"
             }
         }
     }
@@ -2029,10 +2088,12 @@ object MysticGuideGenerator {
         mode: String,
         topicKey: String,
         fortune: CompositeDailyFortune,
-        round: Int
+        round: Int,
+        skinId: String = ""
     ): Long {
         val safeRound = round.coerceAtLeast(0)
-        val source = "${canonicalDateKey(fortune.dateKey)}|$mode|$topicKey|${fortune.overallScore}|$safeRound"
+        val skinSuffix = mysticSkinVoice(mode, skinId)?.let { "|${it.id}" } ?: ""
+        val source = "${canonicalDateKey(fortune.dateKey)}|$mode|$topicKey|${fortune.overallScore}|$safeRound$skinSuffix"
         var hash = 52711L
         for (char in source) {
             hash = (hash * 37L + char.code) % 2147483647L
