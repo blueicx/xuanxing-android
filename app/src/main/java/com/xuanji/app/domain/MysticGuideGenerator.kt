@@ -1067,6 +1067,66 @@ object MysticGuideGenerator {
         return choiceNote + "「$cleanDetail」的${kindLabel}先归位。" + body
     }
 
+    /** 搭腔离席后的头部短状态；只说明现场变化，不判断运势。 */
+    fun asidePresenceState(mode: String, styleKey: String): String {
+        val scholar = mode != "half"
+        return if (scholar) {
+            when (styleKey) {
+                "archive" -> "档案边多了旁注"
+                "harbor" -> "灯影刚送走旁听"
+                "compass" -> "罗盘旁留了个副标"
+                else -> "档案边多了旁注"
+            }
+        } else {
+            when (styleKey) {
+                "herald" -> "台侧刚收一句插话"
+                "alley" -> "茶摊刚少个搭腔"
+                "intern" -> "协作备注多了一条"
+                else -> "台侧刚收一句插话"
+            }
+        }
+    }
+
+    /** 对面离席后留一条手记；同一焦点、选项和作风永远得到同一句。 */
+    fun asideMemoryNote(
+        mode: String,
+        styleKey: String,
+        choiceKey: String,
+        detail: String = ""
+    ): String {
+        val familyStyles = when (mode) {
+            "scholar" -> setOf("archive", "harbor", "compass")
+            "half" -> setOf("herald", "alley", "intern")
+            else -> return ""
+        }
+        val choice = asideChoices().firstOrNull { it.key == choiceKey } ?: return ""
+        if (styleKey !in familyStyles) return ""
+
+        var clean = Normalizer.normalize(detail, Normalizer.Form.NFC)
+        clean = clean.replace(Regex("[\\u0000-\\u0008\\u000B-\\u001F\\u007F-\\u009F\\u200B-\\u200F\\uFEFF]"), "")
+        clean = clean.replace(Regex("[\\s\\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000]+"), " ").trim()
+        if (clean.isEmpty()) return ""
+        if (clean.codePointCount(0, clean.length) > 24) {
+            clean = clean.substring(0, clean.offsetByCodePoints(0, 24)) + "…"
+        }
+
+        val roleName = if (mode == "half") "玄学家" else "半仙"
+        val stance = when (choice.key) {
+            "why" -> "被问依据"
+            "accept" -> "的话被收下"
+            else -> "被拦了一句"
+        }
+        return when (styleKey) {
+            "archive" -> "档案边注：$roleName$stance，线索是$clean。"
+            "harbor" -> "$roleName$stance；${clean}还留在灯下。"
+            "compass" -> "$roleName$stance，${clean}标成副参照。"
+            "herald" -> "场记：$roleName$stance！${clean}仍回主线！"
+            "alley" -> "$roleName$stance；${clean}这茬先放茶边。"
+            "intern" -> "协作备注：$roleName$stance，${clean}保留待办。"
+            else -> ""
+        }
+    }
+
     /** 客串出现后的三种接法；选项固定，回答只复述盘面线索和节奏语义。 */
     fun guestChoices(): List<MysticGuestChoice> = listOf(
         MysticGuestChoice("why", "问依据：这个判断从哪来？"),

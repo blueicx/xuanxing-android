@@ -175,6 +175,7 @@ fun MysticGuideCard(
     var pendingClarify by remember(guide) { mutableStateOf<MysticClarifierOption?>(null) }
     var pendingAsideTurnKey by remember(guide) { mutableStateOf<String?>(null) }
     var pendingAsideActionTurnKey by remember(guide) { mutableStateOf<String?>(null) }
+    var presenceOverride by remember(guide) { mutableStateOf<String?>(null) }
     val interaction = remember(mode, topic, fortune, interactionRound, companion.skinId) {
         MysticGuideGenerator.interaction(
             mode,
@@ -227,6 +228,19 @@ fun MysticGuideCard(
         val text = MysticGuideGenerator.memoryNote(mode, guide.styleKey, kind, detail)
         if (text.isBlank()) return
         val note = MysticMemoryNote("memory-$kind-$memorySequence", text)
+        memoryNotes = (listOf(note) + memoryNotes).take(3)
+        memorySequence += 1
+    }
+
+    fun rememberAsideMemory(choiceKey: String, detail: String) {
+        val text = MysticGuideGenerator.asideMemoryNote(
+            mode,
+            guide.styleKey,
+            choiceKey,
+            detail
+        )
+        if (text.isBlank()) return
+        val note = MysticMemoryNote("memory-aside-$memorySequence", text)
         memoryNotes = (listOf(note) + memoryNotes).take(3)
         memorySequence += 1
     }
@@ -422,6 +436,8 @@ fun MysticGuideCard(
                 turn.asideChoice
             )
         )
+        presenceOverride = MysticGuideGenerator.asidePresenceState(mode, guide.styleKey)
+        rememberAsideMemory(turn.asideChoice, turn.question)
         pendingAsideActionTurnKey = null
     }
 
@@ -445,6 +461,7 @@ fun MysticGuideCard(
         pendingGuestChoiceEcho = null
         selectedClarifier = null
         pendingClarify = null
+        presenceOverride = null
         memoryNotes = emptyList()
         memorySequence = 0
         memoryExpanded = false
@@ -990,7 +1007,11 @@ fun MysticGuideCard(
                         color = accent.copy(alpha = 0.86f)
                     )
                     Text(
-                        "现场 · ${MysticGuideGenerator.presenceState(mode, guide.styleKey, conversation.size)}",
+                        "现场 · ${presenceOverride ?: MysticGuideGenerator.presenceState(
+                            mode,
+                            guide.styleKey,
+                            conversation.size
+                        )}",
                         style = MaterialTheme.typography.labelSmall,
                         color = accent.copy(alpha = 0.86f)
                     )
@@ -1476,6 +1497,7 @@ fun MysticGuideCard(
                                         customQuestion = ""
                                         selectedClarifier = null
                                         pendingClarify = null
+                                        presenceOverride = null
                                         pendingAsideTurnKey = null
                                         pendingAsideActionTurnKey = null
                                     },
