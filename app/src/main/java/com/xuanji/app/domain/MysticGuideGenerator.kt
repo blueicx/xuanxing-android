@@ -48,6 +48,17 @@ data class MysticOpeningCheckin(
     val options: List<MysticOpeningOption>
 )
 
+data class MysticRhythmOption(
+    val key: String,
+    val label: String,
+    val response: String
+)
+
+data class MysticRhythmCheckin(
+    val prompt: String,
+    val options: List<MysticRhythmOption>
+)
+
 /**
  * 双面灵语：玄学家负责基于现有算法结果做心理按摩，半仙负责浮夸调侃。
  * 不使用随机数；同一个人、同一天、同一问题、同一模式必然得到同一回答。
@@ -219,6 +230,218 @@ object MysticGuideGenerator {
                 "herald" -> "开场签到收到！锣鼓先收半个音！"
                 "alley" -> "行，就从这个茬开聊；茶给你续上。"
                 else -> "工单已接！实习生这就翻开对应页！"
+            }
+        }
+    }
+
+    /** 今日节奏签到：把真实盘面锚到用户自报状态上，不新增命运判断。 */
+    fun rhythmCheckin(
+        mode: String,
+        topicKey: String,
+        styleKey: String,
+        fortune: CompositeDailyFortune
+    ): MysticRhythmCheckin? {
+        if (fortune.dimensions.isEmpty()) return null
+        val strong = fortune.dimensions.maxByOrNull { it.score } ?: return null
+        val weak = fortune.dimensions.minByOrNull { it.score } ?: return null
+        val useColor = fortune.overallScore % 2 == 0
+        val switchLabel = if (useColor) fortune.luckyColor else fortune.luckyDirection
+        val switchSource = if (useColor) "幸运色" else "吉利方位"
+        val caution = fortune.cautions.trim().replace(Regex("\\s+"), " ")
+        val prompt = rhythmPrompt(mode != "half", styleKey, topicKey)
+        val options = listOf(
+            MysticRhythmOption(
+                key = "steady",
+                label = "稳稳推进",
+                response = rhythmSteadyResponse(
+                    mode != "half",
+                    styleKey,
+                    topicKey,
+                    strong.label,
+                    strong.score,
+                    switchSource,
+                    switchLabel
+                )
+            ),
+            MysticRhythmOption(
+                key = "tired",
+                label = "有点累",
+                response = rhythmTiredResponse(
+                    mode != "half",
+                    styleKey,
+                    topicKey,
+                    weak.label,
+                    weak.score,
+                    caution
+                )
+            ),
+            MysticRhythmOption(
+                key = "rushed",
+                label = "被赶着走",
+                response = rhythmRushedResponse(
+                    mode != "half",
+                    styleKey,
+                    topicKey,
+                    caution,
+                    switchSource,
+                    switchLabel
+                )
+            )
+        )
+        return MysticRhythmCheckin(prompt, options)
+    }
+
+    fun rhythmReaction(mode: String, styleKey: String): String {
+        return if (mode != "half") {
+            when (styleKey) {
+                "archive" -> "好，节奏这一栏我先记下。"
+                "harbor" -> "嗯，你的节奏我听见了；不用赶。"
+                else -> "速度先标在这里；路线仍由你调。"
+            }
+        } else {
+            when (styleKey) {
+                "herald" -> "节奏档位登记完毕！锣鼓跟着你收放！"
+                "alley" -> "行，今天按这个劲儿来；茶不催你。"
+                else -> "表单提交成功！实习生帮你把节奏置顶！"
+            }
+        }
+    }
+
+    /** 节奏只保存语义档位；下一次可消费动作由当时的人设重新表达。 */
+    fun rhythmCarryover(mode: String, styleKey: String, rhythmKey: String): String {
+        return if (mode != "half") {
+            when (styleKey) {
+                "archive" -> when (rhythmKey) {
+                    "steady" -> "档案边角补了一笔：你今天选了稳速。"
+                    "tired" -> "档案边角记着：你今天有点累。"
+                    "rushed" -> "档案边角记着：你今天被催得紧。"
+                    else -> ""
+                }
+                "harbor" -> when (rhythmKey) {
+                    "steady" -> "我记得你说今天还稳得住。"
+                    "tired" -> "我记得你说今天有些累。"
+                    "rushed" -> "我记得你说今天被人推着走。"
+                    else -> ""
+                }
+                else -> when (rhythmKey) {
+                    "steady" -> "罗盘旁留了个标记：今天的速度是稳的。"
+                    "tired" -> "罗盘旁留了个标记：今天要省一点力。"
+                    "rushed" -> "罗盘旁留了个标记：今天的速度偏急。"
+                    else -> ""
+                }
+            }
+        } else {
+            when (styleKey) {
+                "herald" -> when (rhythmKey) {
+                    "steady" -> "后台字幕已记：今日稳速前进！"
+                    "tired" -> "后台字幕已记：今日电量偏低！"
+                    "rushed" -> "后台字幕已记：今日场务别乱催！"
+                    else -> ""
+                }
+                "alley" -> when (rhythmKey) {
+                    "steady" -> "你刚说今天还算稳，咱记着这茬。"
+                    "tired" -> "你刚说今天累，咱不装没听见。"
+                    "rushed" -> "你刚说今天赶，咱先把这事记下。"
+                    else -> ""
+                }
+                else -> when (rhythmKey) {
+                    "steady" -> "工单备注：今日节奏稳定。"
+                    "tired" -> "工单备注：今日需要省电。"
+                    "rushed" -> "工单备注：今日外部催促较多。"
+                    else -> ""
+                }
+            }
+        }
+    }
+
+    private fun rhythmPrompt(scholar: Boolean, styleKey: String, topicKey: String): String {
+        val topic = topicLabel(topicKey)
+        return if (scholar) {
+            when (styleKey) {
+                "archive" -> "${topic}档案旁多了一栏状态；今天你选哪一档？"
+                "harbor" -> "灯先留着；${topic}之外，你的节奏是哪一种？"
+                else -> "盘面归位了；先标一下你今天的速度。"
+            }
+        } else {
+            when (styleKey) {
+                "herald" -> "开场登记补充项！今天的节奏档位报一个！"
+                "alley" -> "先别急着上茶；今天你是稳、累还是赶？"
+                else -> "云端表单新增一行：今日节奏选哪个？"
+            }
+        }
+    }
+
+    private fun rhythmSteadyResponse(
+        scholar: Boolean,
+        styleKey: String,
+        topicKey: String,
+        label: String,
+        score: Int,
+        switchSource: String,
+        switchValue: String
+    ): String {
+        val topic = topicLabel(topicKey)
+        return if (scholar) {
+            when (styleKey) {
+                "archive" -> "${topic}档案收到「稳稳推进」。最强项是「$label」，$score 分；${switchSource}「${switchValue}」可以当作提醒。"
+                "harbor" -> "稳着来很好。「$label」现在有 $score 分；${switchSource}「${switchValue}」放在顺手处就好。"
+                else -> "${topic}的速度标成稳档。「$label」 $score 分，${switchSource}「${switchValue}」只作小路标。"
+            }
+        } else {
+            when (styleKey) {
+                "herald" -> "稳速档批准！「$label」 $score 分；${switchSource}「${switchValue}」小旗已举起！"
+                "alley" -> "行，稳住就行。「$label」有 $score 分；${switchSource}「${switchValue}」压在茶杯边。"
+                else -> "云端备注：稳速推进。「$label」 $score 分，${switchSource}「${switchValue}」便签已贴好！"
+            }
+        }
+    }
+
+    private fun rhythmTiredResponse(
+        scholar: Boolean,
+        styleKey: String,
+        topicKey: String,
+        label: String,
+        score: Int,
+        caution: String
+    ): String {
+        val topic = topicLabel(topicKey)
+        val cautionLine = if (caution.isEmpty()) "" else if (scholar) " 盘面提醒：${caution}。" else " 小黑板写着：${caution}！"
+        return if (scholar) {
+            when (styleKey) {
+                "archive" -> "${topic}档案记下「有点累」。最需照看的是「$label」，$score 分。${cautionLine}先做十分钟最小的一步。"
+                "harbor" -> "累了就先承认这件事。「$label」 $score 分。${cautionLine}先做十分钟最小的一步。"
+                else -> "速度降一档也没关系。「$label」 $score 分。${cautionLine}先做十分钟最小的一步。"
+            }
+        } else {
+            when (styleKey) {
+                "herald" -> "低电量档登记！「$label」只有 $score 分。${cautionLine}先回血，锣鼓调小声！"
+                "alley" -> "累就直说，挺好。「$label」才 $score 分。${cautionLine}先回血，别硬扛！"
+                else -> "云端状态：需要休息。「$label」 $score 分。${cautionLine}先回血十分钟！"
+            }
+        }
+    }
+
+    private fun rhythmRushedResponse(
+        scholar: Boolean,
+        styleKey: String,
+        topicKey: String,
+        caution: String,
+        switchSource: String,
+        switchValue: String
+    ): String {
+        val topic = topicLabel(topicKey)
+        val cautionLine = if (caution.isEmpty()) "" else if (scholar) " 盘面提醒：${caution}。" else " 小黑板写着：${caution}！"
+        return if (scholar) {
+            when (styleKey) {
+                "archive" -> "${topic}这一页被催出了折角。${cautionLine}清单先砍成一步；${switchSource}「${switchValue}」用来换挡。"
+                "harbor" -> "被赶着走时，先给自己留个泊位。${cautionLine}清单砍成一步；${switchSource}「${switchValue}」帮你换气。"
+                else -> "急速指针需要慢半拍。${cautionLine}把清单砍成一步；${switchSource}「${switchValue}」当换挡提醒。"
+            }
+        } else {
+            when (styleKey) {
+                "herald" -> "急档收到！场务都别催了！${cautionLine}先刹车三分钟；${switchSource}「${switchValue}」便签送上！"
+                "alley" -> "谁把你催成这样？${cautionLine}先刹车三分钟；${switchSource}「${switchValue}」压在清单上面。"
+                else -> "云端提示：速度过载。${cautionLine}刹车三分钟；${switchSource}「${switchValue}」便签已弹出！"
             }
         }
     }
@@ -758,18 +981,21 @@ object MysticGuideGenerator {
                     "game" -> "正在把你的选择抄进档案"
                     "handoff" -> "正在把上一页夹好"
                     "opening" -> "正在给签到句找位置"
+                    "rhythm" -> "正在把节奏栏补上"
                     else -> "正在翻对应的那一页"
                 }
                 "harbor" -> when (kind) {
                     "game" -> "正在看你选出的那一步"
                     "handoff" -> "正在给话题换个坐姿"
                     "opening" -> "正在接住开场那句"
+                    "rhythm" -> "正在接住你的节奏"
                     else -> "先接住这句话"
                 }
                 else -> when (kind) {
                     "game" -> "正在核对最小一步"
                     "handoff" -> "罗盘准备只转一格"
                     "opening" -> "罗盘正在对准入口"
+                    "rhythm" -> "指针正按你的速度调整"
                     else -> "指针正在慢慢对齐"
                 }
             }
@@ -779,18 +1005,21 @@ object MysticGuideGenerator {
                     "game" -> "锣鼓小队正在验票"
                     "handoff" -> "换场锣鼓正在调音"
                     "opening" -> "开场名帖正在登记"
+                    "rhythm" -> "节奏档位正在登记"
                     else -> "天庭司仪正翻到那一页"
                 }
                 "alley" -> when (kind) {
                     "game" -> "半仙正在给你递签"
                     "handoff" -> "大碗茶先挪个位置"
                     "opening" -> "开场这茬正摆上桌"
+                    "rhythm" -> "半仙正在掂量你的劲儿"
                     else -> "街口半仙正在打听"
                 }
                 else -> when (kind) {
                     "game" -> "云上工单正在登记"
                     "handoff" -> "云端工单正在改派"
                     "opening" -> "签到表单提交中"
+                    "rhythm" -> "节奏表单提交中"
                     else -> "实习生法术加载中"
                 }
             }

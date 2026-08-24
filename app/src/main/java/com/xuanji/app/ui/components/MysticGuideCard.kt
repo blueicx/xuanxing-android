@@ -44,6 +44,7 @@ import com.xuanji.app.domain.MysticInteractionOption
 import com.xuanji.app.domain.MysticGuideGenerator
 import com.xuanji.app.domain.MysticOpeningCheckin
 import com.xuanji.app.domain.MysticOpeningOption
+import com.xuanji.app.domain.MysticRhythmCheckin
 
 private data class MysticTurn(
     val key: String,
@@ -57,6 +58,10 @@ private class MysticCompanionState(initialMode: String, initialTopic: String) {
     var mode by mutableStateOf(initialMode)
     var topic by mutableStateOf(initialTopic)
     var interactionCarryoverOption by mutableStateOf<String?>(null)
+    var pendingHandoff by mutableStateOf<String?>(null)
+    var pendingHandoffEcho by mutableStateOf<String?>(null)
+    var rhythmAnswered by mutableStateOf(false)
+    var completedRhythmKey by mutableStateOf<String?>(null)
 }
 
 private val mysticCompanionStates = mutableMapOf<String, MysticCompanionState>()
@@ -76,17 +81,15 @@ fun MysticGuideCard(
     fortune: CompositeDailyFortune
 ) {
     val records by AppModule.testRecordRepository.records.collectAsStateWithLifecycle(initialValue = emptyList())
-    val companionKey = listOf(
-        bazi.chart.display,
-        bazi.strength.level,
-        fortune.dateKey,
-        fortune.overallScore,
-        fortune.luckyNumber
-    ).joinToString("|")
+    val companionKey = "${bazi.hashCode()}|${fortune.hashCode()}"
     val companion = remember(companionKey) { mysticCompanionState(companionKey, fortune) }
     var topic by remember(companion) { companion::topic }
     var mode by remember(companion) { companion::mode }
     var interactionCarryoverOption by remember(companion) { companion::interactionCarryoverOption }
+    var pendingHandoff by remember(companion) { companion::pendingHandoff }
+    var pendingHandoffEcho by remember(companion) { companion::pendingHandoffEcho }
+    var rhythmAnswered by remember(companion) { companion::rhythmAnswered }
+    var completedRhythmKey by remember(companion) { companion::completedRhythmKey }
     val latestTest = records.maxByOrNull { it.date }
     val guide = remember(mode, topic, bazi, fortune, latestTest) {
         MysticGuideGenerator.generate(mode, topic, bazi, fortune, latestTest)
@@ -97,11 +100,11 @@ fun MysticGuideCard(
     var arrivalVisible by remember(guide) { mutableStateOf(false) }
     var pendingFollowUp by remember(guide) { mutableStateOf<String?>(null) }
     var pendingInteraction by remember(guide) { mutableStateOf<MysticInteractionOption?>(null) }
-    var pendingHandoff by remember { mutableStateOf<String?>(null) }
-    var pendingHandoffEcho by remember { mutableStateOf<String?>(null) }
     var pendingCustom by remember(guide) { mutableStateOf<String?>(null) }
     var pendingOpening by remember(guide) { mutableStateOf<MysticOpeningOption?>(null) }
     var openingAnswered by remember(guide) { mutableStateOf(false) }
+    var selectedRhythm by remember(guide) { mutableStateOf<String?>(null) }
+    var pendingRhythm by remember(guide) { mutableStateOf<String?>(null) }
     var customQuestion by remember(guide) { mutableStateOf("") }
     var interactionCount by remember(guide) { mutableStateOf(0) }
     var customCount by remember(guide) { mutableStateOf(0) }
@@ -113,6 +116,14 @@ fun MysticGuideCard(
     }
     val opening: MysticOpeningCheckin? = remember(mode, guide.topicKey, guide.styleKey, fortune) {
         MysticGuideGenerator.openingCheckin(
+            mode,
+            guide.topicKey,
+            guide.styleKey,
+            fortune
+        )
+    }
+    val rhythm: MysticRhythmCheckin? = remember(mode, guide.topicKey, guide.styleKey, fortune) {
+        MysticGuideGenerator.rhythmCheckin(
             mode,
             guide.topicKey,
             guide.styleKey,
@@ -138,7 +149,8 @@ fun MysticGuideCard(
             pendingInteraction != null ||
             pendingHandoff != null ||
             pendingCustom != null ||
-            pendingOpening != null
+            pendingOpening != null ||
+            pendingRhythm != null
         ) return
         pendingFollowUp = key
     }
@@ -149,7 +161,8 @@ fun MysticGuideCard(
             pendingInteraction != null ||
             pendingHandoff != null ||
             pendingCustom != null ||
-            pendingOpening != null
+            pendingOpening != null ||
+            pendingRhythm != null
         ) return
         val cleanQuestion = customQuestion.trim().take(60)
         if (cleanQuestion.isEmpty()) return
@@ -163,7 +176,8 @@ fun MysticGuideCard(
             pendingInteraction != null ||
             pendingHandoff != null ||
             pendingCustom != null ||
-            pendingOpening != null
+            pendingOpening != null ||
+            pendingRhythm != null
         ) return
         interactionCarryoverOption = null
         mode = targetMode
@@ -176,7 +190,8 @@ fun MysticGuideCard(
             pendingInteraction != null ||
             pendingHandoff != null ||
             pendingCustom != null ||
-            pendingOpening != null
+            pendingOpening != null ||
+            pendingRhythm != null
         ) return
         val previousTopic = topic
         val carryover = MysticGuideGenerator.interactionCarryover(
@@ -206,14 +221,23 @@ fun MysticGuideCard(
                     guide.topicKey
                 ),
                 reaction = MysticGuideGenerator.composeReaction(
-                    pendingHandoffEcho.orEmpty(),
-                    MysticGuideGenerator.handoffReaction(mode, guide.styleKey)
+                    MysticGuideGenerator.rhythmCarryover(
+                        mode,
+                        guide.styleKey,
+                        completedRhythmKey.orEmpty()
+                    ),
+                    MysticGuideGenerator.composeReaction(
+                        pendingHandoffEcho.orEmpty(),
+                        MysticGuideGenerator.handoffReaction(mode, guide.styleKey)
+                    )
                 ),
+
                 kind = "handoff"
             )
         )
         while (conversation.size > 5) conversation.removeAt(0)
         interactionCarryoverOption = null
+        completedRhythmKey = null
         pendingHandoff = null
         pendingHandoffEcho = null
         pendingOpening = null
@@ -227,6 +251,7 @@ fun MysticGuideCard(
             pendingHandoff != null ||
             pendingCustom != null ||
             pendingOpening != null ||
+            pendingRhythm != null ||
             opening?.options?.none { it.key == option.key } != false
         ) return
         pendingOpening = option
@@ -263,6 +288,55 @@ fun MysticGuideCard(
         pendingOpening = null
     }
 
+    fun selectRhythm(key: String) {
+        if (
+            !openingAnswered ||
+            rhythmAnswered ||
+            rhythm?.options?.none { it.key == key } != false ||
+            pendingFollowUp != null ||
+            pendingInteraction != null ||
+            pendingHandoff != null ||
+            pendingCustom != null ||
+            pendingOpening != null ||
+            pendingRhythm != null
+        ) return
+        selectedRhythm = key
+        pendingRhythm = key
+    }
+
+    LaunchedEffect(pendingRhythm, guide) {
+        val key = pendingRhythm ?: return@LaunchedEffect
+        kotlinx.coroutines.delay(370)
+        val expectedOption = MysticGuideGenerator.rhythmCheckin(
+            mode,
+            guide.topicKey,
+            guide.styleKey,
+            fortune
+        )?.options?.firstOrNull { it.key == key }
+        val currentStyleKey = MysticGuideGenerator.styleKeyFor(mode, guide.topicKey, fortune)
+        val guideMatches = guide.mode == mode &&
+            guide.topicKey == topic &&
+            guide.styleKey == currentStyleKey
+        if (!guideMatches || expectedOption == null || pendingRhythm != key) {
+            selectedRhythm = null
+            pendingRhythm = null
+            return@LaunchedEffect
+        }
+        conversation.add(
+            MysticTurn(
+                key = "rhythm-${guide.topicKey}-$key",
+                question = expectedOption.label,
+                answer = expectedOption.response,
+                reaction = MysticGuideGenerator.rhythmReaction(mode, guide.styleKey),
+                kind = "rhythm"
+            )
+        )
+        while (conversation.size > 5) conversation.removeAt(0)
+        completedRhythmKey = key
+        rhythmAnswered = true
+        pendingRhythm = null
+    }
+
     LaunchedEffect(pendingCustom, guide) {
         val question = pendingCustom ?: return@LaunchedEffect
         kotlinx.coroutines.delay(430)
@@ -278,19 +352,28 @@ fun MysticGuideCard(
                     latestTest
                 ),
                 reaction = MysticGuideGenerator.composeReaction(
-                    MysticGuideGenerator.interactionCarryover(
+                    MysticGuideGenerator.rhythmCarryover(
                         mode,
                         guide.styleKey,
-                        interactionCarryoverOption.orEmpty()
+                        completedRhythmKey.orEmpty()
                     ),
-                    MysticGuideGenerator.customReaction(mode, guide.styleKey, question)
+                    MysticGuideGenerator.composeReaction(
+                        MysticGuideGenerator.interactionCarryover(
+                            mode,
+                            guide.styleKey,
+                            interactionCarryoverOption.orEmpty()
+                        ),
+                        MysticGuideGenerator.customReaction(mode, guide.styleKey, question)
+                    ),
                 ),
+
                 kind = "ask"
             )
         )
         while (conversation.size > 5) conversation.removeAt(0)
         customCount += 1
         interactionCarryoverOption = null
+        completedRhythmKey = null
         pendingCustom = null
     }
 
@@ -302,13 +385,21 @@ fun MysticGuideCard(
                 key = "game-$interactionCount-${option.label}",
                 question = option.label,
                 answer = option.feedback,
-                reaction = MysticGuideGenerator.interactionReaction(mode, guide.styleKey),
+                reaction = MysticGuideGenerator.composeReaction(
+                    MysticGuideGenerator.rhythmCarryover(
+                        mode,
+                        guide.styleKey,
+                        completedRhythmKey.orEmpty()
+                    ),
+                    MysticGuideGenerator.interactionReaction(mode, guide.styleKey)
+                ),
                 kind = "game"
             )
         )
         while (conversation.size > 5) conversation.removeAt(0)
         interactionCount += 1
         interactionCarryoverOption = option.label
+        completedRhythmKey = null
         pendingInteraction = null
     }
 
@@ -326,12 +417,19 @@ fun MysticGuideCard(
             else -> "ask"
         }
         val reactionLine = MysticGuideGenerator.composeReaction(
-            MysticGuideGenerator.interactionCarryover(
+            MysticGuideGenerator.rhythmCarryover(
                 mode,
                 guide.styleKey,
-                interactionCarryoverOption.orEmpty()
+                completedRhythmKey.orEmpty()
             ),
-            MysticGuideGenerator.reaction(mode, action, askedCount, guide.styleKey)
+            MysticGuideGenerator.composeReaction(
+                MysticGuideGenerator.interactionCarryover(
+                    mode,
+                    guide.styleKey,
+                    interactionCarryoverOption.orEmpty()
+                ),
+                MysticGuideGenerator.reaction(mode, action, askedCount, guide.styleKey)
+            ),
         )
         if (action == "repeat" && conversation.lastOrNull()?.key == key) {
             conversation[conversation.lastIndex] = conversation.last().copy(reaction = reactionLine)
@@ -345,6 +443,7 @@ fun MysticGuideCard(
         askCounts[key] = askedCount
         selectedFollowUp = key
         interactionCarryoverOption = null
+        completedRhythmKey = null
         pendingFollowUp = null
     }
     val accent by animateColorAsState(
@@ -568,6 +667,46 @@ fun MysticGuideCard(
                             }
                         }
 
+                        if (openingAnswered && !rhythmAnswered && rhythm != null) {
+                            Column(
+                                Modifier.fillMaxWidth(),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Text(
+                                    rhythm.prompt,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    lineHeight = 19.sp,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    rhythm.options.forEach { option ->
+                                        Surface(
+                                            onClick = { selectRhythm(option.key) },
+                                            shape = RoundedCornerShape(999.dp),
+                                            color = if (selectedRhythm == option.key) {
+                                                accent
+                                            } else {
+                                                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.48f)
+                                            }
+                                        ) {
+                                            Text(
+                                                option.label,
+                                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                                style = MaterialTheme.typography.labelMedium,
+                                                lineHeight = 17.sp,
+                                                color = if (selectedRhythm == option.key) {
+                                                    Color.White
+                                                } else {
+                                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                                }
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
                         Row(
                             Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
@@ -584,7 +723,8 @@ fun MysticGuideCard(
                                 pendingInteraction != null ||
                                 pendingHandoff != null ||
                                 pendingCustom != null ||
-                                pendingOpening != null
+                                pendingOpening != null ||
+                                pendingRhythm != null
                             ) {
                                 Surface(
                                     onClick = {
@@ -600,6 +740,10 @@ fun MysticGuideCard(
                                         pendingCustom = null
                                         pendingOpening = null
                                         openingAnswered = false
+                                        selectedRhythm = null
+                                        pendingRhythm = null
+                                        completedRhythmKey = null
+                                        rhythmAnswered = false
                                         customQuestion = ""
                                     },
                                     color = Color.Transparent
@@ -659,7 +803,8 @@ fun MysticGuideCard(
                                     pendingInteraction == null &&
                                     pendingHandoff == null &&
                                     pendingCustom == null &&
-                                    pendingOpening == null
+                                    pendingOpening == null &&
+                                    pendingRhythm == null
                             ) {
                                 Text("问")
                             }
@@ -718,7 +863,8 @@ fun MysticGuideCard(
                             pendingInteraction != null ||
                             pendingHandoff != null ||
                             pendingCustom != null ||
-                            pendingOpening != null
+                            pendingOpening != null ||
+                            pendingRhythm != null
                         ) {
                             Row(
                                 Modifier.fillMaxWidth(),
@@ -733,6 +879,7 @@ fun MysticGuideCard(
                                             pendingInteraction != null -> "game"
                                             pendingHandoff != null -> "handoff"
                                             pendingOpening != null -> "opening"
+                                            pendingRhythm != null -> "rhythm"
                                             else -> "ask"
                                         }
                                     ),
@@ -765,7 +912,8 @@ fun MysticGuideCard(
                                         pendingInteraction != null ||
                                         pendingHandoff != null ||
                                         pendingCustom != null ||
-                                        pendingOpening != null
+                                        pendingOpening != null ||
+                                        pendingRhythm != null
                                     ) {
                                         // Keep the current game visible until its pending reply lands.
                                     } else {
@@ -799,7 +947,8 @@ fun MysticGuideCard(
                                             pendingInteraction == null &&
                                             pendingHandoff == null &&
                                             pendingCustom == null &&
-                                            pendingOpening == null
+                                            pendingOpening == null &&
+                                            pendingRhythm == null
                                         ) {
                                             selectedInteraction = option
                                             pendingInteraction = option
