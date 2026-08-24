@@ -5,7 +5,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
-import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
@@ -23,6 +24,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
@@ -176,7 +178,8 @@ class CardLayoutController(
     private var dragSession: CardDragSession? = null
     var draggingCardId by mutableStateOf<String?>(null)
         private set
-    private val cardMetrics = mutableStateMapOf<String, CardMetric>()
+    private val cardMetrics = mutableMapOf<String, CardMetric>()
+    private val previewOffsets = mutableStateMapOf<String, Float>()
 
     fun move(id: String, delta: Int) = update(CardLayouts.move(state, page, id, delta))
 
@@ -224,9 +227,12 @@ class CardLayoutController(
         dragSession = CardDragSession(
             cardId = id,
             originalOrder = visibleIds(),
-            startCenterY = metric.top + metric.height / 2f
+            startCenterY = metric.top + metric.height / 2f,
+            draggedHeight = metric.height,
+            gap = visibleGap()
         )
         draggingCardId = id
+        previewOffsets.clear()
         return true
     }
 
@@ -238,15 +244,25 @@ class CardLayoutController(
         }
         if (insertionIndex == session.lastInsertionIndex) return
         session.lastInsertionIndex = insertionIndex
-        state = state.copy(order = reorderedMap(session.cardId, insertionIndex))
+        updatePreviewOffsets(session, insertionIndex)
     }
 
     fun endDrag() {
-        val next = state
+        commitDrag()
+    }
+
+    fun commitDrag() {
+        val session = dragSession ?: return
+        val next = state.copy(order = reorderedMap(session.cardId, session.lastInsertionIndex))
         dragSession = null
         draggingCardId = null
+        previewOffsets.clear()
+        state = next
         persistState(next)
     }
+
+    fun previewOffset(id: String): Float =
+        if (draggingCardId == null) 0f else previewOffsets[id] ?: 0f
 
     private fun visibleIds(): List<String> = CardLayouts.default(page).order.keys
         .filterNot(state.hidden::contains)
@@ -255,6 +271,32 @@ class CardLayoutController(
     private fun isCenterAbove(id: String, draggedCenterY: Float): Boolean {
         val metric = cardMetrics[id] ?: return false
         return metric.top + metric.height / 2f < draggedCenterY
+    }
+
+    private fun visibleGap(): Float {
+        val ids = visibleIds()
+        val gaps = ids.zipWithNext { currentId, nextId ->
+            val current = cardMetrics[currentId] ?: return@zipWithNext null
+            val next = cardMetrics[nextId] ?: return@zipWithNext null
+            next.top - (current.top + current.height)
+        }.filterNotNull().filter { it >= 0f }
+        return if (gaps.isEmpty()) 0f else gaps.average().toFloat()
+    }
+
+    private fun updatePreviewOffsets(session: CardDragSession, insertionIndex: Int) {
+        val oldIndex = session.originalOrder.indexOf(session.cardId)
+        val shift = session.draggedHeight + session.gap
+        val nextOffsets = session.originalOrder.associateWith { id ->
+            if (id == session.cardId) return@associateWith 0f
+            val index = session.originalOrder.indexOf(id)
+            when {
+                index in (insertionIndex until oldIndex) -> shift
+                index in ((oldIndex + 1)..insertionIndex) -> -shift
+                else -> 0f
+            }
+        }
+        previewOffsets.clear()
+        previewOffsets.putAll(nextOffsets)
     }
 
     private fun reorderedMap(cardId: String, insertionIndex: Int): Map<String, Int> {
@@ -270,9 +312,11 @@ class CardLayoutController(
 private class CardDragSession(
     val cardId: String,
     val originalOrder: List<String>,
-    val startCenterY: Float
+    val startCenterY: Float,
+    val draggedHeight: Float,
+    val gap: Float
 ) {
-    var lastInsertionIndex by mutableStateOf(-1)
+    var lastInsertionIndex = originalOrder.indexOf(cardId).coerceAtLeast(0)
 }
 
 private data class CardMetric(
@@ -370,21 +414,18 @@ fun Modifier.cardDragReorder(
     controller: CardLayoutController
 ): Modifier {
     val currentController by rememberUpdatedState(controller)
-    val scope = rememberCoroutineScope()
-    val dragOffset = remember(cardId) { Animatable(0f) }
+    val dragOffset = remember(cardId) { mutableFloatStateOf(0f) }
     var lastLayoutTop by remember(cardId) { mutableStateOf(Float.NaN) }
+    val previewTarget by rememberUpdatedState(currentController.previewOffset(cardId))
+    val animatedPreview by animateFloatAsState(
+        targetValue = previewTarget,
+        animationSpec = tween(durationMillis = 150, easing = FastOutSlowInEasing),
+        label = "cardDragPreview"
+    )
 
     val measured = onGloballyPositioned { coordinates ->
         val top = coordinates.positionInRoot().y
         val height = coordinates.size.height.toFloat()
-        if (currentController.draggingCardId == cardId &&
-            !lastLayoutTop.isNaN() &&
-            kotlin.math.abs(lastLayoutTop - top) > 0.25f
-        ) {
-            scope.launch {
-                dragOffset.snapTo(dragOffset.value + lastLayoutTop - top)
-            }
-        }
         lastLayoutTop = top
         currentController.recordMetric(cardId, top, height)
     }
@@ -397,7 +438,11 @@ fun Modifier.cardDragReorder(
         .zIndex(if (currentController.draggingCardId == cardId) 3f else 0f)
         .graphicsLayer {
             val active = currentController.draggingCardId == cardId
-            translationY = dragOffset.value
+            translationY = when {
+                active -> dragOffset.floatValue
+                currentController.draggingCardId != null -> animatedPreview
+                else -> 0f
+            }
             scaleX = if (active) 1.01f else 1f
             scaleY = if (active) 1.01f else 1f
             alpha = if (active) 0.98f else 1f
@@ -406,22 +451,16 @@ fun Modifier.cardDragReorder(
             orientation = Orientation.Vertical,
             enabled = true,
             state = rememberDraggableState { delta ->
-                scope.launch {
-                    dragOffset.snapTo(dragOffset.value + delta)
-                    currentController.previewDragTo(dragOffset.value)
-                }
+                if (currentController.draggingCardId != cardId) return@rememberDraggableState
+                dragOffset.floatValue += delta
+                currentController.previewDragTo(dragOffset.floatValue)
             },
             onDragStarted = {
-                scope.launch {
-                    dragOffset.snapTo(0f)
-                    currentController.beginDrag(cardId)
-                }
+                dragOffset.floatValue = 0f
+                currentController.beginDrag(cardId)
             },
             onDragStopped = {
-                scope.launch {
-                    dragOffset.animateTo(0f, tween(150))
-                    currentController.endDrag()
-                }
+                currentController.commitDrag()
             }
         )
 }
