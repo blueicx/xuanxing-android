@@ -99,6 +99,13 @@ data class MysticSkin(
     val reactionTail: String
 )
 
+/** 跨日记访记忆：按命盘隔离，只保留足够玄师“认得人”的最小现场。 */
+data class MysticVisitMemory(
+    val lastDateKey: String,
+    val lastTopicKey: String,
+    val lastAction: String
+)
+
 /**
  * 双面灵语：玄学家负责基于现有算法结果做心理按摩，半仙负责浮夸调侃。
  * 不使用随机数；同一个人、同一天、同一问题、同一模式必然得到同一回答。
@@ -274,6 +281,96 @@ object MysticGuideGenerator {
                 "herald" -> "刚才那句「$label」已在后台登记！"
                 "alley" -> "行，你刚挑的是「$label」，咱记着这茬。"
                 else -> "工单备注：你刚才选了「$label」。"
+            }
+        }
+    }
+
+    /** 两端共用的天文日序差；日期无效或时钟回拨时返回 0。 */
+    fun visitGapDays(previousDateKey: String, currentDateKey: String): Int {
+        val previous = civilDayNumber(canonicalDateKey(previousDateKey))
+        val current = civilDayNumber(canonicalDateKey(currentDateKey))
+        return (current - previous).coerceAtLeast(0L).toInt()
+    }
+
+    /** 隔天回访的开场短句；同输入固定输出，不新增命运判决。 */
+    fun revisitGreeting(
+        mode: String,
+        styleKey: String,
+        fortune: CompositeDailyFortune,
+        memory: MysticVisitMemory
+    ): String {
+        val familyStyles = if (mode == "half") {
+            setOf("herald", "alley", "intern")
+        } else if (mode == "scholar") {
+            setOf("archive", "harbor", "compass")
+        } else {
+            emptySet()
+        }
+        if (styleKey !in familyStyles || memory.lastDateKey.isBlank()) return ""
+        val gap = visitGapDays(memory.lastDateKey, fortune.dateKey)
+        if (gap <= 0) return ""
+
+        val lastTopic = if (topics.containsKey(memory.lastTopicKey)) memory.lastTopicKey else "composite"
+        var action = Normalizer.normalize(memory.lastAction, Normalizer.Form.NFC)
+        action = action.replace(Regex("[\\u0000-\\u0008\\u000B-\\u001F\\u007F-\\u009F\\u200B-\\u200F\\uFEFF]"), "")
+        action = action.replace(Regex("[\\s\\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000]+"), " ").trim()
+        if (action.codePointCount(0, action.length) > 20) {
+            action = action.substring(0, action.offsetByCodePoints(0, 20))
+        }
+        var visitSeed = 52711L
+        val visitSource = "${canonicalDateKey(fortune.dateKey)}|revisit|$mode|$styleKey|$gap|$lastTopic|$action"
+        for (char in visitSource) {
+            visitSeed = (visitSeed * 37L + char.code) % 2147483647L
+        }
+        val variant = (visitSeed % 2L).toInt()
+        val actionClause = if (action.isEmpty()) {
+            if (variant == 0) "上次没等到你的签到" else "上次只留了个到访脚印"
+        } else {
+            "上次你选过「$action」"
+        }
+        val distance = when {
+            gap == 1 -> "昨天"
+            gap <= 6 -> "前几天"
+            else -> "这段时间"
+        }
+        val topicLabel = topicLabel(lastTopic)
+        val luckySwitch = "今天的开关是幸运数字${fortune.luckyNumber}、${fortune.luckyColor}和${fortune.luckyDirection}。"
+
+        return if (mode == "scholar") {
+            when (styleKey) {
+                "archive" -> if (variant == 0) {
+                    "${distance}的档案停在「$topicLabel」那页：$actionClause。$luckySwitch"
+                } else {
+                    "我从「$topicLabel」那页翻回来了——$actionClause；$luckySwitch"
+                }
+                "harbor" -> if (variant == 0) {
+                    "${distance}你回来，灯还照着「$topicLabel」：$actionClause。$luckySwitch"
+                } else {
+                    "「$topicLabel」仍在顺手的地方，$actionClause；$luckySwitch"
+                }
+                else -> if (variant == 0) {
+                    "${distance}的方向记号还留着：$actionClause，我们再看「$topicLabel」。$luckySwitch"
+                } else {
+                    "「$topicLabel」是上次的参照点，$actionClause；$luckySwitch"
+                }
+            }
+        } else {
+            when (styleKey) {
+                "herald" -> if (variant == 0) {
+                    "${distance}的场记还没散场：「$topicLabel」，$actionClause！$luckySwitch"
+                } else {
+                    "锣鼓点接上了，「$topicLabel」重新登场——$actionClause！$luckySwitch"
+                }
+                "alley" -> if (variant == 0) {
+                    "哟，${distance}又来了。$actionClause，咱接着聊「$topicLabel」；$luckySwitch"
+                } else {
+                    "$actionClause，这茬还压在茶碗底下；「$topicLabel」今天续上。$luckySwitch"
+                }
+                else -> if (variant == 0) {
+                    "${distance}的工单自动续上了：主题「$topicLabel」，$actionClause。$luckySwitch"
+                } else {
+                    "旧便签没丢，「$topicLabel」还在排队；$actionClause。$luckySwitch"
+                }
             }
         }
     }
@@ -2561,6 +2658,23 @@ object MysticGuideGenerator {
         val month = parts[1].toIntOrNull() ?: return value
         val day = parts[2].toIntOrNull() ?: return value
         return "$year-$month-$day"
+    }
+
+    private fun civilDayNumber(value: String): Long {
+        val parts = value.split("-")
+        if (parts.size != 3) return 0L
+        val year = parts[0].toIntOrNull() ?: return 0L
+        val month = parts[1].toIntOrNull() ?: return 0L
+        val day = parts[2].toIntOrNull() ?: return 0L
+        if (year !in 1..9999 || month !in 1..12 || day !in 1..31) return 0L
+
+        val countedYear = year - if (month <= 2) 1 else 0
+        val era = countedYear / 400
+        val yearOfEra = countedYear - era * 400
+        val monthIndex = if (month > 2) month - 3 else month + 9
+        val dayOfYear = (153 * monthIndex + 2) / 5 + day - 1
+        val dayOfEra = yearOfEra * 365 + yearOfEra / 4 - yearOfEra / 100 + dayOfYear
+        return era * 146097L + dayOfEra - 719468L
     }
 
     private fun arrivalLine(scholar: Boolean, score: Int, seed: Long): String {

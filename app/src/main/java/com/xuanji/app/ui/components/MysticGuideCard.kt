@@ -35,6 +35,7 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -45,9 +46,14 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.LocalContext
+import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.google.gson.Gson
 import com.xuanji.app.data.model.BaziFull
 import com.xuanji.app.data.model.CompositeDailyFortune
+import com.xuanji.app.data.local.dataStore
 import com.xuanji.app.di.AppModule
 import com.xuanji.app.domain.MysticClarifierOption
 import com.xuanji.app.domain.MysticInteraction
@@ -60,6 +66,10 @@ import com.xuanji.app.domain.MysticGuestChoice
 import com.xuanji.app.domain.MysticGuestExit
 import com.xuanji.app.domain.MysticRhythmCheckin
 import com.xuanji.app.domain.MysticSkin
+import com.xuanji.app.domain.MysticVisitMemory
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
+import java.security.MessageDigest
 
 private data class MysticTurn(
     val key: String,
@@ -79,6 +89,55 @@ private data class MysticMemoryNote(
     val id: String,
     val text: String
 )
+
+private data class StoredMysticVisit(
+    val dateKey: String = "",
+    val topicKey: String = "",
+    val action: String = ""
+)
+
+private class MysticVisitStore(private val context: android.content.Context) {
+    private val gson = Gson()
+
+    suspend fun read(profileKey: String): MysticVisitMemory {
+        val preferences = context.dataStore.data.first()
+        val stored = preferences[stringPreferencesKey("mystic_visit_${fingerprint(profileKey)}")]
+            ?.let { json ->
+                runCatching { gson.fromJson(json, StoredMysticVisit::class.java) }.getOrNull()
+            }
+        return MysticVisitMemory(
+            lastDateKey = stored?.dateKey.orEmpty(),
+            lastTopicKey = stored?.topicKey.orEmpty(),
+            lastAction = stored?.action.orEmpty()
+        )
+    }
+
+    suspend fun save(profileKey: String, memory: MysticVisitMemory) {
+        val key = stringPreferencesKey("mystic_visit_${fingerprint(profileKey)}")
+        context.dataStore.edit { preferences ->
+            preferences[key] = gson.toJson(
+                StoredMysticVisit(
+                    dateKey = canonicalDate(memory.lastDateKey),
+                    topicKey = memory.lastTopicKey,
+                    action = memory.lastAction
+                )
+            )
+        }
+    }
+
+    private fun fingerprint(value: String): String =
+        MessageDigest.getInstance("SHA-256").digest(value.toByteArray())
+            .joinToString("") { "%02x".format(it) }
+
+    private fun canonicalDate(value: String): String {
+        val parts = value.split("-")
+        if (parts.size != 3) return value
+        val year = parts[0].toIntOrNull() ?: return value
+        val month = parts[1].toIntOrNull() ?: return value
+        val day = parts[2].toIntOrNull() ?: return value
+        return "$year-$month-$day"
+    }
+}
 
 private class MysticCompanionState(initialMode: String, initialTopic: String) {
     var mode by mutableStateOf(initialMode)
@@ -121,6 +180,10 @@ fun MysticGuideCard(
     fortune: CompositeDailyFortune
 ) {
     val records by AppModule.testRecordRepository.records.collectAsStateWithLifecycle(initialValue = emptyList())
+    val context = LocalContext.current
+    val visitStore = remember(context) { MysticVisitStore(context) }
+    val coroutineScope = rememberCoroutineScope()
+    val visitProfile = remember(bazi) { "bazi|${bazi.chart.display}" }
     val companionKey = "${bazi.hashCode()}|${fortune.hashCode()}"
     val companion = remember(companionKey) { mysticCompanionState(companionKey, fortune) }
     var topic by remember(companion) { companion::topic }
@@ -141,6 +204,9 @@ fun MysticGuideCard(
     var memoryNotes by remember(companion) { companion::memoryNotes }
     var memorySequence by remember(companion) { companion::memorySequence }
     var memoryExpanded by remember(companion) { companion::memoryExpanded }
+    var revisitLine by remember(visitProfile) { mutableStateOf("") }
+    var visitReady by remember(visitProfile) { mutableStateOf(false) }
+    var persistedVisitAction by remember(visitProfile) { mutableStateOf("") }
     LaunchedEffect(companionKey) {
         guestExit = null
         memoryNotes = emptyList()
@@ -150,6 +216,24 @@ fun MysticGuideCard(
     val latestTest = records.maxByOrNull { it.date }
     val guide = remember(mode, topic, bazi, fortune, latestTest) {
         MysticGuideGenerator.generate(mode, topic, bazi, fortune, latestTest)
+    }
+    LaunchedEffect(visitProfile, fortune.dateKey) {
+        val previousVisit = runCatching { visitStore.read(visitProfile) }.getOrNull()
+        val previousMemory = previousVisit ?: MysticVisitMemory("", "", "")
+        revisitLine = MysticGuideGenerator.revisitGreeting(
+            mode,
+            guide.styleKey,
+            fortune,
+            previousMemory
+        )
+        persistedVisitAction = previousMemory.lastAction
+        visitReady = true
+        runCatching {
+            visitStore.save(
+                visitProfile,
+                MysticVisitMemory(fortune.dateKey, topic, previousMemory.lastAction)
+            )
+        }
     }
     var selectedFollowUp by remember(guide) { mutableStateOf("") }
     var evidenceOpen by remember(guide) { mutableStateOf(false) }
@@ -505,6 +589,16 @@ fun MysticGuideCard(
         pendingGuestChoiceEcho = guestEcho
         guestChoiceCarryoverKey = null
         guestExit = null
+        if (visitReady) {
+            coroutineScope.launch {
+                runCatching {
+                    visitStore.save(
+                        visitProfile,
+                        MysticVisitMemory(fortune.dateKey, key, persistedVisitAction)
+                    )
+                }
+            }
+        }
     }
 
     LaunchedEffect(pendingHandoff, guide) {
@@ -597,6 +691,13 @@ fun MysticGuideCard(
         openingAnswered = true
         pendingOpening = null
         rememberMemory("opening", expectedOption.label)
+        persistedVisitAction = expectedOption.label
+        runCatching {
+            visitStore.save(
+                visitProfile,
+                MysticVisitMemory(fortune.dateKey, topic, expectedOption.label)
+            )
+        }
     }
 
     fun selectRhythm(key: String) {
@@ -1065,6 +1166,32 @@ fun MysticGuideCard(
                             modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
                             style = MaterialTheme.typography.labelSmall,
                             color = if (skinSource == source) accent else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+
+            AnimatedVisibility(visible = revisitLine.isNotBlank()) {
+                Surface(
+                    Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    color = accent.copy(alpha = 0.08f)
+                ) {
+                    Column(
+                        Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Text(
+                            "回访",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = accent
+                        )
+                        Text(
+                            revisitLine,
+                            style = MaterialTheme.typography.bodySmall,
+                            lineHeight = 20.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
