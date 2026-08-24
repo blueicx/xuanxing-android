@@ -137,8 +137,6 @@ private fun CompositeContent(
             }
         }
 
-        PeriodToggleRow(period, onPeriodChange)
-
         MysticGuideCard(bazi, fortune)
 
         // 幸运信息
@@ -148,8 +146,11 @@ private fun CompositeContent(
             LuckChip("吉利方位", fortune.luckyDirection, Modifier.weight(1f))
         }
 
+        // 周期切换贴近受影响的维度内容，避免在长页面顶部和内容之间来回滚动。
+        PeriodToggleRow(period, onPeriodChange)
+
         // 维度
-        Text("今日维度", style = MaterialTheme.typography.titleSmall)
+        Text("${periodLabel(period)}维度", style = MaterialTheme.typography.titleSmall)
         fortune.dimensions.forEach { dim -> DimensionCard(dim) }
 
         // 注意事项
@@ -196,6 +197,12 @@ private fun LuckChip(title: String, value: String, modifier: Modifier = Modifier
             )
         }
     }
+}
+
+private fun periodLabel(period: String): String = when (period) {
+    "week" -> "本周"
+    "month" -> "本月"
+    else -> "今日"
 }
 
 @Composable

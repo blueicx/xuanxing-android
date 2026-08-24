@@ -116,7 +116,6 @@ private fun WesternContent(
     onPeriodChange: (String) -> Unit
 ) {
     val interp = ZodiacCalculator.interpretChart(chart)
-    PeriodToggleRow(period, onPeriodChange)
     if (bazi != null && composite != null) MysticGuideCard(bazi, composite)
     FortuneCard {
         SectionTitle("圆盘星盘")
@@ -309,6 +308,7 @@ private fun WesternContent(
                 sharedText = ResultShare.fortuneTitle("星座运势", period, fortune.overallScore)
             )
         }
+        PeriodToggleRow(period, onPeriodChange)
         Spacer(Modifier.height(8.dp))
         Text(fortune.summary, style = MaterialTheme.typography.bodyLarge)
         Spacer(Modifier.height(12.dp))

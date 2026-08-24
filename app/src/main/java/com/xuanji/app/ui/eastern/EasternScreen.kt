@@ -98,7 +98,6 @@ fun EasternScreen() {
             is EasternUiState.Loading -> Text("正在推算命盘…")
             is EasternUiState.Empty -> Text("尚未设置出生信息，请先到「我的」填写。")
             is EasternUiState.Ready -> {
-                PeriodToggleRow(s.period) { viewModel.setPeriod(it) }
                 HourGuideSection(s.hourGuides)
                 PillarSection(s.full.chart)
                 ConclusionSection(s.full.conclusion)
@@ -113,7 +112,12 @@ fun EasternScreen() {
                 ShenShaSection(s.full.shenSha)
                 ShenShaAtlasSection(s.full.shenSha)
                 s.composite?.let { MysticGuideCard(s.full, it) }
-                TodayFortuneSection(s.fortune, s.full.chart.favorableElements, s.period)
+                TodayFortuneSection(
+                    s.fortune,
+                    s.full.chart.favorableElements,
+                    s.period,
+                    onPeriodChange = viewModel::setPeriod
+                )
                 Text(
                     s.full.note,
                     style = MaterialTheme.typography.bodySmall,
@@ -485,7 +489,8 @@ private fun hourScoreColor(score: Int): Color = when {
 private fun TodayFortuneSection(
     fortune: EasternDailyFortune,
     favorable: List<Element>,
-    period: String = "day"
+    period: String = "day",
+    onPeriodChange: (String) -> Unit
 ) {
     FortuneCard {
         val periodTitle = when (period) {
@@ -498,6 +503,7 @@ private fun TodayFortuneSection(
                 sharedText = ResultShare.fortuneTitle("东方运势", period, fortune.overallScore)
             )
         }
+        PeriodToggleRow(period, onPeriodChange)
         Spacer(Modifier.height(8.dp))
         Text(fortune.summary, style = MaterialTheme.typography.bodyLarge)
         Spacer(Modifier.height(12.dp))
