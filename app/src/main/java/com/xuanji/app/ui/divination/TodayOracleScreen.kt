@@ -33,7 +33,7 @@ fun TodayOracleScreen() {
         value = AppModule.repository.getOrDrawTodayOracle(today)
     }
     val randomResult = remember { mutableStateOf<TodayOracle.OracleResult?>(null) }
-    val taunt = remember { mutableStateOf("") }
+    val reaction = remember { mutableStateOf<TodayOracle.OracleReaction?>(null) }
     val shown = dailyState.value
 
     Column(
@@ -67,8 +67,9 @@ fun TodayOracleScreen() {
         if (shown != null) {
             Button(
                 onClick = {
-                    randomResult.value = TodayOracle.randomDraw()
-                    taunt.value = TodayOracle.manualTaunt()
+                    val draw = TodayOracle.randomDraw()
+                    randomResult.value = draw
+                    reaction.value = TodayOracle.manualReaction(draw)
                 },
                 modifier = Modifier.fillMaxWidth()
             ) {
@@ -77,17 +78,19 @@ fun TodayOracleScreen() {
         }
 
         randomResult.value?.let { extra ->
-            FortuneCard {
-                SectionTitle("手动彩蛋 · 不改今日签")
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    "半仙：${taunt.value}",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.tertiary
-                )
-                Spacer(Modifier.height(12.dp))
-                Text(extra.level, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.secondary)
-                Text("「${extra.poem}」", style = MaterialTheme.typography.bodyMedium)
+            reaction.value?.let { reaction ->
+                FortuneCard {
+                    SectionTitle("手动彩蛋 · 不改今日签")
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "${reaction.roleName}：${reaction.line}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.tertiary
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    Text(extra.level, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.secondary)
+                    Text("「${extra.poem}」", style = MaterialTheme.typography.bodyMedium)
+                }
             }
         }
 

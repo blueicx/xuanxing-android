@@ -18,6 +18,8 @@ object TodayOracle {
         val advice: String
     )
 
+    data class OracleReaction(val roleName: String, val line: String)
+
     private val POEMS = listOf(
         Triple("上上签", "云开见月正分明，谋望求财事有成。", "诸事顺遂，宜把握良机、主动出击。"),
         Triple("上上签", "乘风破浪会有时，直挂云帆济沧海。", "运势上扬，敢想敢为必有所得。"),
@@ -36,14 +38,6 @@ object TodayOracle {
     private val COLORS = listOf("朱红", "明黄", "青碧", "月白", "松绿", "玄黑", "金银", "紫檀")
     private val GOODS = listOf("会友", "签约", "出行", "读书", "表白", "理财", "静思", "助人")
     private val AVOIDS = listOf("争执", "冒进", "熬夜", "借出", "迁居", "贪杯", "拖延", "轻诺")
-    private val MANUAL_TAUNTS = listOf(
-        "哟，今日签都定了还想重抽？本半仙看你是想把命运当自助餐。",
-        "再抽也不会更灵，只会让本半仙多笑三声。",
-        "这支只是彩蛋，别拿它跟今天正牌运势吵架。",
-        "手速挺快，可惜天庭档案已经盖好章了。",
-        "抽吧抽吧，反正本半仙只负责阴阳，不负责改命。",
-        "你这不是求签，是想跟今天讨价还价。"
-    )
 
     fun generate(seed: Long = Random.nextLong()): OracleResult {
         val rnd = Random(seed)
@@ -62,6 +56,40 @@ object TodayOracle {
     /** 从同一固定签库再抽一签 */
     fun randomDraw(): OracleResult = generate()
 
-    /** 手动彩蛋不改当日签；半仙负责吐槽这个行为本身。 */
-    fun manualTaunt(): String = MANUAL_TAUNTS[Random.nextInt(MANUAL_TAUNTS.size)]
+    fun manualReaction(draw: OracleResult): OracleReaction {
+        val tier = when (draw.level) {
+            "上上签", "上签" -> "high"
+            "中平签" -> "mid"
+            "下签", "下下签" -> "low"
+            else -> "low"
+        }
+        val role = if (draw.luckyNumber % 2 == 0) "玄学家" else "半仙"
+
+        return when (tier to role) {
+            "high" to "玄学家" -> OracleReaction(
+                roleName = role,
+                line = "彩蛋倒是亮堂；今日正签已经收好，别把这份当成加码的理由。"
+            )
+            "high" to "半仙" -> OracleReaction(
+                roleName = role,
+                line = "哟，彩蛋也敢这么体面？正签可没答应帮你续杯，别得意。"
+            )
+            "mid" to "玄学家" -> OracleReaction(
+                roleName = role,
+                line = "彩蛋平平也好，正好当对照；今天还是按正签慢慢走。"
+            )
+            "mid" to "半仙" -> OracleReaction(
+                roleName = role,
+                line = "中不溜的彩蛋，看看就行；本半仙可不许你拿它跟正签讨价还价。"
+            )
+            "low" to "玄学家" -> OracleReaction(
+                roleName = role,
+                line = "这支只是彩蛋，不算数；先把今天的节奏放轻一点，别被它带紧张。"
+            )
+            else -> OracleReaction(
+                roleName = role,
+                line = "咳，彩蛋抽得有点蔫？别慌，正签才是今天的主角，本半仙盯着呢。"
+            )
+        }
+    }
 }
