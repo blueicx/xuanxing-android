@@ -19,6 +19,8 @@ object TodayOracle {
     )
 
     data class OracleReaction(val roleName: String, val line: String)
+    data class OracleObserverChoice(val key: String, val label: String)
+    data class OracleExchange(val roleName: String, val line: String, val exitLine: String)
 
     private val POEMS = listOf(
         Triple("上上签", "云开见月正分明，谋望求财事有成。", "诸事顺遂，宜把握良机、主动出击。"),
@@ -56,9 +58,72 @@ object TodayOracle {
     /** 从同一固定签库再抽一签 */
     fun randomDraw(): OracleResult = generate()
 
+    fun observerChoices(): List<OracleObserverChoice> = listOf(
+        OracleObserverChoice("why", "问依据"),
+        OracleObserverChoice("accept", "收下"),
+        OracleObserverChoice("pushback", "拦一句")
+    )
+
+    fun observerExchange(draw: OracleResult, choiceKey: String): OracleExchange? {
+        if (observerChoices().none { it.key == choiceKey }) return null
+
+        val tier = oracleTier(draw.level)
+        val role = oracleRole(draw)
+
+        val line = when (tier) {
+            "high" -> when (role) {
+                "玄学家" -> when (choiceKey) {
+                    "why" -> "凭签面只说今天顺，没说永远顺；你那支「${draw.good}」还在宜里，真正的证据是你怎么做。"
+                    "accept" -> "那就记这一句：亮的时候更要收着走；${draw.luckyColor}可以当个提醒色。"
+                    else -> "好，我不盯着；只留一句——${draw.luckyColor}别变成逞强的旗子。"
+                }
+                else -> when (choiceKey) {
+                    "why" -> "凭什么？凭你自己抽到「${draw.good}」也怕「${draw.avoid}」；本半仙只是把这两头摆出来。"
+                    "accept" -> "收好了就别飘；今日${draw.luckyColor}是提醒色，不是免检章。"
+                    else -> "行行行，我退半步；可${draw.avoid}这根线，本半仙先替你拉着。"
+                }
+            }
+            "mid" -> when (role) {
+                "玄学家" -> when (choiceKey) {
+                    "why" -> "依据就是中平本身：不夸你，也不吓你；把「${draw.avoid}」绕开，路会清楚些。"
+                    "accept" -> "稳着收下就好；今天不必逼自己把每一步都走成答案。"
+                    else -> "我不盯，只提醒一句：中平最怕被急事推着走。"
+                }
+                else -> when (choiceKey) {
+                    "why" -> "本半仙看的是两头——「${draw.good}」能试，「${draw.avoid}」别碰；这不叫玄，叫省事。"
+                    "accept" -> "肯记下也算识相；慢慢来，别拿中平当偷懒的借口。"
+                    else -> "好好好，我不念了；台阶就在那儿，你自己看着踩。"
+                }
+            }
+            else -> when (role) {
+                "玄学家" -> when (choiceKey) {
+                    "why" -> "不是判你不行；签里让你避开「${draw.avoid}」，是把风险说在前头。"
+                    "accept" -> "嗯，先把步子放小；${draw.luckyColor}不用当护身符，当成休息提示就行。"
+                    else -> "好，我只陪到这里；若要继续，也别急着跟坏签硬碰。"
+                }
+                else -> when (choiceKey) {
+                    "why" -> "别皱眉，本半仙不是笑你惨；是看见你还愿意问「${draw.avoid}」怎么避。"
+                    "accept" -> "行，蔫签也能翻页；今天少碰「${draw.avoid}」，先给自己留口气。"
+                    else -> "退退退，不催你；可本半仙还在这儿，等你缓过劲再呛两句。"
+                }
+            }
+        }
+
+        val exitLine = when (role to choiceKey) {
+            "玄学家" to "why" -> "把签纸抚平后离开，像把问题也折进了页边。"
+            "玄学家" to "accept" -> "点头记完一笔，脚步放轻地退开。"
+            "玄学家" to "pushback" -> "抬手示意不扰，转身时仍留了半步距离。"
+            "半仙" to "why" -> "咂了下嘴，甩着袖子走了，嘴上还嘀咕「算你有心」。"
+            "半仙" to "accept" -> "哼了一声，倒背着手晃出门去。"
+            else -> "耸耸肩退到帘外，临走还挑了下眉。"
+        }
+
+        return OracleExchange(roleName = role, line = line, exitLine = exitLine)
+    }
+
     fun dailyReaction(draw: OracleResult): OracleReaction {
         val tier = oracleTier(draw.level)
-        val role = if (draw.luckyNumber % 2 == 0) "玄学家" else "半仙"
+        val role = oracleRole(draw)
 
         return when (tier to role) {
             "high" to "玄学家" -> OracleReaction(
@@ -90,7 +155,7 @@ object TodayOracle {
 
     fun manualReaction(draw: OracleResult): OracleReaction {
         val tier = oracleTier(draw.level)
-        val role = if (draw.luckyNumber % 2 == 0) "玄学家" else "半仙"
+        val role = oracleRole(draw)
 
         return when (tier to role) {
             "high" to "玄学家" -> OracleReaction(
@@ -125,4 +190,7 @@ object TodayOracle {
         "中平签" -> "mid"
         else -> "low"
     }
+
+    private fun oracleRole(draw: OracleResult): String =
+        if (draw.luckyNumber % 2 == 0) "玄学家" else "半仙"
 }

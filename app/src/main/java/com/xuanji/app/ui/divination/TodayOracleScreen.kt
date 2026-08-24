@@ -19,6 +19,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.mutableStateOf
@@ -26,7 +27,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.xuanji.app.di.AppModule
 import com.xuanji.app.domain.divination.TodayOracle
 import com.xuanji.app.ui.components.FortuneCard
@@ -34,6 +37,7 @@ import com.xuanji.app.ui.components.InfoRow
 import com.xuanji.app.ui.components.SectionTitle
 import com.xuanji.app.ui.components.SystemExplanation
 import java.time.LocalDate
+import kotlinx.coroutines.delay
 
 @Composable
 fun TodayOracleScreen() {
@@ -43,6 +47,7 @@ fun TodayOracleScreen() {
     }
     val randomResult = remember { mutableStateOf<TodayOracle.OracleResult?>(null) }
     val reaction = remember { mutableStateOf<TodayOracle.OracleReaction?>(null) }
+    val extraToken = remember { mutableStateOf(0) }
     val shown = dailyState.value
 
     Column(
@@ -71,7 +76,11 @@ fun TodayOracleScreen() {
                 Spacer(Modifier.height(8.dp))
                 Text(shown.advice, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
 
-                TodayObserverBubble(reaction = TodayOracle.dailyReaction(shown))
+                TodayObserverBubble(
+                    sourceKey = "daily-$today",
+                    draw = shown,
+                    reaction = TodayOracle.dailyReaction(shown)
+                )
             }
         }
 
@@ -81,6 +90,7 @@ fun TodayOracleScreen() {
                     val draw = TodayOracle.randomDraw()
                     randomResult.value = draw
                     reaction.value = TodayOracle.manualReaction(draw)
+                    extraToken.value += 1
                 },
                 modifier = Modifier.fillMaxWidth()
             ) {
@@ -93,7 +103,11 @@ fun TodayOracleScreen() {
                 FortuneCard {
                     SectionTitle("手动彩蛋 · 不改今日签")
                     Spacer(Modifier.height(8.dp))
-                    TodayObserverBubble(reaction = reaction)
+                    TodayObserverBubble(
+                        sourceKey = "manual-${extraToken.value}",
+                        draw = extra,
+                        reaction = reaction
+                    )
                     Spacer(Modifier.height(12.dp))
                     Text(extra.level, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.secondary)
                     Text("「${extra.poem}」", style = MaterialTheme.typography.bodyMedium)
@@ -106,7 +120,24 @@ fun TodayOracleScreen() {
 }
 
 @Composable
-private fun TodayObserverBubble(reaction: TodayOracle.OracleReaction) {
+private fun TodayObserverBubble(
+    sourceKey: String,
+    draw: TodayOracle.OracleResult,
+    reaction: TodayOracle.OracleReaction
+) {
+    val selectedChoice = remember(sourceKey) { mutableStateOf<String?>(null) }
+    val pending = remember(sourceKey) { mutableStateOf(false) }
+    val exchange = remember(sourceKey) {
+        mutableStateOf<TodayOracle.OracleExchange?>(null)
+    }
+
+    LaunchedEffect(selectedChoice.value, sourceKey) {
+        val choiceKey = selectedChoice.value ?: return@LaunchedEffect
+        delay(320)
+        exchange.value = TodayOracle.observerExchange(draw, choiceKey)
+        pending.value = false
+    }
+
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
@@ -142,6 +173,68 @@ private fun TodayObserverBubble(reaction: TodayOracle.OracleReaction) {
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+
+                if (selectedChoice.value == null) {
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(top = 10.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        TodayOracle.observerChoices().forEach { choice ->
+                            Surface(
+                                onClick = {
+                                    selectedChoice.value = choice.key
+                                    pending.value = true
+                                },
+                                shape = RoundedCornerShape(999.dp),
+                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.48f)
+                            ) {
+                                Text(
+                                    choice.label,
+                                    modifier = Modifier
+                                        .padding(horizontal = 8.dp, vertical = 6.dp),
+                                    textAlign = TextAlign.Center,
+                                    maxLines = 1,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+                } else {
+                    val askedChoice = TodayOracle.observerChoices()
+                        .firstOrNull { it.key == selectedChoice.value }
+                    Text(
+                        "你 · ${askedChoice?.label.orEmpty()}",
+                        modifier = Modifier.padding(top = 10.dp),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.72f)
+                    )
+                    when (val answer = exchange.value) {
+                        null -> Text(
+                            if (pending.value) "对方正在接话···" else "",
+                            modifier = Modifier.padding(top = 4.dp),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        else -> {
+                            Text(
+                                answer.line,
+                                modifier = Modifier.padding(top = 4.dp),
+                                style = MaterialTheme.typography.bodySmall,
+                                lineHeight = 19.sp,
+                                color = MaterialTheme.colorScheme.tertiary
+                            )
+                            Text(
+                                "${answer.roleName}离席 · ${answer.exitLine}",
+                                modifier = Modifier.padding(top = 8.dp),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.68f)
+                            )
+                        }
+                    }
+                }
             }
         }
     }
