@@ -21,6 +21,7 @@ object TodayOracle {
     data class OracleReaction(val roleName: String, val line: String)
     data class OracleObserverChoice(val key: String, val label: String)
     data class OracleExchange(val roleName: String, val line: String, val exitLine: String)
+    data class OracleRelay(val roleName: String, val line: String)
 
     private val POEMS = listOf(
         Triple("上上签", "云开见月正分明，谋望求财事有成。", "诸事顺遂，宜把握良机、主动出击。"),
@@ -121,6 +122,43 @@ object TodayOracle {
         return OracleExchange(roleName = role, line = line, exitLine = exitLine)
     }
 
+    /** 另一位玄师在离席后偶尔从旁补一句；同一支签和同一选择永远固定。 */
+    fun observerRelay(draw: OracleResult, choiceKey: String): OracleRelay? {
+        if (observerChoices().none { it.key == choiceKey }) return null
+        if (observerRelayGate(draw, choiceKey) != 0) return null
+
+        val firstRole = oracleRole(draw)
+        val secondRole = if (firstRole == "玄学家") "半仙" else "玄学家"
+        val tier = oracleTier(draw.level)
+        val line = when (tier) {
+            "high" -> when (firstRole to choiceKey) {
+                "玄学家" to "why" -> "问得倒认真；可「${draw.good}」不是保证书，别顺手把「${draw.avoid}」也招过来。"
+                "玄学家" to "accept" -> "收这么快？行，${draw.luckyColor}先带着；别把顺日当成免检章。"
+                "玄学家" to "pushback" -> "哟，还敢拦一句？有脾气；那就按住「${draw.avoid}」，别赢了面子丢了里子。"
+                "半仙" to "why" -> "刚才那句粗里有数；「${draw.good}」可以试，「${draw.avoid}」仍要绕开。"
+                "半仙" to "accept" -> "收得刚好。${draw.luckyColor}当提醒就够，不必把顺日演成庆典。"
+                else -> "拦得住嘴，拦不住日子。亮处更要走稳，别急着加码。"
+            }
+            "mid" -> when (firstRole to choiceKey) {
+                "玄学家" to "why" -> "中平的依据就在眼前；避开「${draw.avoid}」，比再算十遍都实在。"
+                "玄学家" to "accept" -> "肯稳着收就好；今天不用把每件事都问出个高低。"
+                "玄学家" to "pushback" -> "行，你们俩都别急；中平最怕被人催成冒进。"
+                "半仙" to "why" -> "我刚瞄了一眼，两头都在纸上——「${draw.good}」可试，「${draw.avoid}」别碰。"
+                "半仙" to "accept" -> "识相。慢慢来，别拿中平当躺平的理由。"
+                else -> "好好好，帘外不吵；台阶留给你自己踩。"
+            }
+            else -> when (firstRole to choiceKey) {
+                "玄学家" to "why" -> "那不是笑你；能问怎么避「${draw.avoid}」，就已经比闷着头强。"
+                "玄学家" to "accept" -> "先把步子放小。${draw.luckyColor}不当护身符，当休息提示就行。"
+                "玄学家" to "pushback" -> "不吵不吵；坏签也不是命令，缓口气再翻页。"
+                "半仙" to "why" -> "别皱眉，签沉不代表你不行；先绕开「${draw.avoid}」，剩下的交给时间。"
+                "半仙" to "accept" -> "行，认栽但不服输；今天少耗一口气，明天才有力气呛回来。"
+                else -> "退退退，不逼你；坏签只提醒风险，不给你定罪。"
+            }
+        }
+        return OracleRelay(roleName = secondRole, line = line)
+    }
+
     fun dailyReaction(draw: OracleResult): OracleReaction {
         val tier = oracleTier(draw.level)
         val role = oracleRole(draw)
@@ -193,4 +231,14 @@ object TodayOracle {
 
     private fun oracleRole(draw: OracleResult): String =
         if (draw.luckyNumber % 2 == 0) "玄学家" else "半仙"
+
+    private fun observerRelayGate(draw: OracleResult, choiceKey: String): Int {
+        val signature = listOf(
+            draw.level, draw.poem, "${draw.luckyNumber}", draw.luckyColor,
+            draw.good, draw.avoid, draw.advice, choiceKey, "oracle-relay"
+        ).joinToString("|")
+        var hash = 5381
+        for (ch in signature) hash = hash * 33 + ch.code
+        return ((hash + draw.luckyNumber) % 4 + 4) % 4
+    }
 }

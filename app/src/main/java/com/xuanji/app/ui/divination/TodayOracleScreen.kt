@@ -130,12 +130,20 @@ private fun TodayObserverBubble(
     val exchange = remember(sourceKey) {
         mutableStateOf<TodayOracle.OracleExchange?>(null)
     }
+    val relay = remember(sourceKey) {
+        mutableStateOf<TodayOracle.OracleRelay?>(null)
+    }
 
     LaunchedEffect(selectedChoice.value, sourceKey) {
         val choiceKey = selectedChoice.value ?: return@LaunchedEffect
         delay(320)
-        exchange.value = TodayOracle.observerExchange(draw, choiceKey)
+        val answer = TodayOracle.observerExchange(draw, choiceKey)
+        exchange.value = answer
         pending.value = false
+        if (answer != null) {
+            delay(480)
+            relay.value = TodayOracle.observerRelay(draw, choiceKey)
+        }
     }
 
     Surface(
@@ -232,6 +240,41 @@ private fun TodayObserverBubble(
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.68f)
                             )
+                            relay.value?.let { aside ->
+                                Row(
+                                    modifier = Modifier.padding(top = 10.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalAlignment = Alignment.Top
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(26.dp)
+                                            .clip(CircleShape)
+                                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            aside.roleName.take(1),
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.primary
+                                        )
+                                    }
+                                    Column(Modifier.weight(1f)) {
+                                        Text(
+                                            "${aside.roleName}在帘外补了一句",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurface
+                                        )
+                                        Text(
+                                            aside.line,
+                                            modifier = Modifier.padding(top = 3.dp),
+                                            style = MaterialTheme.typography.bodySmall,
+                                            lineHeight = 18.sp,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+                            }
                         }
                     }
                 }
