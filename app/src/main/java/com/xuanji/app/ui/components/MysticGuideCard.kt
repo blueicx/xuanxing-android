@@ -606,6 +606,12 @@ fun MysticGuideCard(
             )
         )
         while (conversation.size > 5) conversation.removeAt(0)
+        guestCameo = guestCameo ?: MysticGuideGenerator.clarifierGuestCameo(
+            mode,
+            guide.topicKey,
+            fortune,
+            option.key
+        )
         selectedClarifier = null
         pendingClarify = null
     }
@@ -816,6 +822,9 @@ fun MysticGuideCard(
                         )
 
                         if (guestReply.isBlank()) {
+                            val guestChoicesLocked = pendingGuest ||
+                                pendingClarify != null ||
+                                selectedClarifier != null
                             FlowRow(
                                 Modifier.padding(top = 8.dp),
                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -823,7 +832,7 @@ fun MysticGuideCard(
                                 MysticGuideGenerator.guestChoices().forEach { choice ->
                                     Surface(
                                         onClick = { requestGuestReply(choice.key) },
-                                        enabled = !pendingGuest,
+                                        enabled = !guestChoicesLocked,
                                         shape = RoundedCornerShape(999.dp),
                                         color = if (selectedGuestChoice == choice.key) {
                                             accent.copy(alpha = 0.22f)
@@ -836,7 +845,7 @@ fun MysticGuideCard(
                                             modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
                                             style = MaterialTheme.typography.labelSmall,
                                             lineHeight = 15.sp,
-                                            color = if (pendingGuest) {
+                                            color = if (guestChoicesLocked) {
                                                 MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.62f)
                                             } else {
                                                 MaterialTheme.colorScheme.onSurfaceVariant

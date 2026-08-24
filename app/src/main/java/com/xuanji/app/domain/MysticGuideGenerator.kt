@@ -527,6 +527,74 @@ object MysticGuideGenerator {
         )
     }
 
+    /** 自由提问反问落定后，另一位角色可按稳定取样补一句；不使用运行时随机。 */
+    fun clarifierGuestCameo(
+        mode: String,
+        topicKey: String,
+        fortune: CompositeDailyFortune,
+        optionKey: String
+    ): MysticGuestCameo? {
+        val allowedOptionKeys = setOf(
+            "low",
+            "specific",
+            "pause",
+            "small",
+            "guard",
+            "timing",
+            "source",
+            "risk",
+            "next"
+        )
+        if (fortune.dimensions.isEmpty() || optionKey !in allowedOptionKeys) return null
+
+        val source =
+            "${canonicalDateKey(fortune.dateKey)}|clarify-guest|$mode|$topicKey|${fortune.overallScore}|${fortune.luckyNumber}|$optionKey"
+        var hash = 811L
+        for (char in source) {
+            hash = (hash * 37L + char.code) % 2147483647L
+        }
+        if (hash % 4L != 0L) return null
+
+        val high = fortune.dimensions.maxByOrNull { it.score } ?: fortune.dimensions.first()
+        val low = fortune.dimensions.minByOrNull { it.score } ?: fortune.dimensions.first()
+        val scholarMain = mode != "half"
+        val baseLine = if (scholarMain) {
+            when (optionKey) {
+                "low" -> "「${low.label}」 ${low.score} 分确实要护住；不过别把它供起来，先给口饭、给口气。"
+                "specific" -> "问得细是对的。「${high.label}」 ${high.score} 能用，「${low.label}」 ${low.score} 别硬拉；挑一件说清楚就行。"
+                "pause" -> "歇就歇嘛！综合 ${fortune.overallScore} 分又不是熄火；别把休息也排成任务。"
+                "small" -> "最小一步最实在。「${high.label}」 ${high.score} 在手边，做完就收工，别贪第三件。"
+                "guard" -> "护栏这词好。「${low.label}」 ${low.score} 爱挖坑，大额、大话、大熬夜都先拦住。"
+                "timing" -> "时机不用等神仙批文；「${high.label}」 ${high.score} 先开场，「${low.label}」 ${low.score} 那段缓半拍。"
+                "source" -> "来源就是那页盘面：综合 ${fortune.overallScore} 分，「${high.label}」 ${high.score}，「${low.label}」 ${low.score}；不是本半仙现编的。"
+                "risk" -> "风险在明面上：「${low.label}」 ${low.score} 爱使绊子；嘴慢一点，身体电量留足。"
+                else -> "看完就散场！回「${high.label}」 ${high.score} 能推的小事，比赖在这页反复算强。"
+            }
+        } else {
+            when (optionKey) {
+                "low" -> "「${low.label}」 ${low.score} 分需要照看，不是定性；先把睡眠和一顿热饭安排稳。"
+                "specific" -> "具体一点会更轻。综合 ${fortune.overallScore} 分里，「${high.label}」 ${high.score} 可借力，「${low.label}」 ${low.score} 只要照看。"
+                "pause" -> "停十分钟不算耽误。「${low.label}」 ${low.score} 分在提醒省力，先安静一下就好。"
+                "small" -> "从「${high.label}」 ${high.score} 挑一件今天能完成的小事；完成比铺开更稳。"
+                "guard" -> "先给「${low.label}」 ${low.score} 设边界：金额、承诺和睡眠都留余量。"
+                "timing" -> "综合 ${fortune.overallScore} 分适合分批推进；先用「${high.label}」 ${high.score}，难处放到状态好些时。"
+                "source" -> "来源是现有算法：综合 ${fortune.overallScore} 分，「${high.label}」 ${high.score} 最强，「${low.label}」 ${low.score} 最需照看；它是参照，不是判决。"
+                "risk" -> "眼下先留意「${low.label}」 ${low.score}；别让过度承诺和忽略身体信号抢跑。"
+                else -> "看完回到「${high.label}」 ${high.score} 能推动的一小步；「${low.label}」 ${low.score} 只安排照顾动作。"
+            }
+        }
+        val prefix = when ((hash / 17L) % 3L) {
+            1L -> "我又瞄了一眼；"
+            2L -> "旁听补一句："
+            else -> ""
+        }
+
+        return MysticGuestCameo(
+            roleName = if (scholarMain) "半仙" else "玄学家",
+            line = prefix + baseLine
+        )
+    }
+
     /** 客串出现后的三种接法；选项固定，回答只复述盘面线索和节奏语义。 */
     fun guestChoices(): List<MysticGuestChoice> = listOf(
         MysticGuestChoice("why", "问依据：这个判断从哪来？"),
