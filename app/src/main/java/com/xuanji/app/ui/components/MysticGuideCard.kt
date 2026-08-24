@@ -41,6 +41,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.xuanji.app.data.model.BaziFull
 import com.xuanji.app.data.model.CompositeDailyFortune
 import com.xuanji.app.di.AppModule
+import com.xuanji.app.domain.MysticClarifierOption
 import com.xuanji.app.domain.MysticInteraction
 import com.xuanji.app.domain.MysticInteractionOption
 import com.xuanji.app.domain.MysticGuideGenerator
@@ -145,6 +146,8 @@ fun MysticGuideCard(
     val askCounts = remember(guide) { mutableStateMapOf<String, Int>() }
     var interactionRound by remember(guide) { mutableStateOf(0) }
     var selectedInteraction by remember(guide, interactionRound) { mutableStateOf<MysticInteractionOption?>(null) }
+    var selectedClarifier by remember(guide) { mutableStateOf<String?>(null) }
+    var pendingClarify by remember(guide) { mutableStateOf<MysticClarifierOption?>(null) }
     val interaction = remember(mode, topic, fortune, interactionRound) {
         MysticGuideGenerator.interaction(mode, topic, fortune, interactionRound)
     }
@@ -177,6 +180,8 @@ fun MysticGuideCard(
         guestReply = ""
         guestQuestion = ""
         pendingGuest = false
+        selectedClarifier = null
+        pendingClarify = null
     }
 
     LaunchedEffect(guide) {
@@ -201,7 +206,8 @@ fun MysticGuideCard(
             pendingCustom != null ||
             pendingOpening != null ||
             pendingRhythm != null ||
-            pendingGuest
+            pendingGuest ||
+            pendingClarify != null
         ) return
         pendingFollowUp = key
     }
@@ -214,12 +220,37 @@ fun MysticGuideCard(
             pendingCustom != null ||
             pendingOpening != null ||
             pendingRhythm != null ||
-            pendingGuest
+            pendingGuest ||
+            pendingClarify != null
         ) return
         val cleanQuestion = customQuestion.trim().take(60)
         if (cleanQuestion.isEmpty()) return
         pendingCustom = cleanQuestion
         customQuestion = ""
+    }
+
+    fun selectClarifier(option: MysticClarifierOption) {
+        val customTurn = conversation.lastOrNull()?.takeIf { it.kind == "custom" } ?: return
+        val available = MysticGuideGenerator.customClarifier(
+            mode,
+            guide.styleKey,
+            customTurn.question,
+            fortune,
+            latestTest
+        )?.options?.any { it == option } == true
+        if (
+            !available ||
+            pendingFollowUp != null ||
+            pendingInteraction != null ||
+            pendingHandoff != null ||
+            pendingCustom != null ||
+            pendingOpening != null ||
+            pendingRhythm != null ||
+            pendingGuest ||
+            pendingClarify != null
+        ) return
+        selectedClarifier = option.key
+        pendingClarify = option
     }
 
     fun switchPersona(targetMode: String) {
@@ -230,11 +261,14 @@ fun MysticGuideCard(
             pendingCustom != null ||
             pendingOpening != null ||
             pendingRhythm != null ||
-            pendingGuest
+            pendingGuest ||
+            pendingClarify != null
         ) return
         interactionCarryoverOption = null
         guestChoiceCarryoverKey = null
         pendingGuestChoiceEcho = null
+        selectedClarifier = null
+        pendingClarify = null
         memoryNotes = emptyList()
         memorySequence = 0
         memoryExpanded = false
@@ -250,7 +284,8 @@ fun MysticGuideCard(
             pendingCustom != null ||
             pendingOpening != null ||
             pendingRhythm != null ||
-            pendingGuest
+            pendingGuest ||
+            pendingClarify != null
         ) return
         val previousTopic = topic
         val carryover = MysticGuideGenerator.interactionCarryover(
@@ -266,6 +301,8 @@ fun MysticGuideCard(
         selectedInteraction = null
         pendingFollowUp = null
         pendingInteraction = null
+        selectedClarifier = null
+        pendingClarify = null
         topic = key
         pendingHandoff = previousTopic
         pendingHandoffEcho = carryover
@@ -324,6 +361,7 @@ fun MysticGuideCard(
             pendingOpening != null ||
             pendingRhythm != null ||
             pendingGuest ||
+            pendingClarify != null ||
             opening?.options?.none { it.key == option.key } != false
         ) return
         pendingOpening = option
@@ -372,7 +410,8 @@ fun MysticGuideCard(
             pendingCustom != null ||
             pendingOpening != null ||
             pendingRhythm != null ||
-            pendingGuest
+            pendingGuest ||
+            pendingClarify != null
         ) return
         selectedRhythm = key
         pendingRhythm = key
@@ -430,7 +469,8 @@ fun MysticGuideCard(
             pendingCustom != null ||
             pendingOpening != null ||
             pendingRhythm != null ||
-            pendingGuest
+            pendingGuest ||
+            pendingClarify != null
         ) return
         selectedGuestChoice = key
         pendingGuest = true
@@ -523,7 +563,7 @@ fun MysticGuideCard(
                     )
                 ),
 
-                kind = "ask"
+                kind = "custom"
             )
         )
         while (conversation.size > 5) conversation.removeAt(0)
@@ -533,6 +573,41 @@ fun MysticGuideCard(
         guestChoiceCarryoverKey = null
         pendingCustom = null
         rememberMemory("ask", question)
+    }
+
+    LaunchedEffect(pendingClarify, guide) {
+        val option = pendingClarify ?: return@LaunchedEffect
+        kotlinx.coroutines.delay(370)
+        val customTurn = conversation.lastOrNull()?.takeIf { it.kind == "custom" }
+        if (customTurn == null || pendingClarify != option) {
+            selectedClarifier = null
+            pendingClarify = null
+            return@LaunchedEffect
+        }
+        val expectedOption = MysticGuideGenerator.customClarifier(
+            mode,
+            guide.styleKey,
+            customTurn.question,
+            fortune,
+            latestTest
+        )?.options?.firstOrNull { it.key == option.key }
+        if (expectedOption == null) {
+            selectedClarifier = null
+            pendingClarify = null
+            return@LaunchedEffect
+        }
+        conversation.add(
+            MysticTurn(
+                key = "clarify-$customCount-${option.key}-${customTurn.question.hashCode()}",
+                question = expectedOption.label,
+                answer = expectedOption.answer,
+                reaction = MysticGuideGenerator.customReaction(mode, guide.styleKey, expectedOption.label),
+                kind = "clarify"
+            )
+        )
+        while (conversation.size > 5) conversation.removeAt(0)
+        selectedClarifier = null
+        pendingClarify = null
     }
 
     LaunchedEffect(pendingInteraction) {
@@ -1048,7 +1123,8 @@ fun MysticGuideCard(
                                 pendingCustom != null ||
                                 pendingOpening != null ||
                                 pendingRhythm != null ||
-                                pendingGuest
+                                pendingGuest ||
+                                pendingClarify != null
                             ) {
                                 Surface(
                                     onClick = {
@@ -1079,6 +1155,8 @@ fun MysticGuideCard(
                                         guestQuestion = ""
                                         pendingGuest = false
                                         customQuestion = ""
+                                        selectedClarifier = null
+                                        pendingClarify = null
                                     },
                                     color = Color.Transparent
                                 ) {
@@ -1139,7 +1217,8 @@ fun MysticGuideCard(
                                     pendingCustom == null &&
                                     pendingOpening == null &&
                                     pendingRhythm == null &&
-                                    !pendingGuest
+                                    !pendingGuest &&
+                                    pendingClarify == null
                             ) {
                                 Text("问")
                             }
@@ -1193,13 +1272,73 @@ fun MysticGuideCard(
                             }
                         }
 
+                        val customTurn = conversation.lastOrNull()?.takeIf { it.kind == "custom" }
+                        if (customTurn != null) {
+                            val clarifier = remember(
+                                mode,
+                                guide.styleKey,
+                                customTurn.question,
+                                fortune,
+                                latestTest
+                            ) {
+                                MysticGuideGenerator.customClarifier(
+                                    mode,
+                                    guide.styleKey,
+                                    customTurn.question,
+                                    fortune,
+                                    latestTest
+                                )
+                            }
+                            clarifier?.let { item ->
+                                Column(
+                                    Modifier.fillMaxWidth(),
+                                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Text(
+                                        item.title,
+                                        style = MaterialTheme.typography.labelMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        lineHeight = 19.sp,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        item.options.forEach { option ->
+                                            Surface(
+                                                onClick = { selectClarifier(option) },
+                                                enabled = pendingClarify == null && selectedClarifier == null,
+                                                shape = RoundedCornerShape(999.dp),
+                                                color = if (selectedClarifier == option.key) {
+                                                    accent
+                                                } else {
+                                                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.48f)
+                                                }
+                                            ) {
+                                                Text(
+                                                    option.label,
+                                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                                    style = MaterialTheme.typography.labelMedium,
+                                                    lineHeight = 17.sp,
+                                                    color = if (selectedClarifier == option.key) {
+                                                        Color.White
+                                                    } else {
+                                                        MaterialTheme.colorScheme.onSurfaceVariant
+                                                    }
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
                         if (
                             pendingFollowUp != null ||
                             pendingInteraction != null ||
                             pendingHandoff != null ||
                             pendingCustom != null ||
                             pendingOpening != null ||
-                            pendingRhythm != null
+                            pendingRhythm != null ||
+                            pendingClarify != null
                         ) {
                             Row(
                                 Modifier.fillMaxWidth(),
@@ -1215,6 +1354,7 @@ fun MysticGuideCard(
                                             pendingHandoff != null -> "handoff"
                                             pendingOpening != null -> "opening"
                                             pendingRhythm != null -> "rhythm"
+                                            pendingClarify != null -> "ask"
                                             else -> "ask"
                                         }
                                     ),
@@ -1249,7 +1389,8 @@ fun MysticGuideCard(
                                         pendingCustom != null ||
                                         pendingOpening != null ||
                                         pendingRhythm != null ||
-                                        pendingGuest
+                                        pendingGuest ||
+                                        pendingClarify != null
                                     ) {
                                         // Keep the current game visible until its pending reply lands.
                                     } else {
@@ -1285,7 +1426,8 @@ fun MysticGuideCard(
                                             pendingCustom == null &&
                                             pendingOpening == null &&
                                             pendingRhythm == null &&
-                                            !pendingGuest
+                                            !pendingGuest &&
+                                            pendingClarify == null
                                         ) {
                                             selectedInteraction = option
                                             pendingInteraction = option

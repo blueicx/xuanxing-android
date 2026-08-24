@@ -70,6 +70,17 @@ data class MysticGuestChoice(
     val label: String
 )
 
+data class MysticClarifierOption(
+    val key: String,
+    val label: String,
+    val answer: String
+)
+
+data class MysticClarifier(
+    val title: String,
+    val options: List<MysticClarifierOption>
+)
+
 /**
  * 双面灵语：玄学家负责基于现有算法结果做心理按摩，半仙负责浮夸调侃。
  * 不使用随机数；同一个人、同一天、同一问题、同一模式必然得到同一回答。
@@ -522,6 +533,155 @@ object MysticGuideGenerator {
         MysticGuestChoice("accept", "接一句：我先收下提醒。"),
         MysticGuestChoice("pushback", "拦一句：别俩人一起看我。")
     )
+
+    /** 自由提问落定后的固定反问；同一个人对同族问题的接法完全确定。 */
+    fun customClarifier(
+        mode: String,
+        styleKey: String,
+        question: String,
+        fortune: CompositeDailyFortune,
+        test: TestRecord? = null
+    ): MysticClarifier? {
+        if (fortune.dimensions.isEmpty()) return null
+        val high = fortune.dimensions.maxByOrNull { it.score } ?: return null
+        val low = fortune.dimensions.minByOrNull { it.score } ?: return null
+        val family = when (customIntent(question)) {
+            "mood", "care", "health", "love" -> "reflect"
+            "career", "wealth", "study", "action", "topic" -> "act"
+            "why", "outcome" -> "check"
+            else -> return null
+        }
+        val scholar = mode != "half"
+
+        val title = if (scholar) {
+            when (styleKey) {
+                "harbor" -> when (family) {
+                    "reflect" -> "灯下想轻轻问一句"
+                    "act" -> "先把船桨放稳一点"
+                    else -> "浪头下面先看一眼锚点"
+                }
+                "compass" -> when (family) {
+                    "reflect" -> "罗盘停在一个岔口"
+                    "act" -> "指针想再校一次方向"
+                    else -> "北针先确认读数"
+                }
+                else -> when (family) {
+                    "reflect" -> "档案页边有个小问号"
+                    "act" -> "档案里还差一行注记"
+                    else -> "这份记录还要对个来源"
+                }
+            }
+        } else {
+            when (styleKey) {
+                "alley" -> when (family) {
+                    "reflect" -> "大碗茶边上冒出个问题"
+                    "act" -> "动手前咱把袖口掸一掸"
+                    else -> "这摊账得翻两页看看"
+                }
+                "intern" -> when (family) {
+                    "reflect" -> "工单备注栏亮了一下"
+                    "act" -> "执行前先补一张便签"
+                    else -> "归档前先跑一次自检"
+                }
+                else -> when (family) {
+                    "reflect" -> "锣鼓暂停，司仪要补一句"
+                    "act" -> "登台前先对一遍台本"
+                    else -> "谢幕前先核对节目单"
+                }
+            }
+        }
+
+        val options = when (family) {
+            "reflect" -> listOf(
+                MysticClarifierOption(
+                    key = "low",
+                    label = "最想护住哪块？",
+                    answer = if (scholar) {
+                        "先看「${low.label}」 ${low.score} 分；它不是判决，只是今天最需要照看的信号。综合 ${fortune.overallScore} 分，给它留一点余量就够了。"
+                    } else {
+                        "「${low.label}」 ${low.score} 分在打盹，综合 ${fortune.overallScore} 分还没塌！别把全部力气都押上去，先护住这块就行。"
+                    }
+                ),
+                MysticClarifierOption(
+                    key = "specific",
+                    label = "能不能说得更具体？",
+                    answer = if (scholar) {
+                        "把刚才的问题落到一件事上：综合 ${fortune.overallScore} 分，「${high.label}」 ${high.score} 可用，「${low.label}」 ${low.score} 要照看。越具体，越不容易被情绪带偏。"
+                    } else {
+                        "别问天机，问具体事！综合 ${fortune.overallScore} 分，「${high.label}」 ${high.score} 在线，「${low.label}」 ${low.score} 爱闹。说清一件事，本半仙才好帮你拆。"
+                    }
+                ),
+                MysticClarifierOption(
+                    key = "pause",
+                    label = "要不要先歇一步？",
+                    answer = if (scholar) {
+                        "今天综合 ${fortune.overallScore} 分，幸运色「${fortune.luckyColor}」可以当休息提醒。「${low.label}」 ${low.score} 需要照看，先停十分钟不丢人。"
+                    } else {
+                        "${fortune.overallScore} 分还想硬冲？「${low.label}」 ${low.score} 都举白旗了！用「${fortune.luckyColor}」提醒自己歇口气，神仙也讲究可持续摸鱼。"
+                    }
+                )
+            )
+            "check" -> listOf(
+                MysticClarifierOption(
+                    key = "source",
+                    label = "这个判断从哪来？",
+                    answer = if (scholar) {
+                        "来源是现有盘面：综合 ${fortune.overallScore} 分，「${high.label}」 ${high.score} 最强，「${low.label}」 ${low.score} 最需照看。它是参照，不是命运盖章。"
+                    } else {
+                        "账本在这：综合 ${fortune.overallScore} 分，「${high.label}」 ${high.score} 举火把，「${low.label}」 ${low.score} 坐轿子。数字来自算法，不是本半仙半夜编的。"
+                    }
+                ),
+                MysticClarifierOption(
+                    key = "risk",
+                    label = "眼下最该防什么？",
+                    answer = if (scholar) {
+                        "最该留意「${low.label}」 ${low.score}；综合 ${fortune.overallScore} 分时，风险常藏在过度承诺和忽略身体信号里。先把边界写清楚。"
+                    } else {
+                        "「${low.label}」 ${low.score} 爱使绊子，综合 ${fortune.overallScore} 分时最怕嘴上答应太快、身体电量太低。先留退路，别硬闯。"
+                    }
+                ),
+                MysticClarifierOption(
+                    key = "next",
+                    label = "看完后往哪走？",
+                    answer = if (scholar) {
+                        "看完这一格，先回到「${high.label}」 ${high.score} 能推动的小事；「${low.label}」 ${low.score} 只安排照看动作，不用反复占卜。"
+                    } else {
+                        "别赖在签筒前啦！综合 ${fortune.overallScore} 分，「${high.label}」 ${high.score} 已备好；回去做一件小事，比再抽十次都灵。"
+                    }
+                )
+            )
+            else -> listOf(
+                MysticClarifierOption(
+                    key = "small",
+                    label = "最小一步选哪个？",
+                    answer = if (scholar) {
+                        "从「${high.label}」 ${high.score} 借力，挑一件最小、今天一定能完成的事；综合 ${fortune.overallScore} 分，完成比铺开更有用。"
+                    } else {
+                        "别摆十八般武艺！综合 ${fortune.overallScore} 分，「${high.label}」 ${high.score} 是你的趁手家伙；先做一小步，功劳簿也好记账。"
+                    }
+                ),
+                MysticClarifierOption(
+                    key = "guard",
+                    label = "哪里需要先设护栏？",
+                    answer = if (scholar) {
+                        "「${low.label}」 ${low.score} 是今天的护栏位。金额、承诺和睡眠先设上限，幸运色「${fortune.luckyColor}」只当冷静开关。"
+                    } else {
+                        "「${low.label}」 ${low.score} 爱挖坑，综合 ${fortune.overallScore} 分也别浪！大额、大话和大熬夜都先拦住；「${fortune.luckyColor}」是刹车贴纸，不是护身符。"
+                    }
+                ),
+                MysticClarifierOption(
+                    key = "timing",
+                    label = "什么时候出手合适？",
+                    answer = if (scholar) {
+                        "综合 ${fortune.overallScore} 分说明今天适合分批推进。先用「${high.label}」 ${high.score} 开场，遇到「${low.label}」 ${low.score} 的环节放到状态好一点的时候。"
+                    } else {
+                        "什么时候出手？先看「${high.label}」 ${high.score} 什么时候在线！综合 ${fortune.overallScore} 分，别等黄道吉时等成搁浅；小事现在就能动。"
+                    }
+                )
+            )
+        }
+        return MysticClarifier(title, options)
+    }
 
     /** 客串退场后留给主角的精确回声；只有同一 mode/style family 的已知选择才有效。 */
     fun guestChoiceCarryover(mode: String, styleKey: String, choiceKey: String): String {
