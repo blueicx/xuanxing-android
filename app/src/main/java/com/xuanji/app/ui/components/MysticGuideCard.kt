@@ -58,6 +58,11 @@ private data class MysticTurn(
     val kind: String = "ask"
 )
 
+private data class MysticMemoryNote(
+    val id: String,
+    val text: String
+)
+
 private class MysticCompanionState(initialMode: String, initialTopic: String) {
     var mode by mutableStateOf(initialMode)
     var topic by mutableStateOf(initialTopic)
@@ -73,6 +78,9 @@ private class MysticCompanionState(initialMode: String, initialTopic: String) {
     var pendingGuest by mutableStateOf(false)
     var guestChoiceCarryoverKey by mutableStateOf<String?>(null)
     var pendingGuestChoiceEcho by mutableStateOf<String?>(null)
+    var memoryNotes by mutableStateOf(emptyList<MysticMemoryNote>())
+    var memorySequence by mutableStateOf(0)
+    var memoryExpanded by mutableStateOf(false)
 }
 
 private val mysticCompanionStates = mutableMapOf<String, MysticCompanionState>()
@@ -108,6 +116,14 @@ fun MysticGuideCard(
     var pendingGuest by remember(companion) { companion::pendingGuest }
     var guestChoiceCarryoverKey by remember(companion) { companion::guestChoiceCarryoverKey }
     var pendingGuestChoiceEcho by remember(companion) { companion::pendingGuestChoiceEcho }
+    var memoryNotes by remember(companion) { companion::memoryNotes }
+    var memorySequence by remember(companion) { companion::memorySequence }
+    var memoryExpanded by remember(companion) { companion::memoryExpanded }
+    LaunchedEffect(companionKey) {
+        memoryNotes = emptyList()
+        memorySequence = 0
+        memoryExpanded = false
+    }
     val latestTest = records.maxByOrNull { it.date }
     val guide = remember(mode, topic, bazi, fortune, latestTest) {
         MysticGuideGenerator.generate(mode, topic, bazi, fortune, latestTest)
@@ -168,6 +184,14 @@ fun MysticGuideCard(
         arrivalVisible = true
     }
 
+    fun rememberMemory(kind: String, detail: String) {
+        val text = MysticGuideGenerator.memoryNote(mode, guide.styleKey, kind, detail)
+        if (text.isBlank()) return
+        val note = MysticMemoryNote("memory-$kind-$memorySequence", text)
+        memoryNotes = (listOf(note) + memoryNotes).take(3)
+        memorySequence += 1
+    }
+
     fun selectFollowUp(key: String) {
         if (
             guide.followUps.none { it.key == key } ||
@@ -211,6 +235,9 @@ fun MysticGuideCard(
         interactionCarryoverOption = null
         guestChoiceCarryoverKey = null
         pendingGuestChoiceEcho = null
+        memoryNotes = emptyList()
+        memorySequence = 0
+        memoryExpanded = false
         mode = targetMode
     }
 
@@ -284,6 +311,7 @@ fun MysticGuideCard(
         pendingHandoffEcho = null
         pendingGuestChoiceEcho = null
         pendingOpening = null
+        rememberMemory("handoff", MysticGuideGenerator.topicLabel(fromTopic))
     }
 
     fun selectOpening(option: MysticOpeningOption) {
@@ -330,6 +358,7 @@ fun MysticGuideCard(
         while (conversation.size > 5) conversation.removeAt(0)
         openingAnswered = true
         pendingOpening = null
+        rememberMemory("opening", expectedOption.label)
     }
 
     fun selectRhythm(key: String) {
@@ -386,11 +415,23 @@ fun MysticGuideCard(
             key
         )
         pendingRhythm = null
+        rememberMemory("rhythm", expectedOption.label)
     }
 
     fun requestGuestReply(key: String) {
         val choice = MysticGuideGenerator.guestChoices().firstOrNull { it.key == key }
-        if (guestCameo == null || choice == null || guestReply.isNotBlank() || pendingGuest) return
+        if (
+            guestCameo == null ||
+            choice == null ||
+            guestReply.isNotBlank() ||
+            pendingFollowUp != null ||
+            pendingInteraction != null ||
+            pendingHandoff != null ||
+            pendingCustom != null ||
+            pendingOpening != null ||
+            pendingRhythm != null ||
+            pendingGuest
+        ) return
         selectedGuestChoice = key
         pendingGuest = true
     }
@@ -442,6 +483,7 @@ fun MysticGuideCard(
         completedRhythmKey = null
         pendingGuest = false
         guestChoiceCarryoverKey = choice.key
+        rememberMemory("guest", choice.label)
     }
 
     LaunchedEffect(pendingCustom, guide) {
@@ -490,6 +532,7 @@ fun MysticGuideCard(
         completedRhythmKey = null
         guestChoiceCarryoverKey = null
         pendingCustom = null
+        rememberMemory("ask", question)
     }
 
     LaunchedEffect(pendingInteraction) {
@@ -531,6 +574,7 @@ fun MysticGuideCard(
         completedRhythmKey = null
         guestChoiceCarryoverKey = null
         pendingInteraction = null
+        rememberMemory("game", option.label)
     }
 
     LaunchedEffect(pendingFollowUp) {
@@ -583,6 +627,7 @@ fun MysticGuideCard(
         completedRhythmKey = null
         guestChoiceCarryoverKey = null
         pendingFollowUp = null
+        rememberMemory("ask", item.question)
     }
     val accent by animateColorAsState(
         targetValue = if (mode == "half") MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.primary,
@@ -747,6 +792,55 @@ fun MysticGuideCard(
                                 lineHeight = 19.sp,
                                 color = accent.copy(alpha = 0.90f)
                             )
+                        }
+                    }
+                }
+            }
+
+            if (memoryNotes.isNotEmpty()) {
+                Surface(
+                    Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.24f)
+                ) {
+                    Column(
+                        Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Row(
+                            Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                "现场手记",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            if (memoryNotes.size > 1) {
+                                Surface(
+                                    onClick = { memoryExpanded = !memoryExpanded },
+                                    color = Color.Transparent
+                                ) {
+                                    Text(
+                                        if (memoryExpanded) "收起手记" else "展开手记",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = accent
+                                    )
+                                }
+                            }
+                        }
+                        memoryNotes.forEachIndexed { index, note ->
+                            if (index == 0 || memoryExpanded) {
+                                Text(
+                                    note.text,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    lineHeight = 19.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
                         }
                     }
                 }
@@ -977,6 +1071,9 @@ fun MysticGuideCard(
                                         guestCameo = null
                                         guestChoiceCarryoverKey = null
                                         pendingGuestChoiceEcho = null
+                                        memoryNotes = emptyList()
+                                        memorySequence = 0
+                                        memoryExpanded = false
                                         selectedGuestChoice = ""
                                         guestReply = ""
                                         guestQuestion = ""

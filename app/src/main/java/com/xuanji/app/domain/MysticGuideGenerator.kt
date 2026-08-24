@@ -3,6 +3,7 @@ package com.xuanji.app.domain
 import com.xuanji.app.data.model.BaziFull
 import com.xuanji.app.data.model.CompositeDailyFortune
 import com.xuanji.app.data.model.TestRecord
+import java.text.Normalizer
 import kotlin.math.roundToInt
 
 data class MysticGuide(
@@ -176,6 +177,77 @@ object MysticGuideGenerator {
             echo.isEmpty() -> base
             base.isEmpty() -> echo
             else -> "$echo $base"
+        }
+    }
+
+    /** 现场手记只记录陪伴动作；同输入固定输出，不追加运势判断。 */
+    fun memoryNote(mode: String, styleKey: String, kind: String, detail: String): String {
+        val familyStyles = when (mode) {
+            "scholar" -> setOf("archive", "harbor", "compass")
+            "half" -> setOf("herald", "alley", "intern")
+            else -> return ""
+        }
+        if (styleKey !in familyStyles || kind !in setOf("opening", "rhythm", "game", "guest", "ask", "handoff")) {
+            return ""
+        }
+
+        var clean = Normalizer.normalize(detail, Normalizer.Form.NFC)
+        clean = clean.replace(Regex("[\\u0000-\\u0008\\u000B-\\u001F\\u007F-\\u009F\\u200B-\\u200F\\uFEFF]"), "")
+        clean = clean.replace(Regex("[\\s\\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000]+"), " ").trim()
+        if (clean.isEmpty()) return ""
+        if (clean.codePointCount(0, clean.length) > 24) {
+            clean = clean.substring(0, clean.offsetByCodePoints(0, 24)) + "…"
+        }
+
+        return when (styleKey) {
+            "archive" -> when (kind) {
+                "opening" -> "我把开场这一步记进档案：$clean。"
+                "rhythm" -> "节奏栏补了一笔：$clean。"
+                "game" -> "小游戏这一步留下记录：$clean。"
+                "guest" -> "客串那阵的立场已记下：$clean。"
+                "ask" -> "你问的这句被页边折角保留：$clean。"
+                else -> "从${clean}换页，旧线索仍夹在原处。"
+            }
+            "harbor" -> when (kind) {
+                "opening" -> "我把开场这一步放到灯下：$clean。"
+                "rhythm" -> "你的节奏是${clean}，我先替你收着。"
+                "game" -> "小游戏里的${clean}，我摆在容易看见的地方。"
+                "guest" -> "客串退开后，你的立场是${clean}。"
+                "ask" -> "你问到的${clean}，我先把这句接稳。"
+                else -> "从${clean}走过来，水面还留着刚才的痕迹。"
+            }
+            "compass" -> when (kind) {
+                "opening" -> "开场签到成为第一个参照点：$clean。"
+                "rhythm" -> "我把${clean}标进今天的速度栏。"
+                "game" -> "小游戏选过${clean}，指针旁留了个标记。"
+                "guest" -> "客串立场停在罗盘边缘：${clean}。"
+                "ask" -> "这句问题钉在当前方位：${clean}。"
+                else -> "从${clean}转页，旧标记没有抹掉。"
+            }
+            "herald" -> when (kind) {
+                "opening" -> "开场锣鼓收到：${clean}已入场！"
+                "rhythm" -> "节奏台本补一笔：${clean}登记完毕！"
+                "game" -> "小游戏这一手挂上侧幕：${clean}！"
+                "guest" -> "客串台词痕迹留下：${clean}！"
+                "ask" -> "这句被递到台前，场记先收好：${clean}！"
+                else -> "从${clean}换幕，旧场记继续跟着！"
+            }
+            "alley" -> when (kind) {
+                "opening" -> "开场这句咱先搁茶碗边：${clean}。"
+                "rhythm" -> "今天这个劲儿我给你记着：${clean}。"
+                "game" -> "小游戏挑的这茬留下了：${clean}。"
+                "guest" -> "客串那茬你的接法是：${clean}。"
+                "ask" -> "你问的这句先摆桌面：${clean}。"
+                else -> "从${clean}挪过来，旧茬还在茶边放着。"
+            }
+            else -> when (kind) {
+                "opening" -> "开场记录已提交：${clean}。"
+                "rhythm" -> "节奏工单更新为：${clean}。"
+                "game" -> "小游戏结果已归档：${clean}。"
+                "guest" -> "客串互动备注：${clean}。"
+                "ask" -> "问题已加入待核对清单：${clean}。"
+                else -> "从${clean}交接，旧标签继续保留。"
+            }
         }
     }
 
