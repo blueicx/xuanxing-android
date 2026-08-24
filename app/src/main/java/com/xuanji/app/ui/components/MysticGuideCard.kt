@@ -67,7 +67,12 @@ private data class MysticTurn(
     val answer: String,
     val reaction: String = "",
     val kind: String = "ask",
-    val aside: MysticGuestCameo? = null
+    val aside: MysticGuestCameo? = null,
+    val asidePrompt: String = "",
+    val asideChoice: String = "",
+    val asideReply: String = "",
+    val asideExit: MysticGuestExit? = null,
+    val asideWrapup: String = ""
 )
 
 private data class MysticMemoryNote(
@@ -150,6 +155,9 @@ fun MysticGuideCard(
     var evidenceOpen by remember(guide) { mutableStateOf(false) }
     val conversation = remember(guide) { mutableStateListOf<MysticTurn>() }
     var arrivalVisible by remember(guide) { mutableStateOf(false) }
+    val openAsideTurnKey = conversation.firstOrNull { turn ->
+        turn.aside != null && turn.asideExit == null
+    }?.key
     var pendingFollowUp by remember(guide) { mutableStateOf<String?>(null) }
     var pendingInteraction by remember(guide) { mutableStateOf<MysticInteractionOption?>(null) }
     var pendingCustom by remember(guide) { mutableStateOf<String?>(null) }
@@ -166,6 +174,7 @@ fun MysticGuideCard(
     var selectedClarifier by remember(guide) { mutableStateOf<String?>(null) }
     var pendingClarify by remember(guide) { mutableStateOf<MysticClarifierOption?>(null) }
     var pendingAsideTurnKey by remember(guide) { mutableStateOf<String?>(null) }
+    var pendingAsideActionTurnKey by remember(guide) { mutableStateOf<String?>(null) }
     val interaction = remember(mode, topic, fortune, interactionRound, companion.skinId) {
         MysticGuideGenerator.interaction(
             mode,
@@ -233,7 +242,9 @@ fun MysticGuideCard(
             pendingRhythm != null ||
             pendingGuest ||
             pendingClarify != null ||
-            pendingAsideTurnKey != null
+            pendingAsideTurnKey != null ||
+            pendingAsideActionTurnKey != null ||
+            openAsideTurnKey != null
         ) return
         pendingFollowUp = key
     }
@@ -248,7 +259,9 @@ fun MysticGuideCard(
             pendingRhythm != null ||
             pendingGuest ||
             pendingClarify != null ||
-            pendingAsideTurnKey != null
+            pendingAsideTurnKey != null ||
+            pendingAsideActionTurnKey != null ||
+            openAsideTurnKey != null
         ) return
         val cleanQuestion = customQuestion.trim().take(60)
         if (cleanQuestion.isEmpty()) return
@@ -275,7 +288,9 @@ fun MysticGuideCard(
             pendingRhythm != null ||
             pendingGuest ||
             pendingClarify != null ||
-            pendingAsideTurnKey != null
+            pendingAsideTurnKey != null ||
+            pendingAsideActionTurnKey != null ||
+            openAsideTurnKey != null
         ) return
         selectedClarifier = option.key
         pendingClarify = option
@@ -294,6 +309,7 @@ fun MysticGuideCard(
             pendingGuest ||
             pendingClarify != null ||
             selectedClarifier != null ||
+            openAsideTurnKey != null ||
             pendingAsideTurnKey != null
         ) return
         pendingAsideTurnKey = key
@@ -324,6 +340,91 @@ fun MysticGuideCard(
         pendingAsideTurnKey = null
     }
 
+    fun selectAsideChoice(key: String, choice: MysticGuestChoice) {
+        val turnIndex = conversation.indexOfFirst { it.key == key }
+        if (
+            turnIndex < 0 ||
+            openAsideTurnKey != key ||
+            pendingFollowUp != null ||
+            pendingInteraction != null ||
+            pendingHandoff != null ||
+            pendingCustom != null ||
+            pendingOpening != null ||
+            pendingRhythm != null ||
+            pendingGuest ||
+            pendingClarify != null ||
+            selectedClarifier != null ||
+            pendingAsideTurnKey != null ||
+            pendingAsideActionTurnKey != null
+        ) return
+
+        val turn = conversation[turnIndex]
+        if (
+            turn.aside == null ||
+            turn.asideChoice.isNotEmpty() ||
+            MysticGuideGenerator.asideChoices().none { it.key == choice.key }
+        ) return
+
+        conversation[turnIndex] = turn.copy(
+            asidePrompt = choice.label,
+            asideChoice = choice.key
+        )
+        pendingAsideActionTurnKey = key
+    }
+
+    LaunchedEffect(pendingAsideActionTurnKey, guide) {
+        val key = pendingAsideActionTurnKey ?: return@LaunchedEffect
+        kotlinx.coroutines.delay(320)
+        var turnIndex = conversation.indexOfFirst { it.key == key }
+        var turn = conversation.getOrNull(turnIndex)
+        if (turn == null || turn.aside == null || turn.asideChoice.isEmpty() || pendingAsideActionTurnKey != key) {
+            if (pendingAsideActionTurnKey == key) pendingAsideActionTurnKey = null
+            return@LaunchedEffect
+        }
+
+        val reply = MysticGuideGenerator.asideResponse(
+            mode,
+            guide.styleKey,
+            guide.topicKey,
+            turn.kind,
+            fortune,
+            turn.question,
+            turn.asideChoice
+        )
+        if (reply.isBlank()) {
+            pendingAsideActionTurnKey = null
+            return@LaunchedEffect
+        }
+        conversation[turnIndex] = turn.copy(asideReply = reply)
+
+        kotlinx.coroutines.delay(480)
+        turnIndex = conversation.indexOfFirst { it.key == key }
+        turn = conversation.getOrNull(turnIndex)
+        if (turn == null || turn.aside == null || turn.asideChoice.isEmpty() || pendingAsideActionTurnKey != key) {
+            if (pendingAsideActionTurnKey == key) pendingAsideActionTurnKey = null
+            return@LaunchedEffect
+        }
+
+        conversation[turnIndex] = turn.copy(
+            asideExit = MysticGuideGenerator.guestExitCameo(
+                mode,
+                guide.styleKey,
+                fortune,
+                turn.asideChoice
+            ),
+            asideWrapup = MysticGuideGenerator.asideHostWrapup(
+                mode,
+                guide.styleKey,
+                guide.topicKey,
+                turn.kind,
+                fortune,
+                turn.question,
+                turn.asideChoice
+            )
+        )
+        pendingAsideActionTurnKey = null
+    }
+
     fun switchPersona(targetMode: String) {
         if (
             pendingFollowUp != null ||
@@ -334,7 +435,9 @@ fun MysticGuideCard(
             pendingRhythm != null ||
             pendingGuest ||
             pendingClarify != null ||
-            pendingAsideTurnKey != null
+            pendingAsideTurnKey != null ||
+            pendingAsideActionTurnKey != null ||
+            openAsideTurnKey != null
         ) return
         interactionCarryoverOption = null
         guestChoiceCarryoverKey = null
@@ -359,7 +462,9 @@ fun MysticGuideCard(
             pendingRhythm != null ||
             pendingGuest ||
             pendingClarify != null ||
-            pendingAsideTurnKey != null
+            pendingAsideTurnKey != null ||
+            pendingAsideActionTurnKey != null ||
+            openAsideTurnKey != null
         ) return
         val previousTopic = topic
         val carryover = MysticGuideGenerator.interactionCarryover(
@@ -438,6 +543,8 @@ fun MysticGuideCard(
             pendingGuest ||
             pendingClarify != null ||
             pendingAsideTurnKey != null ||
+            pendingAsideActionTurnKey != null ||
+            openAsideTurnKey != null ||
             opening?.options?.none { it.key == option.key } != false
         ) return
         pendingOpening = option
@@ -488,7 +595,9 @@ fun MysticGuideCard(
             pendingRhythm != null ||
             pendingGuest ||
             pendingClarify != null ||
-            pendingAsideTurnKey != null
+            pendingAsideTurnKey != null ||
+            pendingAsideActionTurnKey != null ||
+            openAsideTurnKey != null
         ) return
         selectedRhythm = key
         pendingRhythm = key
@@ -548,7 +657,9 @@ fun MysticGuideCard(
             pendingRhythm != null ||
             pendingGuest ||
             pendingClarify != null ||
-            pendingAsideTurnKey != null
+            pendingAsideTurnKey != null ||
+            pendingAsideActionTurnKey != null ||
+            openAsideTurnKey != null
         ) return
         selectedGuestChoice = key
         pendingGuest = true
@@ -1366,6 +1477,7 @@ fun MysticGuideCard(
                                         selectedClarifier = null
                                         pendingClarify = null
                                         pendingAsideTurnKey = null
+                                        pendingAsideActionTurnKey = null
                                     },
                                     color = Color.Transparent
                                 ) {
@@ -1482,6 +1594,8 @@ fun MysticGuideCard(
                                             Surface(
                                                 onClick = { requestAside(turn.key) },
                                                 enabled = pendingAsideTurnKey == null &&
+                                                    openAsideTurnKey == null &&
+                                                    pendingAsideActionTurnKey == null &&
                                                     pendingFollowUp == null &&
                                                     pendingInteraction == null &&
                                                     pendingHandoff == null &&
@@ -1549,6 +1663,140 @@ fun MysticGuideCard(
                                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                                     )
                                                 }
+                                            }
+                                        }
+                                        if (
+                                            turn.aside != null &&
+                                            turn.asideChoice.isEmpty() &&
+                                            openAsideTurnKey == turn.key &&
+                                            pendingAsideActionTurnKey == null
+                                        ) {
+                                            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                                MysticGuideGenerator.asideChoices().forEach { choice ->
+                                                    Surface(
+                                                        onClick = { selectAsideChoice(turn.key, choice) },
+                                                        shape = RoundedCornerShape(999.dp),
+                                                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.48f)
+                                                    ) {
+                                                        Text(
+                                                            choice.label,
+                                                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                                            style = MaterialTheme.typography.labelMedium,
+                                                            lineHeight = 17.sp,
+                                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        if (turn.asidePrompt.isNotBlank()) {
+                                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                                                Surface(
+                                                    shape = RoundedCornerShape(14.dp),
+                                                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.38f)
+                                                ) {
+                                                    Text(
+                                                        turn.asidePrompt,
+                                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                                        style = MaterialTheme.typography.bodySmall,
+                                                        lineHeight = 19.sp,
+                                                        color = MaterialTheme.colorScheme.onSurface
+                                                    )
+                                                }
+                                            }
+                                        }
+                                        if (pendingAsideActionTurnKey == turn.key && turn.asideReply.isBlank()) {
+                                            Text(
+                                                "对面正在回话···",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                lineHeight = 16.sp,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                        if (turn.asideReply.isNotBlank()) {
+                                            Surface(
+                                                Modifier.fillMaxWidth(),
+                                                shape = RoundedCornerShape(12.dp),
+                                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.32f)
+                                            ) {
+                                                Column(
+                                                    Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
+                                                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                                                ) {
+                                                    Row(
+                                                        Modifier.fillMaxWidth(),
+                                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                                        verticalAlignment = Alignment.CenterVertically
+                                                    ) {
+                                                        Text(
+                                                            turn.aside?.roleName ?: "",
+                                                            style = MaterialTheme.typography.labelMedium,
+                                                            fontWeight = FontWeight.Bold,
+                                                            color = MaterialTheme.colorScheme.onSurface
+                                                        )
+                                                        Text(
+                                                            "跟着看盘 · 回应",
+                                                            style = MaterialTheme.typography.labelSmall,
+                                                            color = accent.copy(alpha = 0.86f)
+                                                        )
+                                                    }
+                                                    Text(
+                                                        turn.asideReply,
+                                                        style = MaterialTheme.typography.bodySmall,
+                                                        lineHeight = 19.sp,
+                                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                    )
+                                                }
+                                            }
+                                        }
+                                        turn.asideExit?.let { exit ->
+                                            Surface(
+                                                Modifier.fillMaxWidth(),
+                                                shape = RoundedCornerShape(12.dp),
+                                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.32f)
+                                            ) {
+                                                Column(
+                                                    Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
+                                                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                                                ) {
+                                                    Row(
+                                                        Modifier.fillMaxWidth(),
+                                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                                        verticalAlignment = Alignment.CenterVertically
+                                                    ) {
+                                                        Text(
+                                                            exit.roleName,
+                                                            style = MaterialTheme.typography.labelMedium,
+                                                            fontWeight = FontWeight.Bold,
+                                                            color = MaterialTheme.colorScheme.onSurface
+                                                        )
+                                                        Text(
+                                                            "跟着看盘 · 离席",
+                                                            style = MaterialTheme.typography.labelSmall,
+                                                            color = accent.copy(alpha = 0.86f)
+                                                        )
+                                                    }
+                                                    Text(
+                                                        exit.line,
+                                                        style = MaterialTheme.typography.bodySmall,
+                                                        lineHeight = 19.sp,
+                                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                    )
+                                                }
+                                            }
+                                        }
+                                        if (turn.asideWrapup.isNotBlank()) {
+                                            Surface(
+                                                shape = RoundedCornerShape(14.dp),
+                                                color = accent.copy(alpha = 0.16f)
+                                            ) {
+                                                Text(
+                                                    turn.asideWrapup,
+                                                    modifier = Modifier.padding(12.dp),
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    lineHeight = 21.sp,
+                                                    color = MaterialTheme.colorScheme.onSurface
+                                                )
                                             }
                                         }
                                     }

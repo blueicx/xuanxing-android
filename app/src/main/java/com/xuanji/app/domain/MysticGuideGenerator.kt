@@ -864,6 +864,209 @@ object MysticGuideGenerator {
         return MysticGuestCameo(roleName, leadSet[leadIndex] + lines[lineIndex])
     }
 
+    /** 搭腔回应固定三选；选项语义与客串互动一致，但措辞面向两位玄师同场。 */
+    fun asideChoices(): List<MysticGuestChoice> = listOf(
+        MysticGuestChoice("why", "问依据：你从哪里看出来的？"),
+        MysticGuestChoice("accept", "接一句：这个提醒我收下了。"),
+        MysticGuestChoice("pushback", "拦一句：先别抢台词。")
+    )
+
+    private fun cleanAsideDetail(
+        styleKey: String,
+        kind: String,
+        fortune: CompositeDailyFortune,
+        detail: String
+    ): String {
+        val allowedKinds = listOf("opening", "rhythm", "ask", "custom", "clarify", "game", "handoff")
+        val scholarStyles = listOf("archive", "harbor", "compass")
+        val halfStyles = listOf("herald", "alley", "intern")
+        val cleanDetail = detail.trim().replace(Regex("\\s+"), " ").take(60)
+        return if (
+            fortune.dimensions.isNotEmpty() &&
+            fortune.luckyColor.isNotBlank() &&
+            fortune.luckyDirection.isNotBlank() &&
+            kind in allowedKinds &&
+            (styleKey in scholarStyles || styleKey in halfStyles) &&
+            cleanDetail.isNotEmpty()
+        ) {
+            cleanDetail
+        } else {
+            ""
+        }
+    }
+
+    /** 对面角色回应用户；同一盘面、摘要和选择永远得到同一段话。 */
+    fun asideResponse(
+        mode: String,
+        styleKey: String,
+        topicKey: String,
+        kind: String,
+        fortune: CompositeDailyFortune,
+        detail: String = "",
+        choiceKey: String = "why"
+    ): String {
+        val cleanDetail = cleanAsideDetail(styleKey, kind, fortune, detail)
+        val choice = asideChoices().firstOrNull { it.key == choiceKey } ?: return ""
+        if (cleanDetail.isEmpty()) return ""
+
+        val source = listOf(
+            canonicalDateKey(fortune.dateKey),
+            "aside-response",
+            mode,
+            styleKey,
+            topicKey,
+            kind,
+            fortune.overallScore,
+            fortune.luckyNumber,
+            cleanDetail,
+            choice.key
+        ).joinToString("|")
+        var hash = 1031L
+        for (char in source) {
+            hash = (hash * 41L + char.code) % 2147483647L
+        }
+
+        val high = fortune.dimensions.maxByOrNull { it.score } ?: return ""
+        val low = fortune.dimensions.minByOrNull { it.score } ?: return ""
+        val focus = if (topicKey == "test") {
+            high
+        } else {
+            fortune.dimensions.firstOrNull { it.key == topicKey }
+                ?: fortune.dimensions.firstOrNull { it.key == "emotion" && topicKey == "love" }
+                ?: fortune.dimensions.first()
+        }
+        val scholarHost = mode != "half"
+        val score = fortune.overallScore
+        val useColor = score % 2 == 0
+        val value = if (useColor) fortune.luckyColor else fortune.luckyDirection
+        val sourceName = if (useColor) "幸运色" else "吉利方位"
+        val answer = if (scholarHost) {
+            when {
+                score >= 65 -> when (choice.key) {
+                    "accept" -> "行，这句我替你夹进「$value」那页；「${focus.label}」 ${focus.score} 分先用在小处，别急着谢本半仙。"
+                    "pushback" -> "哎，台词留给你。可「${focus.label}」 ${focus.score} 分确实亮，${sourceName}「$value」也只是路标，别唱成大戏。"
+                    else -> "「${focus.label}」 ${focus.score} 分是明账，「${high.label}」 ${high.score} 在旁边帮腔；${sourceName}「$value」只作参照。"
+                }
+                score < 45 -> when (choice.key) {
+                    "accept" -> "收下就好。「${low.label}」 ${low.score} 分先照顾一口饭、一觉觉；本半仙不吓你。"
+                    "pushback" -> "我退半步。「${low.label}」 ${low.score} 分还在页面上，先做最小一件，不催你。"
+                    else -> "我看的是「${low.label}」 ${low.score} 分，它只说今天要省力；${sourceName}「$value」不是判决。"
+                }
+                else -> when (choice.key) {
+                    "accept" -> "稳稳接住就够。「${focus.label}」 ${focus.score} 分适合小步走，${sourceName}「$value」当便签。"
+                    "pushback" -> "好好好，我不抢场。「${low.label}」 ${low.score} 分照看好，大戏改天再唱。"
+                    else -> "温吞这页有线索：「${focus.label}」 ${focus.score} 分；「${high.label}」能借力，「${low.label}」要照顾。"
+                }
+            }
+        } else {
+            when {
+                score >= 65 -> when (choice.key) {
+                    "accept" -> "好，轻轻收下。「${focus.label}」 ${focus.score} 分值得用一次小行动，不必变成表演。"
+                    "pushback" -> "我往旁边挪一步。「${high.label}」 ${high.score} 还亮着，「${low.label}」也要留口气。"
+                    else -> "主证据是「${focus.label}」 ${focus.score} 分，「${high.label}」 ${high.score} 在旁证；${sourceName}「$value」不是护身符。"
+                }
+                score < 45 -> when (choice.key) {
+                    "accept" -> "先收下这句：「${low.label}」 ${low.score} 分需要休息，不需要责备自己。"
+                    "pushback" -> "好，我不多站了；但「${low.label}」 ${low.score} 分值得照看，先吃饭睡觉。"
+                    else -> "我看到的是「${low.label}」 ${low.score} 分；它只是状态页，${sourceName}「$value」当暂停记号。"
+                }
+                else -> when (choice.key) {
+                    "accept" -> "收得很稳。「${focus.label}」 ${focus.score} 分不急不缓，小事做完就可以停下。"
+                    "pushback" -> "我退到门边。「${high.label}」能搭把手，「${low.label}」 ${low.score} 别硬压。"
+                    else -> "我把线捋过了：「${focus.label}」 ${focus.score} 分；${sourceName}「$value」只作参照。"
+                }
+            }
+        }
+
+        val lead = when ((hash / 19L) % 3L) {
+            1L -> "我把刚才那句接回来："
+            2L -> "听你这么说，我再对一眼："
+            else -> ""
+        }
+        return lead + answer
+    }
+
+    /** 对面离席后，原玄师按当前作风收束这场小对话。 */
+    fun asideHostWrapup(
+        mode: String,
+        styleKey: String,
+        topicKey: String,
+        kind: String,
+        fortune: CompositeDailyFortune,
+        detail: String = "",
+        choiceKey: String = "why"
+    ): String {
+        val cleanDetail = cleanAsideDetail(styleKey, kind, fortune, detail)
+        if (cleanDetail.isEmpty() || asideChoices().none { it.key == choiceKey }) return ""
+
+        val high = fortune.dimensions.maxByOrNull { it.score } ?: return ""
+        val low = fortune.dimensions.minByOrNull { it.score } ?: return ""
+        val focus = if (topicKey == "test") {
+            high
+        } else {
+            fortune.dimensions.firstOrNull { it.key == topicKey }
+                ?: fortune.dimensions.firstOrNull { it.key == "emotion" && topicKey == "love" }
+                ?: fortune.dimensions.first()
+        }
+        val score = fortune.overallScore
+        val useColor = score % 2 == 0
+        val value = if (useColor) fortune.luckyColor else fortune.luckyDirection
+        val sourceName = if (useColor) "幸运色" else "吉利方位"
+        val tier = when {
+            score >= 65 -> "high"
+            score < 45 -> "low"
+            else -> "middle"
+        }
+        val kindLabel = when (kind) {
+            "opening" -> "开场"
+            "rhythm" -> "节奏"
+            "ask" -> "提问"
+            "custom" -> "自定义问题"
+            "clarify" -> "澄清"
+            "game" -> "小游戏"
+            else -> "换题"
+        }
+        val body = when (styleKey) {
+            "archive" -> when (tier) {
+                "high" -> "档案页合上半格；「${focus.label}」 ${focus.score} 分可用，「${low.label}」做备注。"
+                "low" -> "档案里补一行：「${low.label}」 ${low.score} 分需要休息，不是定罪；${sourceName}「$value」当便签。"
+                else -> "这一页归档为观察项；「${focus.label}」 ${focus.score} 分先小步走，${sourceName}「$value」只作提醒。"
+            }
+            "harbor" -> when (tier) {
+                "high" -> "灯还留着；「${focus.label}」 ${focus.score} 分可以慢慢走，「${low.label}」也留着位置。"
+                "low" -> "这里不用急着翻页；「${low.label}」 ${low.score} 分先被看见，${sourceName}「$value」放门口就好。"
+                else -> "水面平了些；「${focus.label}」 ${focus.score} 分慢慢整理，${sourceName}「$value」留在手边。"
+            }
+            "compass" -> when (tier) {
+                "high" -> "方向没有变大，只是更清楚；「${focus.label}」 ${focus.score} 分可用一小步验证。"
+                "low" -> "先把针放慢；「${low.label}」 ${low.score} 分需要照顾，${sourceName}「$value」当暂停点。"
+                else -> "指针停在这里就够了；「${focus.label}」 ${focus.score} 分宜整理，「${low.label}」留余量。"
+            }
+            "herald" -> when (tier) {
+                "high" -> "锣鼓停半拍！「${focus.label}」 ${focus.score} 分确实亮眼；给「${low.label}」留口气。"
+                "low" -> "场务别催！「${low.label}」 ${low.score} 分先回血，${sourceName}「$value」只是台侧暗号。"
+                else -> "今日戏码平稳；「${focus.label}」 ${focus.score} 分按小段演，${sourceName}「$value」当道具提示。"
+            }
+            "alley" -> when (tier) {
+                "high" -> "茶先放下！「${focus.label}」 ${focus.score} 分是真排面；「${low.label}」也带一口。"
+                "low" -> "咱不唱衰；「${low.label}」 ${low.score} 分先歇口气，${sourceName}「$value」压在杯底当提醒。"
+                else -> "街口风不大；「${focus.label}」 ${focus.score} 分慢慢晃过去就行，${sourceName}「$value」顺手看一眼。"
+            }
+            "intern" -> when (tier) {
+                "high" -> "工单备注：「${focus.label}」 ${focus.score} 分可用在一件小事上；「${low.label}」另开一栏。"
+                "low" -> "工单已降速：「${low.label}」 ${low.score} 分优先休息，${sourceName}「$value」设成暂停标签。"
+                else -> "云端记录：「${focus.label}」 ${focus.score} 分保持小步推进，${sourceName}「$value」仅作提示。"
+            }
+            else -> return ""
+        }
+        val choiceNote = when (choiceKey) {
+            "accept" -> "你收住了。"
+            "pushback" -> "好，台词还给你。"
+            else -> "问得细。"
+        }
+        return choiceNote + "「$cleanDetail」的${kindLabel}先归位。" + body
+    }
+
     /** 客串出现后的三种接法；选项固定，回答只复述盘面线索和节奏语义。 */
     fun guestChoices(): List<MysticGuestChoice> = listOf(
         MysticGuestChoice("why", "问依据：这个判断从哪来？"),
