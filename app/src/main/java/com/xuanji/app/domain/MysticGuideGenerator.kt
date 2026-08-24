@@ -70,6 +70,11 @@ data class MysticGuestChoice(
     val label: String
 )
 
+data class MysticGuestExit(
+    val roleName: String,
+    val line: String
+)
+
 data class MysticClarifierOption(
     val key: String,
     val label: String,
@@ -524,6 +529,68 @@ object MysticGuideGenerator {
         return MysticGuestCameo(
             roleName = if (scholarMain) "半仙" else "玄学家",
             line = lines[((hash / 13L) % lines.size).toInt()]
+        )
+    }
+
+    /** 客串回应后固定离席；文案只引用盘面上已有的最高和最低维度。 */
+    fun guestExitCameo(
+        mode: String,
+        styleKey: String,
+        fortune: CompositeDailyFortune,
+        choiceKey: String
+    ): MysticGuestExit? {
+        if (
+            fortune.dimensions.isEmpty() ||
+            choiceKey !in setOf("why", "accept", "pushback")
+        ) {
+            return null
+        }
+
+        val high = fortune.dimensions.maxByOrNull { it.score } ?: return null
+        val low = fortune.dimensions.minByOrNull { it.score } ?: return null
+        val line = when (mode) {
+            "scholar" -> when (styleKey) {
+                "archive" -> when (choiceKey) {
+                    "why" -> "合上档案前补一句：「${high.label}」 ${high.score} 是明面依据；「${low.label}」 ${low.score} 我折了角。"
+                    "accept" -> "行，这页先收进「${fortune.luckyColor}」那格；本半仙去隔壁喝茶。"
+                    else -> "得得得，不围了！方向留给「${fortune.luckyDirection}」，本半仙退到台侧。"
+                }
+                "harbor" -> when (choiceKey) {
+                    "why" -> "潮水把我推回来半步：「${high.label}」 ${high.score} 看得见，「${low.label}」 ${low.score} 先别硬压。"
+                    "accept" -> "你把提醒接住了；我踩着「${fortune.luckyColor}」的光退出去。"
+                    else -> "不看了不看了，船交给「${fortune.luckyDirection}」；你自己的舵自己握。"
+                }
+                "compass" -> when (choiceKey) {
+                    "why" -> "指针替我作证：「${high.label}」 ${high.score}，「${low.label}」 ${low.score} 也在盘面上；我先退出刻度外。"
+                    "accept" -> "这笔记在「${fortune.luckyColor}」旁边就行；我不挡你的北。"
+                    else -> "好好好，罗盘只留一个人看；我去「${fortune.luckyDirection}」那头晃。"
+                }
+                else -> return null
+            }
+            "half" -> when (styleKey) {
+                "herald" -> when (choiceKey) {
+                    "why" -> "场记补一笔：「${high.label}」 ${high.score}，「${low.label}」 ${low.score} 都来自盘面；我先退回侧幕。"
+                    "accept" -> "你稳稳接住了提醒；这一幕用「${fortune.luckyColor}」打光刚刚好。"
+                    else -> "幕布收了，围观结束；出口朝「${fortune.luckyDirection}」。"
+                }
+                "alley" -> when (choiceKey) {
+                    "why" -> "我把账摆在桌角：「${high.label}」 ${high.score}、「${low.label}」 ${low.score}，都是现成页码；茶碗端走啦。"
+                    "accept" -> "成，这句咱搁「${fortune.luckyColor}」边上；我先溜达去街口。"
+                    else -> "行行行，不围着瞧；你往「${fortune.luckyDirection}」走，我给你留着道。"
+                }
+                "intern" -> when (choiceKey) {
+                    "why" -> "离席备注已提交：「${high.label}」 ${high.score} / 「${low.label}」 ${low.score}，来源为当前盘面。"
+                    "accept" -> "工单关闭：提醒已接收，颜色标记 ${fortune.luckyColor}。"
+                    else -> "协作人已移出：围观暂停，下一步朝 ${fortune.luckyDirection}。"
+                }
+                else -> return null
+            }
+            else -> return null
+        }
+
+        return MysticGuestExit(
+            roleName = if (mode == "scholar") "半仙" else "玄学家",
+            line = line
         )
     }
 

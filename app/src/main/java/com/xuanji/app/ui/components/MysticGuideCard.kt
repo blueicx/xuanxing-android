@@ -49,6 +49,7 @@ import com.xuanji.app.domain.MysticOpeningCheckin
 import com.xuanji.app.domain.MysticOpeningOption
 import com.xuanji.app.domain.MysticGuestCameo
 import com.xuanji.app.domain.MysticGuestChoice
+import com.xuanji.app.domain.MysticGuestExit
 import com.xuanji.app.domain.MysticRhythmCheckin
 
 private data class MysticTurn(
@@ -73,6 +74,7 @@ private class MysticCompanionState(initialMode: String, initialTopic: String) {
     var rhythmAnswered by mutableStateOf(false)
     var completedRhythmKey by mutableStateOf<String?>(null)
     var guestCameo by mutableStateOf<MysticGuestCameo?>(null)
+    var guestExit by mutableStateOf<MysticGuestExit?>(null)
     var selectedGuestChoice by mutableStateOf("")
     var guestReply by mutableStateOf("")
     var guestQuestion by mutableStateOf("")
@@ -111,6 +113,7 @@ fun MysticGuideCard(
     var rhythmAnswered by remember(companion) { companion::rhythmAnswered }
     var completedRhythmKey by remember(companion) { companion::completedRhythmKey }
     var guestCameo by remember(companion) { companion::guestCameo }
+    var guestExit by remember(companion) { companion::guestExit }
     var selectedGuestChoice by remember(companion) { companion::selectedGuestChoice }
     var guestReply by remember(companion) { companion::guestReply }
     var guestQuestion by remember(companion) { companion::guestQuestion }
@@ -121,6 +124,7 @@ fun MysticGuideCard(
     var memorySequence by remember(companion) { companion::memorySequence }
     var memoryExpanded by remember(companion) { companion::memoryExpanded }
     LaunchedEffect(companionKey) {
+        guestExit = null
         memoryNotes = emptyList()
         memorySequence = 0
         memoryExpanded = false
@@ -176,6 +180,7 @@ fun MysticGuideCard(
 
     LaunchedEffect(guide) {
         guestCameo = null
+        guestExit = null
         selectedGuestChoice = ""
         guestReply = ""
         guestQuestion = ""
@@ -266,6 +271,7 @@ fun MysticGuideCard(
         ) return
         interactionCarryoverOption = null
         guestChoiceCarryoverKey = null
+        guestExit = null
         pendingGuestChoiceEcho = null
         selectedClarifier = null
         pendingClarify = null
@@ -308,6 +314,7 @@ fun MysticGuideCard(
         pendingHandoffEcho = carryover
         pendingGuestChoiceEcho = guestEcho
         guestChoiceCarryoverKey = null
+        guestExit = null
     }
 
     LaunchedEffect(pendingHandoff, guide) {
@@ -488,13 +495,24 @@ fun MysticGuideCard(
         }
         val rhythmKey = completedRhythmKey.orEmpty()
         guestQuestion = choice.label
-        guestReply = MysticGuideGenerator.guestReply(
+        val reply = MysticGuideGenerator.guestReply(
             mode,
             guide.topicKey,
             fortune,
             rhythmKey,
             choice.key
         )
+        guestReply = reply
+        guestExit = if (reply.isBlank()) {
+            null
+        } else {
+            MysticGuideGenerator.guestExitCameo(
+                mode,
+                guide.styleKey,
+                fortune,
+                choice.key
+            )
+        }
         conversation.add(
             MysticTurn(
                 key = "guest-${guide.topicKey}-${choice.key}",
@@ -876,6 +894,21 @@ fun MysticGuideCard(
                                 lineHeight = 19.sp,
                                 color = accent.copy(alpha = 0.90f)
                             )
+                            guestExit?.let { exit ->
+                                Text(
+                                    exit.roleName,
+                                    modifier = Modifier.padding(top = 10.dp),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.68f)
+                                )
+                                Text(
+                                    exit.line,
+                                    modifier = Modifier.padding(top = 2.dp),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    lineHeight = 18.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.82f)
+                                )
+                            }
                         }
                     }
                 }
@@ -1154,6 +1187,7 @@ fun MysticGuideCard(
                                         completedRhythmKey = null
                                         rhythmAnswered = false
                                         guestCameo = null
+                                        guestExit = null
                                         guestChoiceCarryoverKey = null
                                         pendingGuestChoiceEcho = null
                                         memoryNotes = emptyList()
