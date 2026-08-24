@@ -1,6 +1,7 @@
 package com.xuanji.app.ui.components
 
 import android.content.Intent
+import android.content.ClipData
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.platform.LocalContext
 import kotlinx.coroutines.Dispatchers
@@ -36,8 +37,7 @@ object ResultShare {
 
 @Composable
 fun ShareButton(
-    sharedCard: ShareCard? = null,
-    sharedText: String = "",
+    sharedCard: ShareCard,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -45,23 +45,18 @@ fun ShareButton(
 
     IconButton(
         onClick = {
-            val card = sharedCard
-            if (card == null) {
-                startTextShare(context, sharedText)
-            } else {
-                scope.launch {
-                    val uri = withContext(Dispatchers.IO) {
-                        val file = ResultShareCardRenderer.shareImage(context, card)
-                        ResultShareCardRenderer.uri(context, file)
-                    }
-                    val intent = Intent(Intent.ACTION_SEND).apply {
-                        type = "image/png"
-                        putExtra(Intent.EXTRA_STREAM, uri)
-                        putExtra(Intent.EXTRA_TEXT, "${card.title}\n${card.summary}")
-                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                    }
-                    context.startActivity(Intent.createChooser(intent, null))
+            scope.launch {
+                val uri = withContext(Dispatchers.IO) {
+                    val file = ResultShareCardRenderer.shareImage(context, sharedCard)
+                    ResultShareCardRenderer.uri(context, file)
                 }
+                val intent = Intent(Intent.ACTION_SEND).apply {
+                    type = "image/png"
+                    putExtra(Intent.EXTRA_STREAM, uri)
+                    clipData = ClipData.newRawUri(sharedCard.title, uri)
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                }
+                context.startActivity(Intent.createChooser(intent, sharedCard.title))
             }
         },
         modifier = modifier
@@ -76,12 +71,4 @@ fun ShareButton(
             modifier = Modifier.size(19.dp)
         )
     }
-}
-
-private fun startTextShare(context: android.content.Context, text: String) {
-    val intent = Intent(Intent.ACTION_SEND).apply {
-        type = "text/plain"
-        putExtra(Intent.EXTRA_TEXT, text)
-    }
-    context.startActivity(Intent.createChooser(intent, null))
 }
