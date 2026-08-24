@@ -5,15 +5,22 @@ import androidx.compose.animation.Crossfade
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.OutlinedButton
@@ -34,6 +41,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -51,6 +59,7 @@ import com.xuanji.app.domain.MysticGuestCameo
 import com.xuanji.app.domain.MysticGuestChoice
 import com.xuanji.app.domain.MysticGuestExit
 import com.xuanji.app.domain.MysticRhythmCheckin
+import com.xuanji.app.domain.MysticSkin
 
 private data class MysticTurn(
     val key: String,
@@ -733,6 +742,11 @@ fun MysticGuideCard(
         animationSpec = tween(260),
         label = "mysticAccent"
     )
+    val skins = remember(mode) { MysticGuideGenerator.mysticSkins(mode) }
+    var skinIndex by remember(mode, fortune) {
+        mutableStateOf(skins.indexOf(MysticGuideGenerator.defaultMysticSkin(mode, fortune)))
+    }
+    val skin = skins[skinIndex.coerceIn(skins.indices)]
 
     Card(Modifier.fillMaxWidth()) {
         Column(
@@ -744,13 +758,30 @@ fun MysticGuideCard(
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Surface(
-                    shape = RoundedCornerShape(999.dp),
-                    color = accent.copy(alpha = 0.18f)
+                Box(
+                    modifier = Modifier
+                        .size(42.dp)
+                        .clip(CircleShape)
+                        .background(Color(skin.back)),
+                    contentAlignment = Alignment.Center
                 ) {
+                    Box(
+                        Modifier
+                            .align(Alignment.BottomCenter)
+                            .fillMaxWidth()
+                            .height(19.dp)
+                            .background(Color(skin.garment))
+                    )
+                    Box(
+                        Modifier
+                            .align(Alignment.BottomCenter)
+                            .fillMaxWidth()
+                            .padding(bottom = 13.dp)
+                            .height(2.dp)
+                            .background(Color(skin.trim))
+                    )
                     Text(
                         if (mode == "half") "半" else "玄",
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
                         style = MaterialTheme.typography.labelLarge,
                         fontWeight = FontWeight.Bold,
                         color = accent
@@ -768,9 +799,35 @@ fun MysticGuideCard(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
+                        "服饰 · ${skin.label} · ${skin.detail}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = accent.copy(alpha = 0.86f)
+                    )
+                    Text(
                         "现场 · ${MysticGuideGenerator.presenceState(mode, guide.styleKey, conversation.size)}",
                         style = MaterialTheme.typography.labelSmall,
                         color = accent.copy(alpha = 0.86f)
+                    )
+                }
+            }
+
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                skins.forEachIndexed { index, item ->
+                    val isSelected = index == skinIndex
+                    Box(
+                        modifier = Modifier
+                            .size(22.dp)
+                            .clip(CircleShape)
+                            .background(Color(item.garment))
+                            .border(
+                                width = if (isSelected) 2.dp else 1.dp,
+                                color = if (isSelected) accent else Color(item.trim),
+                                shape = CircleShape
+                            )
+                            .clickable { skinIndex = index }
                     )
                 }
             }

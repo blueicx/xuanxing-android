@@ -86,6 +86,15 @@ data class MysticClarifier(
     val options: List<MysticClarifierOption>
 )
 
+data class MysticSkin(
+    val id: String,
+    val label: String,
+    val detail: String,
+    val back: Long,
+    val garment: Long,
+    val trim: Long
+)
+
 /**
  * 双面灵语：玄学家负责基于现有算法结果做心理按摩，半仙负责浮夸调侃。
  * 不使用随机数；同一个人、同一天、同一问题、同一模式必然得到同一回答。
@@ -102,6 +111,38 @@ object MysticGuideGenerator {
     )
 
     fun topicLabels(): List<Pair<String, String>> = topics.map { it.key to it.value }
+
+    fun mysticSkins(mode: String): List<MysticSkin> = if (mode == "half") {
+        listOf(
+            MysticSkin("cloud-daoist", "云纹道袍", "朱砂绦 · 金云补子", 0xFFF5E3D4, 0xFF97654A, 0xFFD89B62),
+            MysticSkin("street-jacket", "街口短打", "铜铃袖口 · 布扣", 0xFFF0E4DA, 0xFF84604F, 0xFFCBA96C),
+            MysticSkin("desert-traveler", "流沙旅袍", "铜镜腰牌 · 沙金披肩", 0xFFF3E6CB, 0xFFA87C4F, 0xFFE4C57C),
+            MysticSkin("festival-costume", "节庆戏袍", "纸符袋 · 撞色滚边", 0xFFF4DBD8, 0xFFA05F63, 0xFFD9A05B)
+        )
+    } else {
+        listOf(
+            MysticSkin("jiangnan-robe", "江南书生袍", "青玉襟 · 素袖", 0xFFDCEAE4, 0xFF6F9C90, 0xFFD9C58B),
+            MysticSkin("academy-gown", "星港学士服", "星扣领 · 深灰披巾", 0xFFDFE5F3, 0xFF77809F, 0xFFE2C275),
+            MysticSkin("silkroad-robe", "丝路学者袍", "藏书腰带 · 松石缠巾", 0xFFDCEDEA, 0xFF48948F, 0xFFE7BE68),
+            MysticSkin("northland-mantle", "北地游学斗篷", "银扣 · 苔绿毛边", 0xFFE1EBDC, 0xFF799458, 0xFFD7E0C6)
+        )
+    }
+
+    fun defaultMysticSkin(mode: String, fortune: CompositeDailyFortune): MysticSkin {
+        val skins = mysticSkins(mode)
+        val source = "${canonicalDateKey(fortune.dateKey)}|$mode|${fortune.overallScore}|${fortune.luckyNumber}|mystic-skin"
+        var hash = 5381L
+        for (char in source) {
+            hash = (hash * 33L + char.code) % 2147483647L
+        }
+        return skins[(hash % skins.size).toInt()]
+    }
+
+    fun nextMysticSkin(mode: String, currentId: String): MysticSkin {
+        val skins = mysticSkins(mode)
+        val index = skins.indexOfFirst { it.id == currentId }
+        return skins[(if (index < 0) 0 else index + 1) % skins.size]
+    }
 
     /** 同一天、同一命盘默认由同一位玄师陪伴；好运坏运不预设谁来接话。 */
     @Suppress("UNUSED_PARAMETER")
