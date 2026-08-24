@@ -451,6 +451,61 @@ object MysticGuideGenerator {
         MysticGuestChoice("pushback", "拦一句：别俩人一起看我。")
     )
 
+    /** 客串退场后留给主角的精确回声；只有同一 mode/style family 的已知选择才有效。 */
+    fun guestChoiceCarryover(mode: String, styleKey: String, choiceKey: String): String {
+        return when (mode) {
+            "scholar" -> if (styleKey !in listOf("archive", "harbor", "compass")) {
+                ""
+            } else {
+                when (styleKey) {
+                    "archive" -> when (choiceKey) {
+                        "why" -> "客串退场后，档案页边多了一行：依据已被当面问过。"
+                        "accept" -> "客串退场后，档案里夹了一张便签：提醒已经由你收下。"
+                        "pushback" -> "客串退场后，档案合上半页：围观已经被你叫停。"
+                        else -> ""
+                    }
+                    "harbor" -> when (choiceKey) {
+                        "why" -> "水面安静下来，你把依据这件事稳稳放上了岸。"
+                        "accept" -> "提醒被你先接住，泊位边少了一件悬着的事。"
+                        "pushback" -> "你拦住了围拢的视线，水面重新留给你自己。"
+                        else -> ""
+                    }
+                    else -> when (choiceKey) {
+                        "why" -> "罗盘指针在「依据」一格停留过，来源核对已经发生。"
+                        "accept" -> "罗盘旁留了一个小记号：那句提醒已被收进手边。"
+                        "pushback" -> "罗盘让出中心位置，两人围观的状态已经解除。"
+                        else -> ""
+                    }
+                }
+            }
+            "half" -> if (styleKey !in listOf("herald", "alley", "intern")) {
+                ""
+            } else {
+                when (styleKey) {
+                    "herald" -> when (choiceKey) {
+                        "why" -> "锣鼓停了半拍：依据问题已经递到台前！"
+                        "accept" -> "台侧记下一笔：提醒先被稳稳接住！"
+                        "pushback" -> "幕布收窄半尺：两个人一起看戏的状态被你叫停！"
+                        else -> ""
+                    }
+                    "alley" -> when (choiceKey) {
+                        "why" -> "这茬摆在茶碗边上：依据你已经当面问过了。"
+                        "accept" -> "提醒接住了，咱先把它放在顺手的地方。"
+                        "pushback" -> "你一句话拦住了，俩人不再一起围着你看了。"
+                        else -> ""
+                    }
+                    else -> when (choiceKey) {
+                        "why" -> "工单状态更新为「依据已问过」。"
+                        "accept" -> "工单状态更新为「提醒已接收」。"
+                        "pushback" -> "工单状态更新为「围观已暂停」。"
+                        else -> ""
+                    }
+                }
+            }
+            else -> ""
+        }
+    }
+
     fun guestReply(
         mode: String,
         topicKey: String,

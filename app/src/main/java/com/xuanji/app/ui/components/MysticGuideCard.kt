@@ -71,6 +71,8 @@ private class MysticCompanionState(initialMode: String, initialTopic: String) {
     var guestReply by mutableStateOf("")
     var guestQuestion by mutableStateOf("")
     var pendingGuest by mutableStateOf(false)
+    var guestChoiceCarryoverKey by mutableStateOf<String?>(null)
+    var pendingGuestChoiceEcho by mutableStateOf<String?>(null)
 }
 
 private val mysticCompanionStates = mutableMapOf<String, MysticCompanionState>()
@@ -104,6 +106,8 @@ fun MysticGuideCard(
     var guestReply by remember(companion) { companion::guestReply }
     var guestQuestion by remember(companion) { companion::guestQuestion }
     var pendingGuest by remember(companion) { companion::pendingGuest }
+    var guestChoiceCarryoverKey by remember(companion) { companion::guestChoiceCarryoverKey }
+    var pendingGuestChoiceEcho by remember(companion) { companion::pendingGuestChoiceEcho }
     val latestTest = records.maxByOrNull { it.date }
     val guide = remember(mode, topic, bazi, fortune, latestTest) {
         MysticGuideGenerator.generate(mode, topic, bazi, fortune, latestTest)
@@ -205,6 +209,8 @@ fun MysticGuideCard(
             pendingGuest
         ) return
         interactionCarryoverOption = null
+        guestChoiceCarryoverKey = null
+        pendingGuestChoiceEcho = null
         mode = targetMode
     }
 
@@ -225,12 +231,19 @@ fun MysticGuideCard(
             guide.styleKey,
             interactionCarryoverOption.orEmpty()
         )
+        val guestEcho = MysticGuideGenerator.guestChoiceCarryover(
+            mode,
+            guide.styleKey,
+            guestChoiceCarryoverKey.orEmpty()
+        )
         selectedInteraction = null
         pendingFollowUp = null
         pendingInteraction = null
         topic = key
         pendingHandoff = previousTopic
         pendingHandoffEcho = carryover
+        pendingGuestChoiceEcho = guestEcho
+        guestChoiceCarryoverKey = null
     }
 
     LaunchedEffect(pendingHandoff, guide) {
@@ -254,7 +267,10 @@ fun MysticGuideCard(
                     ),
                     MysticGuideGenerator.composeReaction(
                         pendingHandoffEcho.orEmpty(),
-                        MysticGuideGenerator.handoffReaction(mode, guide.styleKey)
+                        MysticGuideGenerator.composeReaction(
+                            pendingGuestChoiceEcho.orEmpty(),
+                            MysticGuideGenerator.handoffReaction(mode, guide.styleKey)
+                        )
                     )
                 ),
 
@@ -266,6 +282,7 @@ fun MysticGuideCard(
         completedRhythmKey = null
         pendingHandoff = null
         pendingHandoffEcho = null
+        pendingGuestChoiceEcho = null
         pendingOpening = null
     }
 
@@ -424,6 +441,7 @@ fun MysticGuideCard(
         interactionCarryoverOption = null
         completedRhythmKey = null
         pendingGuest = false
+        guestChoiceCarryoverKey = choice.key
     }
 
     LaunchedEffect(pendingCustom, guide) {
@@ -452,8 +470,15 @@ fun MysticGuideCard(
                             guide.styleKey,
                             interactionCarryoverOption.orEmpty()
                         ),
-                        MysticGuideGenerator.customReaction(mode, guide.styleKey, question)
-                    ),
+                        MysticGuideGenerator.composeReaction(
+                            MysticGuideGenerator.guestChoiceCarryover(
+                                mode,
+                                guide.styleKey,
+                                guestChoiceCarryoverKey.orEmpty()
+                            ),
+                            MysticGuideGenerator.customReaction(mode, guide.styleKey, question)
+                        )
+                    )
                 ),
 
                 kind = "ask"
@@ -463,6 +488,7 @@ fun MysticGuideCard(
         customCount += 1
         interactionCarryoverOption = null
         completedRhythmKey = null
+        guestChoiceCarryoverKey = null
         pendingCustom = null
     }
 
@@ -480,7 +506,21 @@ fun MysticGuideCard(
                         guide.styleKey,
                         completedRhythmKey.orEmpty()
                     ),
-                    MysticGuideGenerator.interactionReaction(mode, guide.styleKey)
+                    MysticGuideGenerator.composeReaction(
+                        MysticGuideGenerator.interactionCarryover(
+                            mode,
+                            guide.styleKey,
+                            interactionCarryoverOption.orEmpty()
+                        ),
+                        MysticGuideGenerator.composeReaction(
+                            MysticGuideGenerator.guestChoiceCarryover(
+                                mode,
+                                guide.styleKey,
+                                guestChoiceCarryoverKey.orEmpty()
+                            ),
+                            MysticGuideGenerator.interactionReaction(mode, guide.styleKey)
+                        )
+                    )
                 ),
                 kind = "game"
             )
@@ -489,6 +529,7 @@ fun MysticGuideCard(
         interactionCount += 1
         interactionCarryoverOption = option.label
         completedRhythmKey = null
+        guestChoiceCarryoverKey = null
         pendingInteraction = null
     }
 
@@ -517,7 +558,14 @@ fun MysticGuideCard(
                     guide.styleKey,
                     interactionCarryoverOption.orEmpty()
                 ),
-                MysticGuideGenerator.reaction(mode, action, askedCount, guide.styleKey)
+                MysticGuideGenerator.composeReaction(
+                    MysticGuideGenerator.guestChoiceCarryover(
+                        mode,
+                        guide.styleKey,
+                        guestChoiceCarryoverKey.orEmpty()
+                    ),
+                    MysticGuideGenerator.reaction(mode, action, askedCount, guide.styleKey)
+                )
             ),
         )
         if (action == "repeat" && conversation.lastOrNull()?.key == key) {
@@ -533,6 +581,7 @@ fun MysticGuideCard(
         selectedFollowUp = key
         interactionCarryoverOption = null
         completedRhythmKey = null
+        guestChoiceCarryoverKey = null
         pendingFollowUp = null
     }
     val accent by animateColorAsState(
@@ -926,6 +975,8 @@ fun MysticGuideCard(
                                         completedRhythmKey = null
                                         rhythmAnswered = false
                                         guestCameo = null
+                                        guestChoiceCarryoverKey = null
+                                        pendingGuestChoiceEcho = null
                                         selectedGuestChoice = ""
                                         guestReply = ""
                                         guestQuestion = ""
