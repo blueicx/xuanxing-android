@@ -754,6 +754,116 @@ object MysticGuideGenerator {
         )
     }
 
+    /** 主玄师回答后，用户可邀请对面角色补一句；出场者固定为当前模式的反面。 */
+    fun asideInvite(
+        mode: String,
+        styleKey: String,
+        topicKey: String,
+        kind: String,
+        fortune: CompositeDailyFortune,
+        detail: String = ""
+    ): MysticGuestCameo? {
+        val allowedKinds = listOf("opening", "rhythm", "ask", "custom", "clarify", "game", "handoff")
+        val scholarStyles = listOf("archive", "harbor", "compass")
+        val halfStyles = listOf("herald", "alley", "intern")
+        if (
+            fortune.dimensions.isEmpty() ||
+            fortune.luckyColor.isBlank() ||
+            fortune.luckyDirection.isBlank() ||
+            kind !in allowedKinds ||
+            (styleKey !in scholarStyles && styleKey !in halfStyles)
+        ) {
+            return null
+        }
+
+        val cleanDetail = detail.trim().replace(Regex("\\s+"), " ").take(60)
+        if (cleanDetail.isEmpty()) return null
+
+        val source = listOf(
+            canonicalDateKey(fortune.dateKey),
+            "aside-invite",
+            mode,
+            styleKey,
+            topicKey,
+            kind,
+            fortune.overallScore,
+            fortune.luckyNumber,
+            cleanDetail
+        ).joinToString("|")
+        var hash = 977L
+        for (char in source) {
+            hash = (hash * 47L + char.code) % 2147483647L
+        }
+
+        val high = fortune.dimensions.maxByOrNull { it.score } ?: return null
+        val low = fortune.dimensions.minByOrNull { it.score } ?: return null
+        val focus = if (topicKey == "test") {
+            high
+        } else {
+            fortune.dimensions.firstOrNull { it.key == topicKey }
+                ?: fortune.dimensions.firstOrNull { it.key == "emotion" && topicKey == "love" }
+                ?: fortune.dimensions.first()
+        }
+        val scholarHost = mode != "half"
+        val roleName = if (scholarHost) "半仙" else "玄学家"
+        val score = fortune.overallScore
+        val useColor = score % 2 == 0
+        val value = if (useColor) fortune.luckyColor else fortune.luckyDirection
+        val sourceName = if (useColor) "幸运色" else "吉利方位"
+        val lines = if (scholarHost) {
+            when {
+                score >= 65 -> listOf(
+                    "你刚说完「${cleanDetail}」，「${focus.label}」 ${focus.score} 分就跟着冒仙气；先让你神气一会儿。",
+                    "好家伙，「${high.label}」 ${high.score} 分撑腰，难怪「${cleanDetail}」说得这么顺。",
+                    "${sourceName}「$value」也来捧场了；小心走太快，仙鹤也要看红绿灯。"
+                )
+                score < 45 -> listOf(
+                    "「${cleanDetail}」这句我听见了；「${low.label}」 ${low.score} 分只是累了，先把饭吃热。",
+                    "别硬撑，「${low.label}」 ${low.score} 分要省着用；本半仙不吓你。",
+                    "这页不算完蛋。「${low.label}」 ${low.score} 分小步走，${sourceName}「$value」当提醒。"
+                )
+                else -> listOf(
+                    "我探头看了看「${cleanDetail}」：「${focus.label}」 ${focus.score} 分，温吞也有温吞的走法。",
+                    "不惊不喜的一页。「${low.label}」 ${low.score} 分先照顾好，大戏改天再唱。",
+                    "${sourceName}「$value」路过递个提醒：把琐事收拾干净就够体面了。"
+                )
+            }
+        } else {
+            when {
+                score >= 65 -> listOf(
+                    "「${cleanDetail}」问得清楚。「${high.label}」 ${high.score} 分可以用，但不必变成表演。",
+                    "我顺着「${cleanDetail}」看了一眼：「${focus.label}」 ${focus.score} 分值得高兴，也可以慢慢用。",
+                    "好消息不用急着放大；「${high.label}」 ${high.score} 分和${sourceName}「$value」都只是参照。"
+                )
+                score < 45 -> listOf(
+                    "关于「${cleanDetail}」，我先替你说一句：「${low.label}」 ${low.score} 分是提醒，不是定性。",
+                    "「${low.label}」 ${low.score} 分需要照看；先做最小一件，不需要责备自己。",
+                    "${sourceName}「$value」可以当停顿记号；「${low.label}」 ${low.score} 分先休息。"
+                )
+                else -> listOf(
+                    "看完「${cleanDetail}」，我想说：「${focus.label}」 ${focus.score} 分适合慢慢整理。",
+                    "这一页平稳。「${low.label}」 ${low.score} 分值得照看，小事做完就可以停下。",
+                    "${sourceName}「$value」只作提醒；路线还是由你在「${cleanDetail}」之后自己定。"
+                )
+            }
+        }
+
+        val leads = mapOf(
+            "archive" to listOf("档案旁补一句：", "我把这页折了个角：", "核对完这一行："),
+            "harbor" to listOf("灯下我也看见了：", "泊在旁边听完了：", "水面那边补一句："),
+            "compass" to listOf("罗盘旁边插一句：", "指针停在刚才那页：", "路线旁做个小注："),
+            "herald" to listOf("锣鼓压低半拍！", "台侧字幕飘过：", "场记快速补一笔："),
+            "alley" to listOf("茶碗边上搭一句：", "街口这茬我也听见了；", "我凑近看了半眼；"),
+            "intern" to listOf("工单旁批注：", "协作备注送达：", "云端便签轻轻弹出：")
+        )
+        val leadSet = leads[styleKey]
+            ?: leads[if (scholarHost) "herald" else "archive"].orEmpty()
+        if (leadSet.isEmpty()) return null
+        val leadIndex = ((hash / 13L) % leadSet.size.toLong()).toInt()
+        val lineIndex = ((hash / 17L) % lines.size.toLong()).toInt()
+        return MysticGuestCameo(roleName, leadSet[leadIndex] + lines[lineIndex])
+    }
+
     /** 客串出现后的三种接法；选项固定，回答只复述盘面线索和节奏语义。 */
     fun guestChoices(): List<MysticGuestChoice> = listOf(
         MysticGuestChoice("why", "问依据：这个判断从哪来？"),
