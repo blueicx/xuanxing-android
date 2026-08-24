@@ -2,7 +2,13 @@ package com.xuanji.app.ui.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.draggable
+import androidx.compose.foundation.gestures.rememberDraggableState
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -18,11 +24,14 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -151,17 +160,30 @@ data class CardLayoutController(
     val page: String,
     val profileKey: String,
     val state: CardLayoutState,
+    val editingCardId: String?,
+    private val onEditingChange: (String?) -> Unit,
     private val store: CardLayoutStore,
     private val onStateChange: (CardLayoutState) -> Unit
 ) {
     fun move(id: String, delta: Int) = update(CardLayouts.move(state, page, id, delta))
 
-    fun toggleCollapse(id: String) {
-        val next = if (id in state.collapsed) state.collapsed - id else state.collapsed + id
-        update(state.copy(collapsed = next))
+    fun moveBy(id: String, delta: Int) {
+        var next = state
+        repeat(kotlin.math.abs(delta)) {
+            next = CardLayouts.move(next, page, id, if (delta > 0) 1 else -1)
+        }
+        update(next)
     }
 
     fun hide(id: String) = update(state.copy(hidden = state.hidden + id))
+
+    fun startEdit(id: String) {
+        onEditingChange(id)
+    }
+
+    fun stopEdit() {
+        onEditingChange(null)
+    }
 
     fun reset() {
         onStateChange(CardLayouts.default(page))
@@ -179,25 +201,31 @@ fun rememberCardLayoutController(page: String, profileKey: String): CardLayoutCo
     val context = LocalContext.current
     val store = remember(context) { CardLayoutStore(context) }
     var state by remember(page, profileKey) { mutableStateOf(CardLayouts.default(page)) }
+    var editingCardId by remember(page, profileKey) { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
 
     LaunchedEffect(page, profileKey) {
         store.flow(page, profileKey).collect { loaded -> state = loaded }
     }
 
-    return CardLayoutController(
-        page = page,
-        profileKey = profileKey,
-        state = state,
-        store = store
-    ) { next ->
-        state = next
-        scope.launch { runCatching { store.save(page, profileKey, next) } }
+    return remember(state, editingCardId) {
+        CardLayoutController(
+            page = page,
+            profileKey = profileKey,
+            state = state,
+            editingCardId = editingCardId,
+            onEditingChange = { editingCardId = it },
+            store = store
+        ) { next ->
+            state = next
+            scope.launch { runCatching { store.save(page, profileKey, next) } }
+        }
     }
 }
 
 val LocalCardLayout = staticCompositionLocalOf<CardLayoutController?> { null }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun CardControls(
     title: String,
@@ -206,28 +234,80 @@ fun CardControls(
     modifier: Modifier = Modifier,
     shareCard: ShareCard? = null
 ) {
-    val collapsed = cardId in controller.state.collapsed
-    Row(
-        modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(5.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
+    if (controller.editingCardId == cardId) {
+        Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(5.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    title,
+                    Modifier.weight(1f),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text("拖动排序", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
+                if (shareCard != null) {
+                    ShareButton(sharedCard = shareCard)
+                }
+                ControlTool("隐藏", "×") { controller.hide(cardId) }
+            }
+            Surface(
+                shape = RoundedCornerShape(9.dp),
+                color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.14f),
+                contentColor = MaterialTheme.colorScheme.secondary,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    "完成整理",
+                    Modifier
+                        .fillMaxWidth()
+                        .combinedClickable(onClickLabel = "退出编辑", onClick = controller::stopEdit)
+                        .padding(vertical = 6.dp),
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+    } else {
         Text(
             title,
-            Modifier.weight(1f),
+            modifier.fillMaxWidth(),
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
-        ControlTool("上移", "↑") { controller.move(cardId, -1) }
-        ControlTool("下移", "↓") { controller.move(cardId, 1) }
-        ControlTool(if (collapsed) "展开" else "收起", if (collapsed) "展" else "收") {
-            controller.toggleCollapse(cardId)
-        }
-        if (shareCard != null) {
-            ShareButton(sharedCard = shareCard)
-        }
-        ControlTool("隐藏", "×") { controller.hide(cardId) }
     }
+}
+
+@Composable
+fun Modifier.cardDragReorder(
+    enabled: Boolean,
+    cardId: String,
+    controller: CardLayoutController
+): Modifier {
+    if (!enabled) return this
+    val currentController by rememberUpdatedState(controller)
+    val density = LocalDensity.current
+    val dragStep = with(density) { 104.dp.toPx() }
+    var dragOffset by remember(cardId) { mutableStateOf(0f) }
+
+    return this
+        .graphicsLayer { translationY = dragOffset }
+        .draggable(
+            orientation = Orientation.Vertical,
+            enabled = true,
+            state = rememberDraggableState { delta ->
+                dragOffset += delta
+                val slots = (dragOffset / dragStep).toInt()
+                if (slots != 0) {
+                    currentController.moveBy(cardId, slots)
+                    dragOffset -= slots * dragStep
+                }
+            },
+            onDragStopped = { dragOffset = 0f }
+        )
 }
 
 @Composable

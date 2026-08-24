@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -31,13 +32,14 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.Canvas
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -48,11 +50,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -105,39 +109,16 @@ fun MysticFloatingGuide(
             enter = fadeIn() + scaleIn(initialScale = 0.96f),
             exit = fadeOut() + scaleOut(targetScale = 0.97f)
         ) {
-            Surface(
-                Modifier.fillMaxSize(),
-                color = MaterialTheme.colorScheme.background
+            MysticImmersiveStage(
+                half = mode == "half",
+                skinId = skin!!.id,
+                garment = Color(skin.garment),
+                backColor = Color(skin.back),
+                trimColor = Color(skin.trim),
+                roleName = if (mode == "half") "半仙" else "玄学家",
+                onClose = { detailOpen = false }
             ) {
-                Column(
-                    Modifier.fillMaxSize(),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Row(
-                        Modifier
-                            .fillMaxWidth()
-                            .padding(start = 16.dp, end = 6.dp, top = 10.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            if (mode == "half") "半仙现场" else "玄学家现场",
-                            style = MaterialTheme.typography.titleMedium
-                        )
-                        IconButton(onClick = { detailOpen = false }) {
-                            Icon(Icons.Filled.Close, contentDescription = "关闭玄师详情")
-                        }
-                    }
-                    Column(
-                        Modifier
-                            .fillMaxWidth()
-                            .weight(1f)
-                            .verticalScroll(rememberScrollState())
-                            .padding(horizontal = 16.dp)
-                    ) {
-                        MysticGuideCard(detailBazi!!, detailFortune!!)
-                    }
-                }
+                MysticGuideCard(detailBazi!!, detailFortune!!, immersive = true)
             }
         }
     }
@@ -182,10 +163,6 @@ private fun MysticOrb(
         Box(
             Modifier
                 .size(60.dp, 74.dp)
-                .shadow(14.dp, RoundedCornerShape(topEnd = 28.dp, topStart = 28.dp, bottomEnd = 22.dp, bottomStart = 22.dp))
-                .clip(RoundedCornerShape(topEnd = 28.dp, topStart = 28.dp, bottomEnd = 22.dp, bottomStart = 22.dp))
-                .background(backColor)
-                .border(1.5.dp, trimColor.copy(alpha = 0.75f), RoundedCornerShape(topEnd = 28.dp, topStart = 28.dp, bottomEnd = 22.dp, bottomStart = 22.dp))
                 .clickable(onClick = onClick),
             contentAlignment = Alignment.Center
         ) {
@@ -308,4 +285,110 @@ private fun DrawScope.drawMysticFigure(
     }
 
     drawLine(trim, Offset(width * .34f, height * .60f), Offset(width * .66f, height * .60f), width * .035f)
+}
+
+@Composable
+private fun MysticImmersiveStage(
+    half: Boolean,
+    skinId: String,
+    garment: Color,
+    backColor: Color,
+    trimColor: Color,
+    roleName: String,
+    onClose: () -> Unit,
+    content: @Composable () -> Unit
+) {
+    val breath = rememberInfiniteTransition(label = "stageBreath")
+    val breathValue by breath.animateFloat(
+        initialValue = 0f,
+        targetValue = (2 * Math.PI).toFloat(),
+        animationSpec = infiniteRepeatable(tween(3600, easing = LinearEasing)),
+        label = "breathValue"
+    )
+    val breathe = 1f + Math.sin(breathValue.toDouble()).toFloat() * 0.018f
+    val ink = Color(0xFF120D1C)
+    val deep = Color(0xFF221733)
+    val warm = Color(0xFF6A4A3B)
+
+    Surface(Modifier.fillMaxSize(), color = ink) {
+        Box {
+            Canvas(Modifier.fillMaxSize()) {
+                drawRect(
+                    Brush.verticalGradient(
+                        listOf(ink, deep.copy(alpha = .94f), warm.copy(alpha = .38f), ink),
+                        startY = 0f,
+                        endY = size.height
+                    )
+                )
+                drawOval(
+                    brush = Brush.radialGradient(listOf(trimColor.copy(alpha = .20f), Color.Transparent)),
+                    topLeft = Offset(size.width * .18f, size.height * .48f),
+                    size = Size(size.width * .64f, size.height * .13f)
+                )
+            }
+
+            Box(
+                Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 58.dp)
+                    .size(210.dp, 240.dp)
+            ) {
+                Canvas(
+                    Modifier
+                        .fillMaxSize()
+                        .graphicsLayer {
+                            scaleX = breathe
+                            scaleY = breathe
+                            alpha = 0.98f
+                        }
+                ) {
+                    drawOval(
+                        color = trimColor.copy(alpha = .12f),
+                        topLeft = Offset(size.width * .10f, size.height * .88f),
+                        size = Size(size.width * .80f, size.height * .07f)
+                    )
+                    drawMysticFigure(half, skinId, garment, trimColor)
+                }
+            }
+
+            Surface(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .heightIn(min = 330.dp),
+                shape = RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp),
+                color = Color(0xFF1B1328).copy(alpha = 0.96f),
+                contentColor = Color(0xFFF4EEE5)
+            ) {
+                MaterialTheme(colorScheme = darkColorScheme(primary = Color(0xFFD9C58B), tertiary = Color(0xFFE3A579))) {
+                    Column(Modifier.fillMaxSize().padding(top = 4.dp)) {
+                        Row(
+                            Modifier.fillMaxWidth().padding(start = 18.dp, end = 8.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                "$roleName · 现场对话",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                                color = Color(0xFFEFE6D8)
+                            )
+                            IconButton(onClick = onClose) {
+                                Icon(Icons.Filled.Close, contentDescription = "关闭玄师详情", tint = Color(0xFFD9C58B))
+                            }
+                        }
+                        Column(
+                            Modifier
+                                .fillMaxWidth()
+                                .weight(1f)
+                                .verticalScroll(rememberScrollState())
+                                .padding(horizontal = 14.dp)
+                        ) {
+                            content()
+                        }
+                    }
+                }
+            }
+        }
+    }
 }

@@ -1,12 +1,14 @@
 package com.xuanji.app.ui.composite
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Card
@@ -37,6 +39,7 @@ import com.xuanji.app.ui.components.ResultShareCards
 import com.xuanji.app.ui.components.RestoreCardsBar
 import com.xuanji.app.ui.components.ShareCard
 import com.xuanji.app.ui.components.FortuneCard
+import com.xuanji.app.ui.components.cardDragReorder
 import com.xuanji.app.ui.components.rememberCardLayoutController
 import com.xuanji.app.ui.viewmodel.CompositeFortuneViewModel
 import com.xuanji.app.ui.viewmodel.CompositeUiState
@@ -129,6 +132,7 @@ private fun fortuneCards(fortune: CompositeDailyFortune, period: String): List<C
     CardMeta("caution", "注意事项", ResultShareCards.composite("caution", period, fortune)) {}
 )
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun OverallCard(
     controller: CardLayoutController,
@@ -137,17 +141,43 @@ private fun OverallCard(
     period: String
 ) {
     Card(
-        Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+        Modifier
+            .fillMaxWidth()
+            .cardDragReorder(
+                enabled = controller.editingCardId == "overall",
+                cardId = "overall",
+                controller = controller
+            )
+            .combinedClickable(
+                onClickLabel = "查看综合运势",
+                onLongClickLabel = "编辑综合卡片",
+                onClick = {},
+                onLongClick = { controller.startEdit("overall") }
+            ),
+        colors = CardDefaults.cardColors(
+            containerColor = if (controller.editingCardId == "overall") {
+                MaterialTheme.colorScheme.secondaryContainer
+            } else {
+                MaterialTheme.colorScheme.primaryContainer
+            }
+        )
     ) {
         Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             if (shareCard != null) {
-                CardControls(
-                    title = "综合总分",
-                    cardId = "overall",
-                    controller = controller,
-                    shareCard = shareCard
-                )
+                if (controller.editingCardId == "overall") {
+                    CardControls(
+                        title = "综合总分",
+                        cardId = "overall",
+                        controller = controller,
+                        shareCard = shareCard
+                    )
+                } else {
+                    Text(
+                        "综合总分",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.78f)
+                    )
+                }
             }
             Row(
                 Modifier.fillMaxWidth(),

@@ -1765,7 +1765,7 @@ object MysticGuideGenerator {
     ): String {
         val topic = topicLabel(topicKey)
         val position = if (strength) "较强" else "较需照看"
-        return if (scholar) {
+        val base = if (scholar) {
             when (styleKey) {
                 "archive" -> "${topic}档案里，「$label」$position（$score 分）。先把它当作参照，不改结论，也不急着定义今天。"
                 "harbor" -> "「$label」现在$position，$score 分。我先把这句话放在桌上；它值得被慢慢说清。"
@@ -1778,6 +1778,26 @@ object MysticGuideGenerator {
                 else -> "${topic}工单显示「$label」$position（$score 分）。已登记！用法说明：观察优先，不吹法术。"
             }
         }
+
+        var beatSeed = 17L
+        "$styleKey|$label|$score|$strength".forEach { char ->
+            beatSeed = (beatSeed * 37L + char.code) % 2147483647L
+        }
+        val beat = if (scholar) {
+            when (styleKey) {
+                "archive" -> listOf("先不急着归档，茶还温着。", "这一行我用铅笔记，明天还能改。", "你看完再接话，我不抢你的判断。")
+                "harbor" -> listOf("你不用马上回岸，我可以在这儿多坐一会儿。", "这句话先浮着，等你想拿再说。", "潮声有点慢，正好留给喘气。")
+                else -> listOf("指针停住了，轮到你看看它指向哪儿。", "我不推罗盘；它只是陪你确认方向。", "这里没有倒计时，只有一格一格的余地。")
+            }
+        } else {
+            when (styleKey) {
+                "herald" -> listOf("锣鼓先收半声，别吓着你！", "本半仙只报幕，不替天签字！", "台下的瓜子先放下，听你说下一句。")
+                "alley" -> listOf("咱不整虚的，日子还得自己过。", "这茬先搁茶碗边，凉了再说也行。", "我嘴上嫌弃，手边还是给你留了座。")
+                else -> listOf("云端信号良好，但决定权仍然归你。", "小本本已合上，不会自动替你行动。", "法术余额为零，陪伴服务照常供应。")
+            }
+        }[((beatSeed / 13L) % 3L).toInt()]
+
+        return "$base $beat"
     }
 
     private fun openingSwitchResponse(

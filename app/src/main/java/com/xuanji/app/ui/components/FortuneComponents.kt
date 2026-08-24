@@ -2,6 +2,8 @@ package com.xuanji.app.ui.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -31,6 +33,7 @@ import com.xuanji.app.data.model.Element
 import com.xuanji.app.domain.elementColorCompose
 import com.xuanji.app.domain.elementName
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun FortuneCard(
     modifier: Modifier = Modifier,
@@ -40,11 +43,36 @@ fun FortuneCard(
     content: @Composable ColumnScope.() -> Unit
 ) {
     val layout = LocalCardLayout.current
-    val collapsed = layout != null && cardId != null && cardId in layout.state.collapsed
+    val editable = layout != null && cardId != null && title != null
+    val editing = editable && layout?.editingCardId == cardId
+    val cardModifier = if (editable) {
+        modifier
+            .fillMaxWidth()
+            .cardDragReorder(
+                enabled = editing,
+                cardId = cardId!!,
+                controller = layout!!
+            )
+            .combinedClickable(
+                onClickLabel = "查看卡片",
+                onLongClickLabel = "编辑卡片",
+                onClick = {},
+                onLongClick = { layout.startEdit(cardId) }
+            )
+    } else {
+        modifier.fillMaxWidth()
+    }
+
     Card(
-        modifier = modifier.fillMaxWidth(),
+        modifier = cardModifier,
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        colors = CardDefaults.cardColors(
+            containerColor = if (editing) {
+                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.82f)
+            } else {
+                MaterialTheme.colorScheme.surface
+            }
+        ),
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
     ) {
         Column(Modifier.padding(16.dp)) {
@@ -62,7 +90,7 @@ fun FortuneCard(
                 }
                 Spacer(Modifier.height(4.dp))
             }
-            if (!collapsed) content()
+            content()
         }
     }
 }
