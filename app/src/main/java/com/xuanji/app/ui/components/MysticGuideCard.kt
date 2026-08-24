@@ -47,6 +47,7 @@ import com.xuanji.app.domain.MysticGuideGenerator
 import com.xuanji.app.domain.MysticOpeningCheckin
 import com.xuanji.app.domain.MysticOpeningOption
 import com.xuanji.app.domain.MysticGuestCameo
+import com.xuanji.app.domain.MysticGuestChoice
 import com.xuanji.app.domain.MysticRhythmCheckin
 
 private data class MysticTurn(
@@ -66,7 +67,9 @@ private class MysticCompanionState(initialMode: String, initialTopic: String) {
     var rhythmAnswered by mutableStateOf(false)
     var completedRhythmKey by mutableStateOf<String?>(null)
     var guestCameo by mutableStateOf<MysticGuestCameo?>(null)
+    var selectedGuestChoice by mutableStateOf("")
     var guestReply by mutableStateOf("")
+    var guestQuestion by mutableStateOf("")
     var pendingGuest by mutableStateOf(false)
 }
 
@@ -97,7 +100,9 @@ fun MysticGuideCard(
     var rhythmAnswered by remember(companion) { companion::rhythmAnswered }
     var completedRhythmKey by remember(companion) { companion::completedRhythmKey }
     var guestCameo by remember(companion) { companion::guestCameo }
+    var selectedGuestChoice by remember(companion) { companion::selectedGuestChoice }
     var guestReply by remember(companion) { companion::guestReply }
+    var guestQuestion by remember(companion) { companion::guestQuestion }
     var pendingGuest by remember(companion) { companion::pendingGuest }
     val latestTest = records.maxByOrNull { it.date }
     val guide = remember(mode, topic, bazi, fortune, latestTest) {
@@ -148,7 +153,9 @@ fun MysticGuideCard(
 
     LaunchedEffect(guide) {
         guestCameo = null
+        selectedGuestChoice = ""
         guestReply = ""
+        guestQuestion = ""
         pendingGuest = false
     }
 
@@ -364,8 +371,10 @@ fun MysticGuideCard(
         pendingRhythm = null
     }
 
-    fun requestGuestReply() {
-        if (guestCameo == null || guestReply.isNotBlank() || pendingGuest) return
+    fun requestGuestReply(key: String) {
+        val choice = MysticGuideGenerator.guestChoices().firstOrNull { it.key == key }
+        if (guestCameo == null || choice == null || guestReply.isNotBlank() || pendingGuest) return
+        selectedGuestChoice = key
         pendingGuest = true
     }
 
@@ -373,12 +382,47 @@ fun MysticGuideCard(
         if (!pendingGuest || guestCameo == null) return@LaunchedEffect
         kotlinx.coroutines.delay(320)
         if (!pendingGuest || guestCameo == null) return@LaunchedEffect
+        val choice = MysticGuideGenerator.guestChoices().firstOrNull { it.key == selectedGuestChoice }
+        if (choice == null) {
+            selectedGuestChoice = ""
+            pendingGuest = false
+            return@LaunchedEffect
+        }
+        val rhythmKey = completedRhythmKey.orEmpty()
+        guestQuestion = choice.label
         guestReply = MysticGuideGenerator.guestReply(
             mode,
             guide.topicKey,
             fortune,
-            completedRhythmKey.orEmpty()
+            rhythmKey,
+            choice.key
         )
+        conversation.add(
+            MysticTurn(
+                key = "guest-${guide.topicKey}-${choice.key}",
+                question = choice.label,
+                answer = MysticGuideGenerator.guestHostWrapup(
+                    mode,
+                    guide.styleKey,
+                    guide.topicKey,
+                    fortune,
+                    rhythmKey,
+                    choice.key
+                ),
+                reaction = MysticGuideGenerator.composeReaction(
+                    MysticGuideGenerator.rhythmCarryover(mode, guide.styleKey, rhythmKey),
+                    MysticGuideGenerator.interactionCarryover(
+                        mode,
+                        guide.styleKey,
+                        interactionCarryoverOption.orEmpty()
+                    )
+                ),
+                kind = "ask"
+            )
+        )
+        while (conversation.size > 5) conversation.removeAt(0)
+        interactionCarryoverOption = null
+        completedRhythmKey = null
         pendingGuest = false
     }
 
@@ -603,21 +647,50 @@ fun MysticGuideCard(
                         )
 
                         if (guestReply.isBlank()) {
-                            OutlinedButton(
-                                onClick = ::requestGuestReply,
-                                enabled = !pendingGuest,
-                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
-                                modifier = Modifier
-                                    .padding(top = 6.dp)
-                                    .heightIn(min = 30.dp)
+                            FlowRow(
+                                Modifier.padding(top = 8.dp),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
+                                MysticGuideGenerator.guestChoices().forEach { choice ->
+                                    Surface(
+                                        onClick = { requestGuestReply(choice.key) },
+                                        enabled = !pendingGuest,
+                                        shape = RoundedCornerShape(999.dp),
+                                        color = if (selectedGuestChoice == choice.key) {
+                                            accent.copy(alpha = 0.22f)
+                                        } else {
+                                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.48f)
+                                        }
+                                    ) {
+                                        Text(
+                                            choice.label,
+                                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                            style = MaterialTheme.typography.labelSmall,
+                                            lineHeight = 15.sp,
+                                            color = if (pendingGuest) {
+                                                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.62f)
+                                            } else {
+                                                MaterialTheme.colorScheme.onSurfaceVariant
+                                            }
+                                        )
+                                    }
+                                }
+                            }
+                            if (pendingGuest) {
                                 Text(
-                                    if (pendingGuest) "客串正在接话" else "回一句",
+                                    "客串正在接话···",
+                                    modifier = Modifier.padding(top = 6.dp),
                                     style = MaterialTheme.typography.labelSmall,
-                                    lineHeight = 15.sp
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
                         } else {
+                            Text(
+                                guestQuestion,
+                                modifier = Modifier.padding(top = 8.dp),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
                             Text(
                                 guestReply,
                                 modifier = Modifier.padding(top = 8.dp),
@@ -853,7 +926,9 @@ fun MysticGuideCard(
                                         completedRhythmKey = null
                                         rhythmAnswered = false
                                         guestCameo = null
+                                        selectedGuestChoice = ""
                                         guestReply = ""
+                                        guestQuestion = ""
                                         pendingGuest = false
                                         customQuestion = ""
                                     },

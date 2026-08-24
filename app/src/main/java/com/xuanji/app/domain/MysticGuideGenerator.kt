@@ -64,6 +64,11 @@ data class MysticGuestCameo(
     val line: String
 )
 
+data class MysticGuestChoice(
+    val key: String,
+    val label: String
+)
+
 /**
  * 双面灵语：玄学家负责基于现有算法结果做心理按摩，半仙负责浮夸调侃。
  * 不使用随机数；同一个人、同一天、同一问题、同一模式必然得到同一回答。
@@ -439,22 +444,31 @@ object MysticGuideGenerator {
         )
     }
 
-    /** 客串出现后的唯一追问；只复述盘面线索和节奏语义，不追加命运判断。 */
+    /** 客串出现后的三种接法；选项固定，回答只复述盘面线索和节奏语义。 */
+    fun guestChoices(): List<MysticGuestChoice> = listOf(
+        MysticGuestChoice("why", "问依据：这个判断从哪来？"),
+        MysticGuestChoice("accept", "接一句：我先收下提醒。"),
+        MysticGuestChoice("pushback", "拦一句：别俩人一起看我。")
+    )
+
     fun guestReply(
         mode: String,
         topicKey: String,
         fortune: CompositeDailyFortune,
-        rhythmKey: String = ""
+        rhythmKey: String = "",
+        choiceKey: String = "why"
     ): String {
         if (fortune.dimensions.isEmpty()) return ""
+        val choice = guestChoices().firstOrNull { it.key == choiceKey } ?: guestChoices().first()
         val source = listOf(
             canonicalDateKey(fortune.dateKey),
-            "guest-reply",
+            "guest-answer",
             mode,
             topicKey,
             fortune.overallScore,
             fortune.luckyNumber,
-            rhythmKey
+            rhythmKey,
+            choice.key
         ).joinToString("|")
         var hash = 937L
         for (char in source) {
@@ -481,44 +495,123 @@ object MysticGuideGenerator {
             else -> "节奏先按刚才那页记着"
         }
         val scholarMain = mode != "half"
-        val lines = if (scholarMain) {
+        val answer = if (scholarMain) {
             when {
-                score >= 65 -> listOf(
-                    "行，「${focus.label}」 ${focus.score} 分确实能打；${rhythmNote}，${sourceName}「$value」就当个路标。",
-                    "本半仙再瞄一眼：「${high.label}」 ${high.score} 是排面，「${low.label}」别忘照看；${rhythmNote}。",
-                    "好运不用我盖章。「${focus.label}」有 ${focus.score} 分，${sourceName}「$value」只是提醒；${rhythmNote}。"
-                )
-                score < 45 -> listOf(
-                    "「${low.label}」 ${low.score} 分是提醒，不是判决；${rhythmNote}，先做最小一件。",
-                    "我还在旁边。「${focus.label}」 ${focus.score} 分要省着用，${sourceName}「$value」别当成命令。",
-                    "这页不算塌。「${low.label}」需要休息，${sourceName}「$value」可以帮你停一下；${rhythmNote}。"
-                )
-                else -> listOf(
-                    "再看一遍：「${focus.label}」 ${focus.score} 分适合小步走；${rhythmNote}，${sourceName}「$value」当便签。",
-                    "温吞不是坏事。「${high.label}」 ${high.score} 能借力，「${low.label}」 ${low.score} 要照顾。",
-                    "我把分数摆平了：「${focus.label}」 ${focus.score} 分；${sourceName}「$value」只作参照；${rhythmNote}。"
-                )
+                score >= 65 -> when (choice.key) {
+                    "accept" -> "算你会接。「${focus.label}」 ${focus.score} 分先用在小处；${rhythmNote}，${sourceName}「$value」当个记号。"
+                    "pushback" -> "本半仙退后半步；可「${focus.label}」 ${focus.score} 分摆在这儿，${rhythmNote}，你别装没看见。"
+                    else -> "「${focus.label}」 ${focus.score} 是明面证据，「${high.label}」 ${high.score} 在后面撑着；${sourceName}「$value」只是路标，${rhythmNote}。"
+                }
+                score < 45 -> when (choice.key) {
+                    "accept" -> "收下就行。「${low.label}」 ${low.score} 分先照顾一口饭、一觉觉；${rhythmNote}，${sourceName}「$value」不用背锅。"
+                    "pushback" -> "我这就少说两句；但「${low.label}」 ${low.score} 分还在页面上，${rhythmNote}，先做最小一件。"
+                    else -> "我看的是「${low.label}」 ${low.score} 分，它只说今天要省力；${rhythmNote}，${sourceName}「$value」不是判决。"
+                }
+                else -> when (choice.key) {
+                    "accept" -> "稳稳接住就够。「${focus.label}」 ${focus.score} 分适合小步走；${rhythmNote}，${sourceName}「$value」当便签。"
+                    "pushback" -> "行行行，我不围观点评；可「${low.label}」 ${low.score} 分得照看，${rhythmNote}，大戏改天再唱。"
+                    else -> "「${focus.label}」 ${focus.score} 分是主线索：温吞不是坏事；「${high.label}」能借力，「${low.label}」要照顾，${rhythmNote}。"
+                }
             }
         } else {
             when {
-                score >= 65 -> listOf(
-                    "好兆头我不抢功。「${focus.label}」 ${focus.score} 分在线；${rhythmNote}，${sourceName}「$value」当提醒就好。",
-                    "「${high.label}」 ${high.score} 确实亮；可「${low.label}」也要留口气，${rhythmNote}。",
-                    "我从旁核对过：「${focus.label}」有 ${focus.score} 分，${sourceName}「$value」不是护身符；${rhythmNote}。"
-                )
-                score < 45 -> listOf(
-                    "「${low.label}」 ${low.score} 分看着低，但只是今天的状态页；${rhythmNote}，先吃饭睡觉。",
-                    "别急着定性。「${focus.label}」 ${focus.score} 分要收着走，${sourceName}「$value」当暂停记号。",
-                    "这一页不吓人。「${low.label}」需要照看，${sourceName}「$value」只是提示；${rhythmNote}。"
-                )
-                else -> listOf(
-                    "「${focus.label}」 ${focus.score} 分不急不缓；${rhythmNote}，${sourceName}「$value」放在手边即可。",
-                    "这盘面像温水。「${high.label}」能搭把手，「${low.label}」 ${low.score} 别硬压。",
-                    "我替你把线捋了捋：「${focus.label}」 ${focus.score} 分；${sourceName}「$value」只作参照；${rhythmNote}。"
-                )
+                score >= 65 -> when (choice.key) {
+                    "accept" -> "好，那就轻轻收下。「${focus.label}」 ${focus.score} 分值得用一次小行动；${rhythmNote}，${sourceName}「$value」当提醒。"
+                    "pushback" -> "我往旁边挪一步。「${high.label}」 ${high.score} 还亮着，「${low.label}」也要留口气；${rhythmNote}。"
+                    else -> "主证据是「${focus.label}」 ${focus.score} 分，「${high.label}」 ${high.score} 在旁证；${sourceName}「$value」不是护身符，${rhythmNote}。"
+                }
+                score < 45 -> when (choice.key) {
+                    "accept" -> "先收下这句：「${low.label}」 ${low.score} 分需要休息；${rhythmNote}，${sourceName}「$value」帮你停一下。"
+                    "pushback" -> "好，我不多站了；但「${low.label}」 ${low.score} 分值得照看，${rhythmNote}，先吃饭睡觉。"
+                    else -> "我看到的是「${low.label}」 ${low.score} 分；它只是状态页，不是结论。${sourceName}「$value」当暂停记号，${rhythmNote}。"
+                }
+                else -> when (choice.key) {
+                    "accept" -> "收得很稳。「${focus.label}」 ${focus.score} 分不急不缓；${rhythmNote}，${sourceName}「$value」放在手边即可。"
+                    "pushback" -> "我退到门边。「${high.label}」能搭把手，「${low.label}」 ${low.score} 别硬压；${rhythmNote}。"
+                    else -> "我把线捋过了：「${focus.label}」 ${focus.score} 分；${sourceName}「$value」只作参照，${rhythmNote}。"
+                }
             }
         }
-        return lines[((hash / 17L) % lines.size).toInt()]
+        val lead = when ((hash / 19L) % 3L) {
+            1L -> "我又看了一眼；"
+            2L -> "按这一页说；"
+            else -> ""
+        }
+        return lead + answer
+    }
+
+    fun guestHostWrapup(
+        mode: String,
+        styleKey: String,
+        topicKey: String,
+        fortune: CompositeDailyFortune,
+        rhythmKey: String = "",
+        choiceKey: String = "why"
+    ): String {
+        if (fortune.dimensions.isEmpty()) return ""
+        val high = fortune.dimensions.maxByOrNull { it.score } ?: fortune.dimensions.first()
+        val low = fortune.dimensions.minByOrNull { it.score } ?: fortune.dimensions.first()
+        val focus = if (topicKey == "test") {
+            high
+        } else {
+            fortune.dimensions.firstOrNull { it.key == topicKey }
+                ?: fortune.dimensions.firstOrNull { it.key == "emotion" && topicKey == "love" }
+                ?: fortune.dimensions.first()
+        }
+        val score = fortune.overallScore
+        val useColor = score % 2 == 0
+        val value = if (useColor) fortune.luckyColor else fortune.luckyDirection
+        val sourceName = if (useColor) "幸运色" else "吉利方位"
+        val rhythmNote = when (rhythmKey) {
+            "steady" -> "稳速那栏先合上"
+            "tired" -> "累的那栏先合上"
+            "rushed" -> "被催那栏先合上"
+            else -> "节奏栏先按刚才记着"
+        }
+        val scholar = mode != "half"
+        val choiceNote = when (choiceKey) {
+            "accept" -> "你接得住。"
+            "pushback" -> "好，都退半步。"
+            else -> "问得对。"
+        }
+        val body = if (scholar) {
+            when (styleKey) {
+                "harbor" -> when {
+                    score >= 65 -> "客串的话我先接住。${focus.label}有 ${focus.score} 分，${low.label}也留着位置；${rhythmNote}。"
+                    score < 45 -> "这里不用急着翻页。${low.label} ${low.score} 分先被看见，${rhythmNote}；${sourceName}「$value」放门口就好。"
+                    else -> "灯还留着。${focus.label} ${focus.score} 分可以慢慢走，${rhythmNote}；${sourceName}「$value」只作提醒。"
+                }
+                "compass" -> when {
+                    score >= 65 -> "方向没有变大，只是更清楚。${focus.label} ${focus.score} 分可用一小步验证；${rhythmNote}。"
+                    score < 45 -> "先把针放慢。${low.label} ${low.score} 分需要照顾，${rhythmNote}；${sourceName}「$value」当暂停点。"
+                    else -> "指针停在这里就够了。${focus.label} ${focus.score} 分宜整理，${rhythmNote}；${sourceName}「$value」留作参照。"
+                }
+                else -> when {
+                    score >= 65 -> "我把客串那句夹进档案。${focus.label} ${focus.score} 分是入口，${low.label}做备注；${rhythmNote}。"
+                    score < 45 -> "档案里补一行：${low.label} ${low.score} 分需要休息，不是定罪；${rhythmNote}。"
+                    else -> "这一页归档为观察项。${focus.label} ${focus.score} 分先小步走；${rhythmNote}，${sourceName}「$value」当便签。"
+                }
+            }
+        } else {
+            when (styleKey) {
+                "alley" -> when {
+                    score >= 65 -> "茶先放下！${focus.label} ${focus.score} 分是真排面；${low.label}也带一口，${rhythmNote}。"
+                    score < 45 -> "咱不唱衰。${low.label} ${low.score} 分先歇口气，${rhythmNote}；${sourceName}「$value」压在杯底当提醒。"
+                    else -> "街口风不大。${focus.label} ${focus.score} 分慢慢晃过去就行，${rhythmNote}；${sourceName}「$value」顺手看一眼。"
+                }
+                "intern" -> when {
+                    score >= 65 -> "工单备注：${focus.label} ${focus.score} 分可用在一件小事上；${low.label}另开一栏，${rhythmNote}。"
+                    score < 45 -> "工单已降速：${low.label} ${low.score} 分优先休息；${rhythmNote}，${sourceName}「$value」设成暂停标签。"
+                    else -> "云端记录：${focus.label} ${focus.score} 分保持小步推进；${rhythmNote}，${sourceName}「$value」仅作提示。"
+                }
+                else -> when {
+                    score >= 65 -> "锣鼓停半拍！${focus.label} ${focus.score} 分确实亮眼；给${low.label}留口气，${rhythmNote}。"
+                    score < 45 -> "场务别催！${low.label} ${low.score} 分先回血，${rhythmNote}；${sourceName}「$value」只是台侧暗号。"
+                    else -> "今日戏码平稳。${focus.label} ${focus.score} 分按小段演，${rhythmNote}；${sourceName}「$value」当道具提示。"
+                }
+            }
+        }
+        return choiceNote + body
     }
 
     private fun rhythmPrompt(scholar: Boolean, styleKey: String, topicKey: String): String {
