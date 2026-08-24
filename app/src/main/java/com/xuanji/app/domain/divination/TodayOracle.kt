@@ -56,13 +56,40 @@ object TodayOracle {
     /** 从同一固定签库再抽一签 */
     fun randomDraw(): OracleResult = generate()
 
-    fun manualReaction(draw: OracleResult): OracleReaction {
-        val tier = when (draw.level) {
-            "上上签", "上签" -> "high"
-            "中平签" -> "mid"
-            "下签", "下下签" -> "low"
-            else -> "low"
+    fun dailyReaction(draw: OracleResult): OracleReaction {
+        val tier = oracleTier(draw.level)
+        val role = if (draw.luckyNumber % 2 == 0) "玄学家" else "半仙"
+
+        return when (tier to role) {
+            "high" to "玄学家" -> OracleReaction(
+                roleName = role,
+                line = "今日签面确实亮；我把要点记在旁边，别急着把它当成通行证。"
+            )
+            "high" to "半仙" -> OracleReaction(
+                roleName = role,
+                line = "哟，签面挺会挑日子？先别飘，本半仙看看你能不能接住。"
+            )
+            "mid" to "玄学家" -> OracleReaction(
+                roleName = role,
+                line = "今日签不急不缓，正好看你怎么走；稳着来就好。"
+            )
+            "mid" to "半仙" -> OracleReaction(
+                roleName = role,
+                line = "不上不下的签？行吧，本半仙先看看你会不会自己找台阶。"
+            )
+            "low" to "玄学家" -> OracleReaction(
+                roleName = role,
+                line = "签面沉一点而已，不是终局；今天把步子放小，我在旁边看着。"
+            )
+            else -> OracleReaction(
+                roleName = role,
+                line = "签是有点蔫，但别急着给自己判刑；本半仙还等着看你翻页呢。"
+            )
         }
+    }
+
+    fun manualReaction(draw: OracleResult): OracleReaction {
+        val tier = oracleTier(draw.level)
         val role = if (draw.luckyNumber % 2 == 0) "玄学家" else "半仙"
 
         return when (tier to role) {
@@ -91,5 +118,11 @@ object TodayOracle {
                 line = "咳，彩蛋抽得有点蔫？别慌，正签才是今天的主角，本半仙盯着呢。"
             )
         }
+    }
+
+    private fun oracleTier(level: String): String = when (level) {
+        "上上签", "上签" -> "high"
+        "中平签" -> "mid"
+        else -> "low"
     }
 }
