@@ -34,15 +34,36 @@ import com.xuanji.app.domain.elementName
 @Composable
 fun FortuneCard(
     modifier: Modifier = Modifier,
+    cardId: String? = null,
+    title: String? = null,
+    shareCard: ShareCard? = null,
     content: @Composable ColumnScope.() -> Unit
 ) {
+    val layout = LocalCardLayout.current
+    val collapsed = layout != null && cardId != null && cardId in layout.state.collapsed
     Card(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
     ) {
-        Column(Modifier.padding(16.dp), content = content)
+        Column(Modifier.padding(16.dp)) {
+            if (layout != null && cardId != null && title != null) {
+                CardControls(
+                    title = title,
+                    cardId = cardId,
+                    controller = layout,
+                    shareCard = shareCard
+                )
+                Spacer(Modifier.height(8.dp))
+            } else if (shareCard != null) {
+                Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.TopEnd) {
+                    ShareButton(sharedCard = shareCard)
+                }
+                Spacer(Modifier.height(4.dp))
+            }
+            if (!collapsed) content()
+        }
     }
 }
 

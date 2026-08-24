@@ -18,12 +18,14 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -58,16 +60,22 @@ import com.xuanji.app.domain.BaziCalculator
 import com.xuanji.app.domain.HourGuide
 import com.xuanji.app.domain.elementName
 import com.xuanji.app.ui.components.ElementBalance
+import com.xuanji.app.ui.components.CardLayouts
+import com.xuanji.app.ui.components.CardMeta
 import com.xuanji.app.ui.components.FortuneCard
 import com.xuanji.app.ui.components.HealthBodyAtlas
 import com.xuanji.app.ui.components.InfoRow
-import com.xuanji.app.ui.components.MysticGuideCard
+import com.xuanji.app.ui.components.LocalCardLayout
+import com.xuanji.app.ui.components.MysticFloatingGuide
 import com.xuanji.app.ui.components.PeriodToggleRow
 import com.xuanji.app.ui.components.PillarCard
 import com.xuanji.app.ui.components.ResultShare
+import com.xuanji.app.ui.components.ResultShareCards
+import com.xuanji.app.ui.components.RestoreCardsBar
 import com.xuanji.app.ui.components.ScoreRow
 import com.xuanji.app.ui.components.SectionTitle
 import com.xuanji.app.ui.components.ShareButton
+import com.xuanji.app.ui.components.rememberCardLayoutController
 import com.xuanji.app.ui.components.WuxingRatioList
 import com.xuanji.app.ui.components.WuxingWheel
 import com.xuanji.app.ui.viewmodel.EasternUiState
@@ -81,57 +89,126 @@ import kotlin.math.sin
 fun EasternScreen() {
     val viewModel = xuanjiViewModel { EasternViewModel(AppModule.repository) }
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val readyState = uiState as? EasternUiState.Ready
+    val controller = rememberCardLayoutController(
+        "eastern",
+        readyState?.full?.chart?.display ?: "guest"
+    )
 
-    Column(
-        Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        Text(
-            "五行八字",
-            style = MaterialTheme.typography.headlineSmall,
-            color = MaterialTheme.colorScheme.primary
-        )
-        when (val s = uiState) {
-            is EasternUiState.Loading -> Text("正在推算命盘…")
-            is EasternUiState.Empty -> Text("尚未设置出生信息，请先到「我的」填写。")
-            is EasternUiState.Ready -> {
-                HourGuideSection(s.hourGuides)
-                PillarSection(s.full.chart)
-                ConclusionSection(s.full.conclusion)
-                GejuSection(s.full.geju)
-                FiveElementsSection(s.full.chart.elementCounts)
-                TenGodSection(s.full.tenGods)
-                TenGodProportionSection(s.full.tenGods)
-                StrengthSection(s.full.strength)
-                YongJiSection(s.full.yongJi)
-                DaYunSection(s.full.daYun)
-                if (s.full.relations.isNotEmpty()) RelationsSection(s.full.relations)
-                ShenShaSection(s.full.shenSha)
-                ShenShaAtlasSection(s.full.shenSha)
-                s.composite?.let { MysticGuideCard(s.full, it) }
-                TodayFortuneSection(
-                    s.fortune,
-                    s.full.chart.favorableElements,
-                    s.period,
-                    onPeriodChange = viewModel::setPeriod
-                )
-                Text(
-                    s.full.note,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+    val content: @Composable (ScrollState) -> Unit = when (val s = uiState) {
+        is EasternUiState.Loading -> {
+            {
+                EasternMessage("正在推算命盘…")
             }
+        }
+        is EasternUiState.Empty -> {
+            {
+                EasternMessage("尚未设置出生信息，请先到「我的」填写。")
+            }
+        }
+        is EasternUiState.Ready -> {
+            {
+                Column(
+                    Modifier
+                        .fillMaxSize()
+                        .verticalScroll(it)
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    val cards = easternCards(
+                        full = s.full,
+                        hourGuides = s.hourGuides,
+                        fortune = s.fortune,
+                        period = s.period,
+                        onPeriodChange = viewModel::setPeriod
+                    )
+                    CardLayouts.ordered(cards, controller.state).forEach { card ->
+                        if (card.id == "fortune") {
+                            PeriodToggleRow(s.period, viewModel::setPeriod)
+                        }
+                        card.content()
+                    }
+                    if (controller.state.hiddenCount > 0) {
+                        RestoreCardsBar(controller)
+                    }
+                    Text(
+                        s.full.note,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
+    }
+
+    val composite = (uiState as? EasternUiState.Ready)?.composite
+    val readyBazi = (uiState as? EasternUiState.Ready)?.full
+    if (readyBazi != null && composite != null) {
+        CompositionLocalProvider(LocalCardLayout provides controller) {
+            MysticFloatingGuide(readyBazi, composite) { scrollState -> content(scrollState) }
+        }
+    } else {
+        content(rememberScrollState())
+    }
+}
+
+private fun easternCards(
+    full: BaziFull,
+    hourGuides: List<HourGuide>,
+    fortune: EasternDailyFortune,
+    period: String,
+    onPeriodChange: (String) -> Unit
+): List<CardMeta> {
+    fun share(cardId: String) = ResultShareCards.eastern(
+        cardId, period, full, fortune, hourGuides.firstOrNull()?.timeText
+    )
+    return listOf(
+        CardMeta("hours", "今日吉时", share("hours")) { HourGuideSection(hourGuides, share("hours")) },
+        CardMeta("pillars", "八字命盘", share("pillars")) { PillarSection(full.chart, share("pillars")) },
+        CardMeta("conclusion", "综合结论", share("conclusion")) { ConclusionSection(full.conclusion, share("conclusion")) },
+        CardMeta("geju", "生辰格局", share("geju")) { GejuSection(full.geju, share("geju")) },
+        CardMeta("elements", "五行占比", share("elements")) { FiveElementsSection(full.chart.elementCounts, share("elements")) },
+        CardMeta("ten-gods", "十神格局", share("ten-gods")) { TenGodSection(full.tenGods, share("ten-gods")) },
+        CardMeta("ten-god-ratio", "十神占比", share("ten-god-ratio")) { TenGodProportionSection(full.tenGods, share("ten-god-ratio")) },
+        CardMeta("strength", "日主旺衰", share("strength")) { StrengthSection(full.strength, share("strength")) },
+        CardMeta("yongji", "用神忌神", share("yongji")) { YongJiSection(full.yongJi, share("yongji")) },
+        CardMeta("dayun", "大运流年", share("dayun")) { DaYunSection(full.daYun, share("dayun")) },
+        CardMeta("relations", "刑冲合害", share("relations")) { RelationsSection(full.relations, share("relations")) },
+        CardMeta("shensha", "神煞", share("shensha")) { ShenShaSection(full.shenSha, share("shensha")) },
+        CardMeta("atlas", "神煞图鉴", share("shensha")) { ShenShaAtlasSection(full.shenSha, share("shensha")) },
+        CardMeta("fortune", "周期运势", share("fortune")) {
+            TodayFortuneSection(
+                fortune = fortune,
+                favorable = full.chart.favorableElements,
+                period = period,
+                onPeriodChange = onPeriodChange,
+                shareCard = share("fortune")
+            )
+        }
+    )
+}
+
+@Composable
+private fun EasternMessage(text: String) {
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(
+                "五行八字",
+                style = MaterialTheme.typography.headlineSmall,
+                color = MaterialTheme.colorScheme.primary
+            )
+            Spacer(Modifier.height(12.dp))
+            Text(text, style = MaterialTheme.typography.bodyMedium)
         }
     }
 }
 
 @Composable
-private fun PillarSection(chart: com.xuanji.app.data.model.BaziChart) {
-    FortuneCard {
-        SectionTitle("八字命盘（四柱）")
+private fun PillarSection(
+    chart: com.xuanji.app.data.model.BaziChart,
+    shareCard: com.xuanji.app.ui.components.ShareCard
+) {
+    FortuneCard(cardId = "pillars", title = "八字命盘（四柱）", shareCard = shareCard) {
         Spacer(Modifier.height(12.dp))
         PillarCard(chart)
         Spacer(Modifier.height(12.dp))
@@ -147,9 +224,11 @@ private fun PillarSection(chart: com.xuanji.app.data.model.BaziChart) {
 }
 
 @Composable
-private fun FiveElementsSection(counts: Map<Element, Int>) {
-    FortuneCard {
-        SectionTitle("五行占比 · 相生相克")
+private fun FiveElementsSection(
+    counts: Map<Element, Int>,
+    shareCard: com.xuanji.app.ui.components.ShareCard
+) {
+    FortuneCard(cardId = "elements", title = "五行占比 · 相生相克", shareCard = shareCard) {
         Spacer(Modifier.height(4.dp))
         Text(
             "圆环外侧绿色箭头为相生（木→火→土→金→水→木），内部红色虚线为相克（木克土、土克水、水克火、火克金、金克木）；节点大小与百分比代表该五行在命局中的占比。",
@@ -163,9 +242,11 @@ private fun FiveElementsSection(counts: Map<Element, Int>) {
 }
 
 @Composable
-private fun ConclusionSection(c: BaziConclusion) {
-    FortuneCard {
-        SectionTitle("综合结论")
+private fun ConclusionSection(
+    c: BaziConclusion,
+    shareCard: com.xuanji.app.ui.components.ShareCard
+) {
+    FortuneCard(cardId = "conclusion", title = "综合结论", shareCard = shareCard) {
         Spacer(Modifier.height(8.dp))
         Text(
             c.summary,
@@ -242,11 +323,13 @@ private fun TagFlow(tags: List<String>) {
 }
 
 @Composable
-private fun TenGodSection(items: List<TenGodItem>) {
+private fun TenGodSection(
+    items: List<TenGodItem>,
+    shareCard: com.xuanji.app.ui.components.ShareCard
+) {
     val byPillar = items.groupBy { it.pillarLabel }
     val order = listOf("年", "月", "日", "时")
-    FortuneCard {
-        SectionTitle("十神格局")
+    FortuneCard(cardId = "ten-gods", title = "十神格局", shareCard = shareCard) {
         Spacer(Modifier.height(8.dp))
         Text(
             "以日干为「我」，推演其余干支与日主的关系。",
@@ -278,9 +361,11 @@ private fun TenGodSection(items: List<TenGodItem>) {
 }
 
 @Composable
-private fun StrengthSection(strength: com.xuanji.app.data.model.StrengthResult) {
-    FortuneCard {
-        SectionTitle("日主旺衰")
+private fun StrengthSection(
+    strength: com.xuanji.app.data.model.StrengthResult,
+    shareCard: com.xuanji.app.ui.components.ShareCard
+) {
+    FortuneCard(cardId = "strength", title = "日主旺衰", shareCard = shareCard) {
         Spacer(Modifier.height(8.dp))
         Row(Modifier.fillMaxWidth()) {
             Text(
@@ -301,9 +386,11 @@ private fun StrengthSection(strength: com.xuanji.app.data.model.StrengthResult) 
 }
 
 @Composable
-private fun YongJiSection(yongJi: YongJi) {
-    FortuneCard {
-        SectionTitle("用神 · 忌神")
+private fun YongJiSection(
+    yongJi: YongJi,
+    shareCard: com.xuanji.app.ui.components.ShareCard
+) {
+    FortuneCard(cardId = "yongji", title = "用神 · 忌神", shareCard = shareCard) {
         Spacer(Modifier.height(8.dp))
         InfoRow("用神", yongJi.useful.joinToString("、") { elementName(it) })
         InfoRow("忌神", yongJi.avoidance.joinToString("、") { elementName(it) })
@@ -313,9 +400,11 @@ private fun YongJiSection(yongJi: YongJi) {
 }
 
 @Composable
-private fun DaYunSection(daYun: List<DaYun>) {
-    FortuneCard {
-        SectionTitle("大运 · 流年")
+private fun DaYunSection(
+    daYun: List<DaYun>,
+    shareCard: com.xuanji.app.ui.components.ShareCard
+) {
+    FortuneCard(cardId = "dayun", title = "大运 · 流年", shareCard = shareCard) {
         Spacer(Modifier.height(8.dp))
         daYun.forEach { dy ->
             Row(
@@ -334,9 +423,11 @@ private fun DaYunSection(daYun: List<DaYun>) {
 }
 
 @Composable
-private fun RelationsSection(relations: List<BranchRelation>) {
-    FortuneCard {
-        SectionTitle("刑冲合害")
+private fun RelationsSection(
+    relations: List<BranchRelation>,
+    shareCard: com.xuanji.app.ui.components.ShareCard
+) {
+    FortuneCard(cardId = "relations", title = "刑冲合害", shareCard = shareCard) {
         Spacer(Modifier.height(8.dp))
         relations.forEach { r ->
             Text(
@@ -349,14 +440,16 @@ private fun RelationsSection(relations: List<BranchRelation>) {
 }
 
 @Composable
-private fun HourGuideSection(guides: List<HourGuide>) {
+private fun HourGuideSection(
+    guides: List<HourGuide>,
+    shareCard: com.xuanji.app.ui.components.ShareCard
+) {
     val ordered = Branch.values().mapNotNull { branch -> guides.firstOrNull { it.pillar.branch == branch } }
     var selectedBranch by remember(guides) { mutableStateOf(ordered.firstOrNull()?.pillar?.branch) }
     val selected = ordered.firstOrNull { it.pillar.branch == selectedBranch } ?: ordered.firstOrNull()
     val outline = MaterialTheme.colorScheme.outline
 
-    FortuneCard {
-        SectionTitle("今日吉时 · 五行择时")
+    FortuneCard(cardId = "hours", title = "今日吉时 · 五行择时", shareCard = shareCard) {
         Spacer(Modifier.height(6.dp))
         Text(
             "按五鼠遁推十二时辰干支，以日主生克与喜忌修正排序；点击圆盘查看时辰详情。",
@@ -490,19 +583,17 @@ private fun TodayFortuneSection(
     fortune: EasternDailyFortune,
     favorable: List<Element>,
     period: String = "day",
-    onPeriodChange: (String) -> Unit
+    onPeriodChange: (String) -> Unit,
+    shareCard: com.xuanji.app.ui.components.ShareCard
 ) {
-    FortuneCard {
+    FortuneCard(cardId = "fortune", title = "周期运势", shareCard = shareCard) {
         val periodTitle = when (period) {
             "week" -> "本周"
             "month" -> "本月"
             else -> "今日"
         }
-        SectionTitle("${periodTitle}运势 · ${fortune.dateKey}") {
-            ShareButton(
-                sharedText = ResultShare.fortuneTitle("东方运势", period, fortune.overallScore)
-            )
-        }
+        Text("${periodTitle}运势 · ${fortune.dateKey}", style = MaterialTheme.typography.titleMedium)
+        Spacer(Modifier.height(8.dp))
         PeriodToggleRow(period, onPeriodChange)
         Spacer(Modifier.height(8.dp))
         Text(fortune.summary, style = MaterialTheme.typography.bodyLarge)
@@ -548,9 +639,11 @@ private fun NatureChip(text: String) {
 }
 
 @Composable
-private fun GejuSection(geju: Geju) {
-    FortuneCard {
-        SectionTitle("生辰格局")
+private fun GejuSection(
+    geju: Geju,
+    shareCard: com.xuanji.app.ui.components.ShareCard
+) {
+    FortuneCard(cardId = "geju", title = "生辰格局", shareCard = shareCard) {
         Spacer(Modifier.height(8.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
@@ -575,7 +668,10 @@ private val TEN_GOD_COLORS = mapOf<TenGod, Color>(
 )
 
 @Composable
-private fun TenGodProportionSection(items: List<TenGodItem>) {
+private fun TenGodProportionSection(
+    items: List<TenGodItem>,
+    shareCard: com.xuanji.app.ui.components.ShareCard
+) {
     val order = listOf(
         TenGod.正官, TenGod.七杀, TenGod.正印, TenGod.偏印,
         TenGod.正财, TenGod.偏财, TenGod.食神, TenGod.伤官,
@@ -583,8 +679,7 @@ private fun TenGodProportionSection(items: List<TenGodItem>) {
     )
     val counts = order.associateWith { tg -> items.count { it.tenGod == tg } }
     val total = counts.values.sum().coerceAtLeast(1)
-    FortuneCard {
-        SectionTitle("十神占比")
+    FortuneCard(cardId = "ten-god-ratio", title = "十神占比", shareCard = shareCard) {
         Spacer(Modifier.height(6.dp))
         Text(
             "天干与地支藏干共推演出下列十神分布（按出现次数计）。",
@@ -659,9 +754,11 @@ private fun TenGodProportionSection(items: List<TenGodItem>) {
 }
 
 @Composable
-private fun ShenShaSection(items: List<ShenShaItem>) {
-    FortuneCard {
-        SectionTitle("神煞（命中所带）")
+private fun ShenShaSection(
+    items: List<ShenShaItem>,
+    shareCard: com.xuanji.app.ui.components.ShareCard
+) {
+    FortuneCard(cardId = "shensha", title = "神煞（命中所带）", shareCard = shareCard) {
         Spacer(Modifier.height(6.dp))
         if (items.isEmpty()) {
             Text(
@@ -713,12 +810,14 @@ private fun ShenShaSection(items: List<ShenShaItem>) {
 }
 
 @Composable
-private fun ShenShaAtlasSection(present: List<ShenShaItem>) {
+private fun ShenShaAtlasSection(
+    present: List<ShenShaItem>,
+    shareCard: com.xuanji.app.ui.components.ShareCard
+) {
     val presentNames = present.map { it.name }.toSet()
     val presentBranch = present.associate { it.name to it.branch }
     val atlas = BaziCalculator.SHEN_SHA_ATLAS
-    FortuneCard {
-        SectionTitle("神煞图鉴")
+    FortuneCard(cardId = "atlas", title = "神煞图鉴", shareCard = shareCard) {
         Spacer(Modifier.height(4.dp))
         Text(
             "常见神煞一览；命中带者以高亮标注（✓）。",
