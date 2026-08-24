@@ -1,16 +1,11 @@
 package com.xuanji.app.ui.components
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -24,9 +19,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -60,6 +57,8 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.xuanji.app.data.model.BaziFull
 import com.xuanji.app.data.model.CompositeDailyFortune
 import com.xuanji.app.domain.MysticGuideGenerator
@@ -104,21 +103,25 @@ fun MysticFloatingGuide(
             )
         }
 
-        AnimatedVisibility(
-            visible = detailOpen && detailBazi != null && detailFortune != null,
-            enter = fadeIn() + scaleIn(initialScale = 0.96f),
-            exit = fadeOut() + scaleOut(targetScale = 0.97f)
-        ) {
-            MysticImmersiveStage(
-                half = mode == "half",
-                skinId = skin!!.id,
-                garment = Color(skin.garment),
-                backColor = Color(skin.back),
-                trimColor = Color(skin.trim),
-                roleName = if (mode == "half") "半仙" else "玄学家",
-                onClose = { detailOpen = false }
+        if (detailOpen && detailBazi != null && detailFortune != null && skin != null) {
+            Dialog(
+                onDismissRequest = { detailOpen = false },
+                properties = DialogProperties(
+                    usePlatformDefaultWidth = false,
+                    decorFitsSystemWindows = false
+                )
             ) {
-                MysticGuideCard(detailBazi!!, detailFortune!!, immersive = true)
+                MysticImmersiveStage(
+                    half = mode == "half",
+                    skinId = skin.id,
+                    garment = Color(skin.garment),
+                    backColor = Color(skin.back),
+                    trimColor = Color(skin.trim),
+                    roleName = if (mode == "half") "半仙" else "玄学家",
+                    onClose = { detailOpen = false }
+                ) {
+                    MysticGuideCard(detailBazi!!, detailFortune!!, immersive = true)
+                }
             }
         }
     }
@@ -363,7 +366,10 @@ private fun MysticImmersiveStage(
                 MaterialTheme(colorScheme = darkColorScheme(primary = Color(0xFFD9C58B), tertiary = Color(0xFFE3A579))) {
                     Column(Modifier.fillMaxSize().padding(top = 4.dp)) {
                         Row(
-                            Modifier.fillMaxWidth().padding(start = 18.dp, end = 8.dp),
+                            Modifier
+                                .fillMaxWidth()
+                                .statusBarsPadding()
+                                .padding(start = 18.dp, end = 8.dp),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
@@ -383,6 +389,7 @@ private fun MysticImmersiveStage(
                                 .weight(1f)
                                 .verticalScroll(rememberScrollState())
                                 .padding(horizontal = 14.dp)
+                                .navigationBarsPadding()
                         ) {
                             content()
                         }

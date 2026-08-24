@@ -5,6 +5,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
@@ -22,17 +24,20 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.datastore.preferences.core.edit
@@ -156,15 +161,23 @@ class CardLayoutStore(private val context: android.content.Context) {
             .joinToString("") { "%02x".format(it) }
 }
 
-data class CardLayoutController(
+class CardLayoutController(
     val page: String,
     val profileKey: String,
-    val state: CardLayoutState,
-    val editingCardId: String?,
-    private val onEditingChange: (String?) -> Unit,
     private val store: CardLayoutStore,
-    private val onStateChange: (CardLayoutState) -> Unit
+    initialState: CardLayoutState,
+    private val persistState: (CardLayoutState) -> Unit
 ) {
+    var state by mutableStateOf(initialState)
+        private set
+    var editingCardId by mutableStateOf<String?>(null)
+        private set
+
+    private var dragSession: CardDragSession? = null
+    var draggingCardId by mutableStateOf<String?>(null)
+        private set
+    private val cardMetrics = mutableStateMapOf<String, CardMetric>()
+
     fun move(id: String, delta: Int) = update(CardLayouts.move(state, page, id, delta))
 
     fun moveBy(id: String, delta: Int) {
@@ -178,49 +191,118 @@ data class CardLayoutController(
     fun hide(id: String) = update(state.copy(hidden = state.hidden + id))
 
     fun startEdit(id: String) {
-        onEditingChange(id)
+        editingCardId = id
     }
 
     fun stopEdit() {
-        onEditingChange(null)
+        editingCardId = null
     }
 
     fun reset() {
-        onStateChange(CardLayouts.default(page))
+        update(CardLayouts.default(page))
     }
 
     private fun update(next: CardLayoutState) {
-        onStateChange(next)
+        state = next
+        persistState(next)
+    }
+
+    fun updateFromStore(loaded: CardLayoutState) {
+        if (draggingCardId == null) {
+            state = loaded
+        }
     }
 
     suspend fun persist() = store.save(page, profileKey, state)
+
+    fun recordMetric(id: String, top: Float, height: Float) {
+        cardMetrics[id] = CardMetric(top, height)
+    }
+
+    fun beginDrag(id: String): Boolean {
+        val metric = cardMetrics[id] ?: return false
+        dragSession = CardDragSession(
+            cardId = id,
+            originalOrder = visibleIds(),
+            startCenterY = metric.top + metric.height / 2f
+        )
+        draggingCardId = id
+        return true
+    }
+
+    fun previewDragTo(dragOffset: Float) {
+        val session = dragSession ?: return
+        val draggedCenter = session.startCenterY + dragOffset
+        val insertionIndex = session.originalOrder.count { other ->
+            other != session.cardId && isCenterAbove(other, draggedCenter)
+        }
+        if (insertionIndex == session.lastInsertionIndex) return
+        session.lastInsertionIndex = insertionIndex
+        state = state.copy(order = reorderedMap(session.cardId, insertionIndex))
+    }
+
+    fun endDrag() {
+        val next = state
+        dragSession = null
+        draggingCardId = null
+        persistState(next)
+    }
+
+    private fun visibleIds(): List<String> = CardLayouts.default(page).order.keys
+        .filterNot(state.hidden::contains)
+        .sortedBy { state.order[it] ?: Int.MAX_VALUE }
+
+    private fun isCenterAbove(id: String, draggedCenterY: Float): Boolean {
+        val metric = cardMetrics[id] ?: return false
+        return metric.top + metric.height / 2f < draggedCenterY
+    }
+
+    private fun reorderedMap(cardId: String, insertionIndex: Int): Map<String, Int> {
+        val visible = visibleIds().toMutableList()
+        visible.remove(cardId)
+        visible.add(insertionIndex.coerceIn(0, visible.size), cardId)
+        return state.order.toMutableMap().apply {
+            visible.forEachIndexed { index, id -> this[id] = index + 1 }
+        }
+    }
 }
+
+private class CardDragSession(
+    val cardId: String,
+    val originalOrder: List<String>,
+    val startCenterY: Float
+) {
+    var lastInsertionIndex by mutableStateOf(-1)
+}
+
+private data class CardMetric(
+    val top: Float,
+    val height: Float
+)
 
 @Composable
 fun rememberCardLayoutController(page: String, profileKey: String): CardLayoutController {
     val context = LocalContext.current
     val store = remember(context) { CardLayoutStore(context) }
-    var state by remember(page, profileKey) { mutableStateOf(CardLayouts.default(page)) }
-    var editingCardId by remember(page, profileKey) { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
-
-    LaunchedEffect(page, profileKey) {
-        store.flow(page, profileKey).collect { loaded -> state = loaded }
-    }
-
-    return remember(state, editingCardId) {
+    val controller = remember(page, profileKey) {
         CardLayoutController(
             page = page,
             profileKey = profileKey,
-            state = state,
-            editingCardId = editingCardId,
-            onEditingChange = { editingCardId = it },
-            store = store
+            store = store,
+            initialState = CardLayouts.default(page)
         ) { next ->
-            state = next
             scope.launch { runCatching { store.save(page, profileKey, next) } }
         }
     }
+
+    LaunchedEffect(controller) {
+        store.flow(page, profileKey).collect { loaded ->
+            controller.updateFromStore(loaded)
+        }
+    }
+
+    return controller
 }
 
 val LocalCardLayout = staticCompositionLocalOf<CardLayoutController?> { null }
@@ -287,26 +369,60 @@ fun Modifier.cardDragReorder(
     cardId: String,
     controller: CardLayoutController
 ): Modifier {
-    if (!enabled) return this
     val currentController by rememberUpdatedState(controller)
-    val density = LocalDensity.current
-    val dragStep = with(density) { 104.dp.toPx() }
-    var dragOffset by remember(cardId) { mutableStateOf(0f) }
+    val scope = rememberCoroutineScope()
+    val dragOffset = remember(cardId) { Animatable(0f) }
+    var lastLayoutTop by remember(cardId) { mutableStateOf(Float.NaN) }
 
-    return this
-        .graphicsLayer { translationY = dragOffset }
+    val measured = onGloballyPositioned { coordinates ->
+        val top = coordinates.positionInRoot().y
+        val height = coordinates.size.height.toFloat()
+        if (currentController.draggingCardId == cardId &&
+            !lastLayoutTop.isNaN() &&
+            kotlin.math.abs(lastLayoutTop - top) > 0.25f
+        ) {
+            scope.launch {
+                dragOffset.snapTo(dragOffset.value + lastLayoutTop - top)
+            }
+        }
+        lastLayoutTop = top
+        currentController.recordMetric(cardId, top, height)
+    }
+
+    if (!enabled) {
+        return measured
+    }
+
+    return measured
+        .zIndex(if (currentController.draggingCardId == cardId) 3f else 0f)
+        .graphicsLayer {
+            val active = currentController.draggingCardId == cardId
+            translationY = dragOffset.value
+            scaleX = if (active) 1.01f else 1f
+            scaleY = if (active) 1.01f else 1f
+            alpha = if (active) 0.98f else 1f
+        }
         .draggable(
             orientation = Orientation.Vertical,
             enabled = true,
             state = rememberDraggableState { delta ->
-                dragOffset += delta
-                val slots = (dragOffset / dragStep).toInt()
-                if (slots != 0) {
-                    currentController.moveBy(cardId, slots)
-                    dragOffset -= slots * dragStep
+                scope.launch {
+                    dragOffset.snapTo(dragOffset.value + delta)
+                    currentController.previewDragTo(dragOffset.value)
                 }
             },
-            onDragStopped = { dragOffset = 0f }
+            onDragStarted = {
+                scope.launch {
+                    dragOffset.snapTo(0f)
+                    currentController.beginDrag(cardId)
+                }
+            },
+            onDragStopped = {
+                scope.launch {
+                    dragOffset.animateTo(0f, tween(150))
+                    currentController.endDrag()
+                }
+            }
         )
 }
 
