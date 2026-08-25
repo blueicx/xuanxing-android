@@ -119,15 +119,22 @@ fun EasternScreen() {
                         full = s.full,
                         hourGuides = s.hourGuides,
                         fortune = s.fortune,
-                        period = s.period,
-                        onPeriodChange = viewModel::setPeriod
+                        period = s.period
                     )
-                    CardLayouts.ordered(cards, controller.state).forEach { card ->
-                        if (card.id == "fortune") {
-                            PeriodToggleRow(s.period, viewModel::setPeriod)
-                        }
-                        card.content()
-                    }
+                    TodayFortuneSection(
+                        fortune = s.fortune,
+                        favorable = s.full.chart.favorableElements,
+                        period = s.period,
+                        onPeriodChange = viewModel::setPeriod,
+                        shareCard = ResultShareCards.eastern(
+                            "fortune",
+                            s.period,
+                            s.full,
+                            s.fortune,
+                            s.hourGuides.firstOrNull()?.timeText
+                        )
+                    )
+                    CardLayouts.ordered(cards, controller.state).forEach { card -> card.content() }
                     if (controller.state.hiddenCount > 0) {
                         RestoreCardsBar(controller)
                     }
@@ -156,8 +163,7 @@ private fun easternCards(
     full: BaziFull,
     hourGuides: List<HourGuide>,
     fortune: EasternDailyFortune,
-    period: String,
-    onPeriodChange: (String) -> Unit
+    period: String
 ): List<CardMeta> {
     fun share(cardId: String) = ResultShareCards.eastern(
         cardId, period, full, fortune, hourGuides.firstOrNull()?.timeText
@@ -176,15 +182,6 @@ private fun easternCards(
         CardMeta("relations", "刑冲合害", share("relations")) { RelationsSection(full.relations, share("relations")) },
         CardMeta("shensha", "神煞", share("shensha")) { ShenShaSection(full.shenSha, share("shensha")) },
         CardMeta("atlas", "神煞图鉴", share("shensha")) { ShenShaAtlasSection(full.shenSha, share("shensha")) },
-        CardMeta("fortune", "周期运势", share("fortune")) {
-            TodayFortuneSection(
-                fortune = fortune,
-                favorable = full.chart.favorableElements,
-                period = period,
-                onPeriodChange = onPeriodChange,
-                shareCard = share("fortune")
-            )
-        }
     )
 }
 

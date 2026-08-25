@@ -45,6 +45,8 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Color.Companion.Transparent
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -180,7 +182,11 @@ private fun mysticCompanionState(
 fun MysticGuideCard(
     bazi: BaziFull,
     fortune: CompositeDailyFortune,
-    immersive: Boolean = false
+    immersive: Boolean = false,
+    onStageModeChange: (String) -> Unit = {},
+    onStageSkinChange: (String) -> Unit = {},
+    stageCostumeRequest: Pair<String, String>? = null,
+    onStageCostumeConsumed: () -> Unit = {}
 ) {
     val records by AppModule.testRecordRepository.records.collectAsStateWithLifecycle(initialValue = emptyList())
     val context = LocalContext.current
@@ -553,6 +559,7 @@ fun MysticGuideCard(
         memorySequence = 0
         memoryExpanded = false
         mode = targetMode
+        onStageModeChange(targetMode)
     }
 
     fun selectTopic(key: String) {
@@ -854,7 +861,7 @@ fun MysticGuideCard(
             MysticTurn(
                 key = "custom-$customCount-${question.hashCode()}",
                 question = question,
-                answer = MysticGuideGenerator.customAnswer(
+                answer = "你问：「$question」\n\n" + MysticGuideGenerator.customAnswer(
                     mode,
                     guide.topicKey,
                     question,
@@ -1049,6 +1056,107 @@ fun MysticGuideCard(
         companion.skinId = skins.getOrNull(skinIndex)?.id.orEmpty()
     }
     val skin = skins[skinIndex.coerceIn(skins.indices)]
+    var pendingSkinId by remember { mutableStateOf<String?>(null)
+    }
+
+    LaunchedEffect(mode, skin.id) {
+        onStageModeChange(mode)
+        onStageSkinChange(skin.id)
+    }
+    LaunchedEffect(stageCostumeRequest, mode, skins) {
+        val request = stageCostumeRequest ?: return@LaunchedEffect
+        val (targetMode, targetSkinId) = request
+        if (targetMode != mode) {
+            pendingSkinId = targetSkinId
+            switchPersona(targetMode)
+        } else {
+            val index = skins.indexOfFirst { it.id == targetSkinId }
+            if (index >= 0) {
+                skinIndex = index
+                companion.skinId = targetSkinId
+            }
+        }
+        onStageCostumeConsumed()
+    }
+    LaunchedEffect(mode, pendingSkinId, skins) {
+        val targetSkinId = pendingSkinId ?: return@LaunchedEffect
+        val index = skins.indexOfFirst { it.id == targetSkinId }
+        if (index >= 0) {
+            skinIndex = index
+            companion.skinId = targetSkinId
+        }
+        pendingSkinId = null
+    }
+
+    if (immersive) {
+        Column(
+            Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            if (revisitLine.isNotBlank()) {
+                MysticStageSpeech(revisitLine, accent)
+            }
+            MysticStageSpeech(guide.arrival, accent)
+
+            conversation.forEach { turn ->
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                    Surface(
+                        shape = RoundedCornerShape(16.dp),
+                        color = Color.White.copy(alpha = 0.10f)
+                    ) {
+                        Text(
+                            turn.question,
+                            modifier = Modifier.padding(horizontal = 13.dp, vertical = 9.dp),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color(0xFFF4EEE5)
+                        )
+                    }
+                }
+                Surface(
+                    shape = RoundedCornerShape(topStart = 4.dp, topEnd = 16.dp, bottomStart = 16.dp, bottomEnd = 16.dp),
+                    color = accent.copy(alpha = 0.13f)
+                ) {
+                    Text(
+                        if (turn.reaction.isBlank()) turn.answer else "${turn.answer}\n\n${turn.reaction}",
+                        modifier = Modifier.padding(horizontal = 13.dp, vertical = 10.dp),
+                        style = MaterialTheme.typography.bodySmall,
+                        lineHeight = 21.sp,
+                        color = Color(0xFFEFE6D7)
+                    )
+                }
+            }
+
+            if (pendingCustom != null) {
+                Text(
+                    "正在推演···",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = accent.copy(alpha = 0.78f)
+                )
+            }
+
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                OutlinedTextField(
+                    value = customQuestion,
+                    onValueChange = { if (it.length <= 60) customQuestion = it },
+                    placeholder = { Text("问一句今天的事") },
+                    modifier = Modifier.weight(1f),
+                    singleLine = true,
+                    shape = RoundedCornerShape(16.dp)
+                )
+                OutlinedButton(
+                    onClick = ::submitCustom,
+                    enabled = customQuestion.isNotBlank() && pendingCustom == null
+                ) {
+                    Text("问")
+                }
+            }
+        }
+        return
+    }
 
     Card(
         Modifier.fillMaxWidth(),
@@ -2156,6 +2264,25 @@ fun MysticGuideCard(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun MysticStageSpeech(
+    text: String,
+    accent: Color
+) {
+    Surface(
+        shape = RoundedCornerShape(topStart = 4.dp, topEnd = 16.dp, bottomStart = 16.dp, bottomEnd = 16.dp),
+        color = accent.copy(alpha = 0.13f)
+    ) {
+        Text(
+            text,
+            modifier = Modifier.padding(horizontal = 13.dp, vertical = 10.dp),
+            style = MaterialTheme.typography.bodySmall,
+            lineHeight = 21.sp,
+            color = Color(0xFFEFE6D7)
+        )
     }
 }
 

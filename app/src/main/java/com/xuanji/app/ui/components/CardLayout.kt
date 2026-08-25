@@ -11,13 +11,20 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -256,6 +263,7 @@ class CardLayoutController(
         val next = state.copy(order = reorderedMap(session.cardId, session.lastInsertionIndex))
         dragSession = null
         draggingCardId = null
+        editingCardId = null
         previewOffsets.clear()
         state = next
         persistState(next)
@@ -468,20 +476,31 @@ fun Modifier.cardDragReorder(
 @Composable
 private fun ControlTool(label: String, symbol: String, onClick: () -> Unit) {
     Surface(
-        shape = RoundedCornerShape(9.dp),
+        modifier = Modifier.size(38.dp),
+        shape = CircleShape,
         color = MaterialTheme.colorScheme.primary.copy(alpha = 0.10f),
         contentColor = MaterialTheme.colorScheme.primary
     ) {
-        Text(
-            symbol,
+        Box(
             Modifier
-                .width(30.dp)
-                .clickable(onClickLabel = label, onClick = onClick)
-                .padding(vertical = 5.dp),
-            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-            style = MaterialTheme.typography.labelSmall,
-            fontWeight = FontWeight.Bold
-        )
+                .fillMaxSize()
+                .clickable(onClickLabel = label, onClick = onClick),
+            contentAlignment = Alignment.Center
+        ) {
+            if (symbol == "×") {
+                Icon(
+                    Icons.Filled.Close,
+                    contentDescription = label,
+                    modifier = Modifier.size(19.dp)
+                )
+            } else {
+                Text(
+                    symbol,
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
     }
 }
 

@@ -127,7 +127,7 @@ private fun WesternContent(
     controller: com.xuanji.app.ui.components.CardLayoutController
 ) {
     val interp = ZodiacCalculator.interpretChart(chart)
-    val cards = westernCards(detail, fortune, chart, interp, period, onPeriodChange)
+    val cards = westernCards(detail, fortune, chart, interp, period)
 
     CompositionLocalProvider(LocalCardLayout provides controller) {
         MysticFloatingGuide(bazi, composite) { scrollState ->
@@ -138,12 +138,8 @@ private fun WesternContent(
                     .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                CardLayouts.ordered(cards, controller.state).forEach { card ->
-                    if (card.id == "fortune") {
-                        PeriodToggleRow(period, onPeriodChange)
-                    }
-                    card.content()
-                }
+                WesternFortuneSection(fortune, period, onPeriodChange, ResultShareCards.western("fortune", period, fortune, detail, chart, interp))
+                CardLayouts.ordered(cards, controller.state).forEach { card -> card.content() }
                 if (controller.state.hiddenCount > 0) {
                     RestoreCardsBar(controller)
                 }
@@ -158,8 +154,7 @@ private fun westernCards(
     fortune: WesternDailyFortune,
     chart: ZodiacCalculator.NatalChart,
     interp: ZodiacCalculator.ChartInterpretation,
-    period: String,
-    onPeriodChange: (String) -> Unit
+    period: String
 ): List<CardMeta> {
     fun share(cardId: String) = ResultShareCards.western(cardId, period, fortune, detail, chart, interp)
 
@@ -174,9 +169,6 @@ private fun westernCards(
         CardMeta("conclusion", "综合解读", share("conclusion")) {
             WesternConclusionSection(ZodiacCalculator.computeConclusion(detail, chart), share("conclusion"))
         },
-        CardMeta("fortune", "周期运势", share("fortune")) {
-            WesternFortuneSection(fortune, period, onPeriodChange, share("fortune"))
-        }
     )
 }
 

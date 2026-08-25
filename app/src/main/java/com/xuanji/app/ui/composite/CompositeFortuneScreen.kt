@@ -88,15 +88,15 @@ private fun CompositeContent(
                     .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                var periodInserted = false
+                OverallCard(
+                    controller,
+                    ResultShareCards.composite("overall", period, fortune),
+                    fortune,
+                    period,
+                    onPeriodChange
+                )
                 CardLayouts.ordered(cards, controller.state).forEach { card ->
-                    if (!periodInserted && (card.id.startsWith("dim-") || card.id == "caution")) {
-                        PeriodToggleRow(period, onPeriodChange)
-                        Text("${periodLabel(period)}维度", style = MaterialTheme.typography.titleSmall)
-                        periodInserted = true
-                    }
                     when (card.id) {
-                        "overall" -> OverallCard(controller, card.shareCard, fortune, period)
                         "luck" -> LuckCard(card.shareCard, fortune)
                         "caution" -> CautionCard(card.shareCard, fortune.cautions)
                         else -> card.content()
@@ -118,7 +118,6 @@ private fun CompositeContent(
 }
 
 private fun fortuneCards(fortune: CompositeDailyFortune, period: String): List<CardMeta> = listOf(
-    CardMeta("overall", "综合总分", ResultShareCards.composite("overall", period, fortune)) {},
     CardMeta("luck", "幸运信息", ResultShareCards.composite("luck", period, fortune)) {},
     *fortune.dimensions.map { dim ->
         val dimensionShare = ResultShareCards.composite("dim-${dim.key}", period, fortune)
@@ -138,7 +137,8 @@ private fun OverallCard(
     controller: CardLayoutController,
     shareCard: ShareCard?,
     fortune: CompositeDailyFortune,
-    period: String
+    period: String,
+    onPeriodChange: (String) -> Unit
 ) {
     Card(
         Modifier
@@ -163,6 +163,7 @@ private fun OverallCard(
         )
     ) {
         Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            PeriodToggleRow(period, onPeriodChange)
             if (shareCard != null) {
                 if (controller.editingCardId == "overall") {
                     CardControls(
