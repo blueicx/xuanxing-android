@@ -279,6 +279,10 @@ object NadiAstrology {
     /** 16 Kandam 概览（供展示） */
     fun kandamOverview(): List<String> = NADI_KANDAMS
 
+    /** Reads a licensed leaf corpus when configured; otherwise callers can pass the explicit simulation provider. */
+    fun reading(query: NadiQuery, provider: NadiCorpusProvider = OfflineNadiSimulationProvider): NadiReading =
+        provider.lookup(query)
+
     /** 宿名 → 索引（0-26），找不到返回 null */
     fun moonNakshatraIndexFromName(name: String): Int? =
         NADI_NAKSHATRAS.indexOf(name).let { if (it < 0) null else it }

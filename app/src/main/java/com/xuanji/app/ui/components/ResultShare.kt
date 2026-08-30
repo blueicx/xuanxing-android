@@ -28,6 +28,7 @@ object ResultShare {
         val periodLabel = when (period) {
             "week" -> "本周"
             "month" -> "本月"
+            "year" -> "本年"
             else -> "今日"
         }
         val scoreText = score?.let { " ${it}分" } ?: ""

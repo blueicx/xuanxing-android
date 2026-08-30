@@ -192,8 +192,8 @@ val SYSTEM_GUIDES: Map<String, List<GuideSection>> = mapOf(
     ),
     "ifa" to listOf(
         GuideSection("概述", "艾法预言（Ifá Divination）是约鲁巴文明的占卜体系，2008 年列入联合国非物质文化遗产。占卜者抛撒棕榈果生成 Odu 卦象，再依求问之事从数百首 Ese 诗节文集中给出指引。"),
-        GuideSection("核心原理", "主要 Odu 共 16 个（可组合为 256 章），各有二进制模式与象征含义。本 App 以「日期 + 求问内容」的确定性哈希生成 Odu（同题同果、无随机），并按问题关键词（爱情/事业/健康）附加个性化提示。"),
-        GuideSection("怎么看", "输入问题即可得 Odu 卦象、二进制模式与解读，底部附十六主 Odu 一览。真正的艾法预言是深邃复杂的文化体系，本页仅供文化娱乐参考。")
+        GuideSection("核心原理", "主要 Odu 共 16 个（可组合为 256 章）。本 App 仅以「日期 + 求问内容」的确定性哈希生成主 Odu 名称索引，不模拟 Ikin/Ọ̀pẹ̀lẹ̀ 仪式，也不声称包含 Ese 口传经文。"),
+        GuideSection("怎么看", "输入问题即可查看一个文化浏览索引与象征性提示，底部附十六主 Odu 名称。真正的艾法预言依赖仪式、语境与受训者传承，本页仅供文化娱乐参考。")
     ),
     "celtic" to listOf(
         GuideSection("概述", "凯尔特树历（Celtic Tree Calendar）以 13 个树月对应欧甘字母（Ogham）与守护动物，是罗伯特·格雷夫斯在《白女神》中对古凯尔特传统的流行化重构。"),

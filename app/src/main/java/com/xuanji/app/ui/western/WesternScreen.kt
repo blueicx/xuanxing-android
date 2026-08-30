@@ -30,6 +30,11 @@ import com.xuanji.app.data.model.WesternDailyFortune
 import com.xuanji.app.di.AppModule
 import com.xuanji.app.domain.ZodiacCalculator
 import com.xuanji.app.ui.components.FortuneCard
+import com.xuanji.app.ui.components.FortuneDimensionDetail
+import com.xuanji.app.ui.components.FortuneInsightList
+import com.xuanji.app.ui.components.FortunePageWidth
+import com.xuanji.app.ui.components.FortuneProse
+import com.xuanji.app.ui.components.FortuneStickyHeader
 import com.xuanji.app.ui.components.InfoRow
 import com.xuanji.app.ui.components.CardLayouts
 import com.xuanji.app.ui.components.CardMeta
@@ -41,6 +46,7 @@ import com.xuanji.app.ui.components.ResultShare
 import com.xuanji.app.ui.components.ResultShareCards
 import com.xuanji.app.ui.components.RestoreCardsBar
 import com.xuanji.app.ui.components.ScoreRow
+import com.xuanji.app.ui.components.ScoreRing
 import com.xuanji.app.ui.components.SectionTitle
 import com.xuanji.app.ui.components.SystemExplanation
 import com.xuanji.app.ui.components.ShareButton
@@ -131,19 +137,38 @@ private fun WesternContent(
 
     CompositionLocalProvider(LocalCardLayout provides controller) {
         MysticFloatingGuide(bazi, composite) { scrollState ->
-            Column(
-                Modifier
-                    .fillMaxSize()
-                    .verticalScroll(scrollState)
-                    .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                WesternFortuneSection(fortune, period, onPeriodChange, ResultShareCards.western("fortune", period, fortune, detail, chart, interp))
-                CardLayouts.ordered(cards, controller.state).forEach { card -> card.content() }
-                if (controller.state.hiddenCount > 0) {
-                    RestoreCardsBar(controller)
+            Column(Modifier.fillMaxSize()) {
+                FortuneStickyHeader(
+                    period = period,
+                    onPeriodChange = onPeriodChange,
+                    headline = "${periodTitle(period)}星盘 ${fortune.overallScore} 分",
+                    subtitle = "${fortune.dateKey} · ${fortune.sign}当值行运"
+                )
+                Column(
+                    Modifier
+                        .weight(1f)
+                        .verticalScroll(scrollState)
+                        .padding(bottom = 28.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    FortunePageWidth {
+                        Column(
+                            Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+                            verticalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
+                            WesternFortuneSection(
+                                fortune,
+                                period,
+                                ResultShareCards.western("fortune", period, fortune, detail, chart, interp)
+                            )
+                            CardLayouts.ordered(cards, controller.state).forEach { card -> card.content() }
+                            if (controller.state.hiddenCount > 0) {
+                                RestoreCardsBar(controller)
+                            }
+                            SystemExplanation("western")
+                        }
+                    }
                 }
-                SystemExplanation("western")
             }
         }
     }
@@ -293,31 +318,42 @@ private fun AspectMeaningSection(interp: ZodiacCalculator.ChartInterpretation, s
 private fun WesternFortuneSection(
     fortune: WesternDailyFortune,
     period: String,
-    onPeriodChange: (String) -> Unit,
     shareCard: ShareCard
 ) {
-    val periodTitle = when (period) {
-        "week" -> "本周"
-        "month" -> "本月"
-        else -> "今日"
+    val label = periodTitle(period)
+    FortuneCard(cardId = "fortune", title = "${label}行运解说", shareCard = shareCard) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            ScoreRing(fortune.overallScore, caption = "${label}总分")
+            Spacer(Modifier.width(14.dp))
+            Column(Modifier.weight(1f)) {
+                InfoRow("太阳星座", fortune.sign)
+                InfoRow("幸运数字", "${fortune.luckyNumber}")
+                InfoRow("幸运色", fortune.luckyColor)
+                InfoRow("吉利方位", fortune.luckyDirection)
+            }
+        }
+        Spacer(Modifier.height(14.dp))
+        FortuneProse(fortune.summary)
+        if (fortune.dimensionNotes.isNotEmpty()) {
+            Spacer(Modifier.height(16.dp))
+            SectionTitle("${label}分项详批")
+            Spacer(Modifier.height(8.dp))
+            FortuneDimensionDetail(fortune.dimensionNotes)
+        }
+        if (fortune.insights.isNotEmpty()) {
+            Spacer(Modifier.height(16.dp))
+            SectionTitle("${label}加减分的依据")
+            Spacer(Modifier.height(8.dp))
+            FortuneInsightList(fortune.insights)
+        }
     }
-    FortuneCard(cardId = "fortune", title = "周期运势", shareCard = shareCard) {
-        Text("${periodTitle}运势 · ${fortune.dateKey}", style = MaterialTheme.typography.titleMedium)
-        Spacer(Modifier.height(8.dp))
-        PeriodToggleRow(period, onPeriodChange)
-        Spacer(Modifier.height(8.dp))
-        Text(fortune.summary, style = MaterialTheme.typography.bodyLarge)
-        Spacer(Modifier.height(12.dp))
-        ScoreRow("综合", fortune.overallScore)
-        ScoreRow("事业", fortune.careerScore)
-        ScoreRow("财运", fortune.wealthScore)
-        ScoreRow("感情", fortune.loveScore)
-        ScoreRow("健康", fortune.healthScore)
-        Spacer(Modifier.height(8.dp))
-        InfoRow("幸运数字", "${fortune.luckyNumber}")
-        InfoRow("幸运色", fortune.luckyColor)
-        InfoRow("吉利方位", fortune.luckyDirection)
-    }
+}
+
+private fun periodTitle(period: String): String = when (period) {
+    "week" -> "本周"
+    "month" -> "本月"
+    "year" -> "本年"
+    else -> "今日"
 }
 
 private val PLANET_LEGEND = listOf(

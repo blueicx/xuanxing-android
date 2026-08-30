@@ -1,5 +1,7 @@
 package com.xuanji.app.domain
 
+import com.xuanji.app.domain.calendar.LunisolarDate
+
 /**
  * 紫微斗数排盘系统 —— 三派合一。
  *
@@ -10,7 +12,7 @@ package com.xuanji.app.domain
  *
  * 安星算法基于传统紫微斗数排盘规则（离线确定性，无随机）：
  *  - 年干支（公历近似）
- *  - 五行局（按年干）
+ *  - 五行局（简化按年干；非完整纳音五行局）
  *  - 命宫/身宫（生月、生时）
  *  - 十二宫天干（五虎遁）
  *  - 紫微星（命宫干支五行局 + 生日）
@@ -259,20 +261,20 @@ object ZiweiCalculator {
                 name = PALACE_NAMES[i],
                 branch = DI_ZHI[branchPos],
                 gan = palaceGan[branchPos],
-                mainStars = MAIN_STARS.filter { mainStars[it] == i },
-                luckyStars = lucky.filter { it.value == i }.map { it.key },
-                badStars = bad.filter { it.value == i }.map { it.key },
-                hua = huaTable.filterValues { it in MAIN_STARS && mainStars[it] == i }
+                mainStars = MAIN_STARS.filter { mainStars[it] == branchPos },
+                luckyStars = lucky.filter { it.value == branchPos }.map { it.key },
+                badStars = bad.filter { it.value == branchPos }.map { it.key },
+                hua = huaTable.filterValues { it in MAIN_STARS && mainStars[it] == branchPos }
                     .map { (hua, star) -> "$star$hua" },
-                isLife = i == lifePos,
-                isBody = i == bodyPos
+                isLife = i == 0,
+                isBody = branchPos == bodyPos
             )
         }
 
         // 四化摘要（按派别）
         val fourTrans = huaTable.map { (hua, star) ->
             val pos = mainStars[star] ?: -1
-            val palaceName = if (pos in 0..11) PALACE_NAMES[pos] else "未知"
+            val palaceName = if (pos in 0..11) PALACE_NAMES[(pos - lifePos + 12) % 12] else "未知"
             "$star$hua（${HUA_MEANING[hua]}；落${palaceName}宫）"
         }
 
@@ -282,12 +284,27 @@ object ZiweiCalculator {
             gender = gender,
             yearGan = yearGan, yearZhi = yearZhi,
             bureau = bureau,
-            lifePalace = PALACE_NAMES[lifePos],
-            bodyPalace = PALACE_NAMES[bodyPos],
+            lifePalace = DI_ZHI[lifePos],
+            bodyPalace = DI_ZHI[bodyPos],
             palaces = palaces,
             fourTrans = fourTrans,
             schoolInfo = SCHOOL_INFO[s] ?: "",
-            note = "本报告基于传统紫微斗数排盘，各派别四化规则有所不同；紫微斗数为传统命理学，仅供文化研究与自我探索参考。"
+            note = "本报告以公历近似输入，未含农历换算、闰月与完整纳音五行局，不能替代传统紫微斗数排盘；各派别四化规则亦有差异，仅供文化研究与自我探索参考。"
+        )
+    }
+
+    /** Canonical Ziwei entry point when a verified lunar date is available. */
+    fun calculate(
+        lunarDate: LunisolarDate,
+        hour: Int,
+        minute: Int,
+        gender: String = "male",
+        school: String = "中州派"
+    ): ZiweiChart {
+        val chart = calculate(lunarDate.year, lunarDate.month, lunarDate.day, hour, minute, gender, school)
+        val leapLabel = if (lunarDate.isLeapMonth) "闰" else ""
+        return chart.copy(
+            note = "本命盘使用农历${lunarDate.year}年${leapLabel}${lunarDate.month}月${lunarDate.day}日；闰月已显式保留。紫微斗数各派在闰月安置与起限规则上仍有差异，请以所选流派排盘规则复核。"
         )
     }
 

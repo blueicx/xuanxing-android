@@ -4,6 +4,8 @@ import android.Manifest
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.SystemBarStyle
+import androidx.activity.enableEdgeToEdge
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.fillMaxSize
@@ -34,6 +36,12 @@ class MainActivity : ComponentActivity() {
         // 开屏页：必须在 setContent 之前调用
         installSplashScreen()
         super.onCreate(savedInstanceState)
+        // 全屏幕沉浸式：内容延伸到状态栏与导航栏下方，
+        // 深色底 + 浅色图标由 Scaffold 统一分发 insets，页面不再出现多余空带。
+        enableEdgeToEdge(
+            statusBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
+            navigationBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT)
+        )
         setContent {
             XuanjiTheme {
                 val scope = rememberCoroutineScope()

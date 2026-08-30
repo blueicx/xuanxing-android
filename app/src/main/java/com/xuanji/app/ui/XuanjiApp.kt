@@ -9,6 +9,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
@@ -23,17 +24,22 @@ import androidx.compose.material.icons.filled.Quiz
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.zIndex
+import androidx.compose.ui.unit.dp
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -99,6 +105,9 @@ import com.xuanji.app.ui.profile.ProfileScreen
 import com.xuanji.app.ui.western.WesternScreen
 import com.xuanji.app.ui.composite.CompositeFortuneScreen
 import com.xuanji.app.ui.test.TestHubScreen
+import com.xuanji.app.ui.components.LocalImmersiveStageOpen
+import com.xuanji.app.ui.components.LocalMysticGuideVisible
+import com.xuanji.app.di.AppModule
 
 sealed class Screen(val route: String, val label: String, val icon: androidx.compose.ui.graphics.vector.ImageVector) {
     data object Eastern : Screen("eastern", "东方", Icons.Filled.AutoStories)
@@ -174,29 +183,54 @@ fun XuanjiApp() {
         Screen.Composite, Screen.Eastern, Screen.Western,
         Screen.Divination, Screen.Test, Screen.History, Screen.Profile
     )
+    val immersiveStageOpen = remember { mutableStateOf(false) }
+    val mysticGuideVisible = remember { mutableStateOf(true) }
 
-    Scaffold(
-        bottomBar = {
-            NavigationBar {
-                items.forEach { screen ->
-                    NavigationBarItem(
-                        icon = { Icon(screen.icon, contentDescription = screen.label) },
-                        label = { Text(screen.label) },
-                        selected = selectedTab == screen.route,
-                        onClick = { selectedTab = screen.route }
-                    )
+    LaunchedEffect(Unit) {
+        AppModule.repository.mysticGuideEnabledFlow.collect { enabled ->
+            mysticGuideVisible.value = enabled
+        }
+    }
+
+    CompositionLocalProvider(
+        LocalImmersiveStageOpen provides immersiveStageOpen,
+        LocalMysticGuideVisible provides mysticGuideVisible
+    ) {
+        Scaffold(
+            // 底栏与页面同色，去掉 M3 默认的深灰容器，
+            // 让底部看起来是一整块连续的深色，不再出现一条色带断层。
+            containerColor = MaterialTheme.colorScheme.background,
+            bottomBar = {
+                if (!immersiveStageOpen.value) {
+                    NavigationBar(
+                        containerColor = MaterialTheme.colorScheme.background,
+                        tonalElevation = 0.dp
+                    ) {
+                        items.forEach { screen ->
+                            NavigationBarItem(
+                                icon = { Icon(screen.icon, contentDescription = screen.label) },
+                                label = { Text(screen.label) },
+                                selected = selectedTab == screen.route,
+                                onClick = { selectedTab = screen.route }
+                            )
+                        }
+                    }
                 }
             }
-        }
-    ) { innerPadding ->
-        Box(Modifier.fillMaxSize().padding(innerPadding)) {
-            KeepAliveTab(active = selectedTab == Screen.Composite.route) { CompositeFortuneScreen() }
-            KeepAliveTab(active = selectedTab == Screen.Eastern.route) { EasternScreen() }
-            KeepAliveTab(active = selectedTab == Screen.Western.route) { WesternScreen() }
-            KeepAliveTab(active = selectedTab == Screen.Divination.route) { DivinationRoot() }
-            KeepAliveTab(active = selectedTab == Screen.Test.route) { TestHubScreen() }
-            KeepAliveTab(active = selectedTab == Screen.History.route) { HistoryScreen() }
-            KeepAliveTab(active = selectedTab == Screen.Profile.route) { ProfileScreen() }
+        ) { innerPadding ->
+            Box(
+                Modifier.fillMaxSize().padding(
+                    if (immersiveStageOpen.value) PaddingValues(0.dp) else innerPadding
+                )
+            ) {
+                KeepAliveTab(active = selectedTab == Screen.Composite.route) { CompositeFortuneScreen() }
+                KeepAliveTab(active = selectedTab == Screen.Eastern.route) { EasternScreen() }
+                KeepAliveTab(active = selectedTab == Screen.Western.route) { WesternScreen() }
+                KeepAliveTab(active = selectedTab == Screen.Divination.route) { DivinationRoot() }
+                KeepAliveTab(active = selectedTab == Screen.Test.route) { TestHubScreen() }
+                KeepAliveTab(active = selectedTab == Screen.History.route) { HistoryScreen() }
+                KeepAliveTab(active = selectedTab == Screen.Profile.route) { ProfileScreen() }
+            }
         }
     }
 }
@@ -305,7 +339,6 @@ private fun DivinationRoot() {
                 onBack = { nav.popBackStack() }
             )
         }
-        composable(Screen.NineStars.route) { NineStarsScreen() }
         composable(Screen.TodayOracle.route) { TodayOracleScreen() }
         composable(Screen.Tarot.route) { TarotScreen() }
         composable(Screen.Numerology.route) { NumerologyScreen() }

@@ -1,5 +1,6 @@
 package com.xuanji.app.domain
 
+import java.time.LocalDate
 import kotlin.math.abs
 import kotlin.math.asin
 import kotlin.math.atan2
@@ -115,7 +116,7 @@ object ZodiacCalculator {
     // 采用 JPL「Keplerian Elements for Approximate Positions of the Major Planets」低精度根数：
     // 先由根数求日心黄道直角坐标，再减地球日心坐标得到地心黄经。
     // 相比旧的「平黄经近似」，落座准确度大幅提升（已对照真实星历验证内/外行星）。
-    // 适用范围约 1800–2100 年，误差通常在 1° 以内，足够落座与宫位判定。
+    // JPL 此组近似根数的公开适用范围为约 1800–2050 年；超出范围不应标作精确星历。
     private data class OrbitEl(
         val name: String,
         val symbol: String,
@@ -260,7 +261,7 @@ object ZodiacCalculator {
         "台北" to Pair(25.03, 121.57)
     )
 
-    private const val TZ_OFFSET_HOURS = 8.0   // 北京时间(UTC+8)，无夏令时
+    private const val DEFAULT_TIME_ZONE_OFFSET_HOURS = 8.0
 
     // ===================== 对外 API =====================
 
@@ -271,9 +272,10 @@ object ZodiacCalculator {
         year: Int, month: Int, day: Int, hour: Int, minute: Int,
         locationName: String,
         locationLat: Double? = null,
-        locationLng: Double? = null
+        locationLng: Double? = null,
+        timeZoneOffsetHours: Double = DEFAULT_TIME_ZONE_OFFSET_HOURS
     ): WesternDetail = detailFromChart(
-        calculateNatalChart(year, month, day, hour, minute, locationName, locationLat, locationLng)
+        calculateNatalChart(year, month, day, hour, minute, locationName, locationLat, locationLng, timeZoneOffsetHours)
     )
 
     /** 兼容旧调用（无地点时按北京推算） */
@@ -290,7 +292,7 @@ object ZodiacCalculator {
             rising = infoOf(BY_NAME.getValue(STANDARD_ORDER[ascIdx])),
             moon = infoOf(BY_NAME.getValue(moon.sign)),
             note = "太阳 / 上升 / 天顶为按出生地经纬度的精确推算；" +
-                "十大行星采用 JPL 开普勒轨道根数推算地心黄经（约 1800–2100 年适用，误差通常 1° 内）；北交为平均交点近似，仅供娱乐参考。"
+                "十大行星采用 JPL 近似开普勒轨道根数推算地心黄经（约 1800–2050 年适用，非高精度星历）；北交为平均交点近似，仅供娱乐参考。"
         )
     }
 
@@ -304,12 +306,13 @@ object ZodiacCalculator {
         year: Int, month: Int, day: Int, hour: Int, minute: Int,
         locationName: String,
         locationLat: Double? = null,
-        locationLng: Double? = null
+        locationLng: Double? = null,
+        timeZoneOffsetHours: Double = DEFAULT_TIME_ZONE_OFFSET_HOURS
     ): NatalChart {
         val legacy = locationToCoords(locationName)
         val lat = locationLat ?: legacy.first
         val lon = locationLng ?: legacy.second
-        val utHours = (hour + minute / 60.0) - TZ_OFFSET_HOURS
+        val utHours = (hour + minute / 60.0) - timeZoneOffsetHours
         val jd = julianDate(year, month, day, utHours)
         val d = jd - 2451545.0
         val T = d / 36525.0
@@ -366,6 +369,72 @@ object ZodiacCalculator {
         year: Int, month: Int, day: Int, hour: Int, minute: Int
     ): NatalChart = calculateNatalChart(year, month, day, hour, minute, "北京")
 
+    // ===================== 行运星历（占星运势的唯一数据源） =====================
+
+    /** 某一时刻的真实空位：黄经表 + 正在逆行的行星集合。 */
+    data class SkySnapshot(
+        val longitudes: Map<String, Double>,
+        val retrograde: Set<String>
+    ) {
+        fun lon(name: String): Double = longitudes[name] ?: 0.0
+        fun isRetro(name: String): Boolean = name in retrograde
+
+        /** 两颗星的实际角距（0..180），相位计算的基础量。 */
+        fun separation(a: String, b: String): Double {
+            val d = abs(lon(a) - lon(b)) % 360.0
+            return if (d > 180.0) 360.0 - d else d
+        }
+
+        /** 该星黄经所在的十二星座名（白羊起）。 */
+        fun signIndex(name: String): Int {
+            val i = (Math.floor(lon(name) / 30.0).toInt() % 12 + 12) % 12
+            return i
+        }
+    }
+
+    /**
+     * 指定日期（默认北京时间正午）的真实空位。
+     * 与本命盘共用同一套开普勒轨道根数与真月亮公式，
+     * 所以「行运本命相位」是严格可比的，不是按太阳星座糊出来的近似。
+     */
+    fun skyAt(
+        date: LocalDate,
+        localHours: Double = 12.0,
+        timeZoneOffsetHours: Double = DEFAULT_TIME_ZONE_OFFSET_HOURS
+    ): SkySnapshot {
+        val ut = localHours - timeZoneOffsetHours
+        val jd = julianDate(date.year, date.monthValue, date.dayOfMonth, ut)
+        val cur = geoLongitudes(jd)
+        val prev = geoLongitudes(julianDate(date.year, date.monthValue, date.dayOfMonth, ut - 6.0))
+        val next = geoLongitudes(julianDate(date.year, date.monthValue, date.dayOfMonth, ut + 6.0))
+        val retro = cur.keys.filter { name ->
+            if (name == "北交") return@filter false
+            mod360((next[name] ?: 0.0) - (prev[name] ?: 0.0)) > 180.0
+        }.toSet()
+        return SkySnapshot(cur, retro)
+    }
+
+    /** 日心坐标转地心黄经：本命与行运共用的换算。 */
+    private fun geoLongitudes(jd: Double): Map<String, Double> {
+        val d = jd - 2451545.0
+        val T = d / 36525.0
+        val earth = helioPosition(EARTH_EL, T)
+        val out = LinkedHashMap<String, Double>()
+        out["太阳"] = mod360(Math.toDegrees(atan2(earth.second, earth.first)) + 180.0)
+        out["月亮"] = trueMoon(jd)
+        for (el in PLANET_KEPLER) {
+            val p = helioPosition(el, T)
+            out[el.name] = mod360(
+                Math.toDegrees(atan2(p.second - earth.second, p.first - earth.first))
+            )
+        }
+        out["北交"] = mod360(125.04 - 19.361 * (d / 365.25))
+        return out
+    }
+
+    /** 月亮与太阳的角距（0=朔，180=望），用于月相判定。 */
+    fun moonPhase(sky: SkySnapshot): Double = mod360(sky.lon("月亮") - sky.lon("太阳"))
+
     // ===================== 内部工具 =====================
 
     private fun planetAt(lon: Double, cusps: List<Double>, name: String, symbol: String): PlanetPosition {
@@ -384,21 +453,7 @@ object ZodiacCalculator {
         val M = 357.5291092 + 35999.0502909 * T - 0.0001536 * T * T + T * T * T / 24490000
         val Mp = 134.9633964 + 477198.8675055 * T + 0.0087414 * T * T + T * T * T / 69699 - T * T * T * T / 14712000
         val F = 93.2720950 + 483202.0175233 * T - 0.0036539 * T * T - T * T * T / 3526000 + T * T * T * T / 863310000
-        val L = Lp
-            + 6.288774 * sin(r(Mp))
-            + 1.274027 * sin(r(2 * D - Mp))
-            + 0.658314 * sin(r(2 * D))
-            + 0.213618 * sin(r(2 * Mp))
-            + 0.185116 * sin(r(2 * M))
-            - 0.114332 * sin(r(2 * F))
-            + 0.058793 * sin(r(2 * D - 2 * Mp))
-            + 0.057066 * sin(r(2 * D - M - Mp))
-            + 0.053322 * sin(r(2 * D + Mp))
-            + 0.045758 * sin(r(2 * D - M))
-            + 0.040923 * sin(r(Mp - M))
-            - 0.034720 * sin(r(D))
-            - 0.030383 * sin(r(2 * F - Mp))
-            + 0.014216 * sin(r(2 * D + 2 * Mp))
+        val L = Lp + 6.288774 * sin(r(Mp)) + 1.274027 * sin(r(2 * D - Mp)) + 0.658314 * sin(r(2 * D)) + 0.213618 * sin(r(2 * Mp)) + 0.185116 * sin(r(2 * M)) - 0.114332 * sin(r(2 * F)) + 0.058793 * sin(r(2 * D - 2 * Mp)) + 0.057066 * sin(r(2 * D - M - Mp)) + 0.053322 * sin(r(2 * D + Mp)) + 0.045758 * sin(r(2 * D - M)) + 0.040923 * sin(r(Mp - M)) - 0.034720 * sin(r(D)) - 0.030383 * sin(r(2 * F - Mp)) + 0.014216 * sin(r(2 * D + 2 * Mp))
         return mod360(L)
     }
 

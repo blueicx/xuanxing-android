@@ -17,10 +17,10 @@ import java.time.LocalDate
 
 /** 16 主 Odu 名称（索引 = 二进制值） */
 private val ODU_NAMES = listOf(
-    "Eji Ogbe", "Ọ̀ṣẹ́ Òtúrá", "Ọ̀ṣẹ́ Òdí", "Ọ̀ṣẹ́ Ìrẹtẹ̀",
-    "Ọ̀ṣẹ́ Òbàrà", "Ọ̀ṣẹ́ Ògúndá", "Ọ̀ṣẹ́ Òsá", "Ọ̀ṣẹ́ Ìká",
-    "Ọ̀ṣẹ́ Òtúrúpọ̀n", "Ọ̀ṣẹ́ Ìwòrì", "Ọ̀ṣẹ́ Òdí", "Ọ̀ṣẹ́ Ìrẹtẹ̀",
-    "Ọ̀ṣẹ́ Òbàrà", "Ọ̀ṣẹ́ Ògúndá", "Ọ̀ṣẹ́ Òsá", "Ọ̀ṣẹ́ Ìká"
+    "Eji Ogbe", "Oyeku Meji", "Iwori Meji", "Odi Meji",
+    "Irosun Meji", "Owonrin Meji", "Obara Meji", "Okanran Meji",
+    "Ogunda Meji", "Osa Meji", "Ika Meji", "Oturupon Meji",
+    "Otura Meji", "Irete Meji", "Ose Meji", "Ofun Meji"
 )
 
 private val ODU_READINGS = mapOf(
@@ -127,7 +127,9 @@ data class IfaResult(
     val question: String,
     val binaryPattern: String,   // 4 位二进制
     val oduName: String,
-    val reading: String
+    val reading: String,
+    val combination: IfaCombination = IfaCatalogue.combination(0, 0),
+    val ese: EseEntry? = null
 )
 
 // ======================== 核心计算 ========================
@@ -150,10 +152,14 @@ object Ifa {
     fun divine(date: LocalDate, question: String, seed: Int = 0): IfaResult {
         val q = question.trim().ifEmpty { "关于我的未来" }
         val h = stableHash(date.toString(), q, "ask$seed")
-        val idx = (h % 16).toInt()
+        val outer = (h and 0x0f).toInt()
+        val inner = ((h shr 4) and 0x0f).toInt()
+        val idx = outer
         val binary = String.format("%04d", Integer.parseInt(Integer.toBinaryString(idx)))
         val odu = ODU_NAMES[idx]
-        val base = ODU_READINGS[odu] ?: "这是一个充满潜力的 Odu，需要深入的仪式来解读。"
+        val combination = IfaCatalogue.combination(outer, inner)
+        val base = ODU_READINGS[odu]
+            ?: "这是「$odu」的文化名称索引；实际 Ifá 解读需要 Ikin/Ọ̀pẹ̀lẹ̀ 仪式、求问语境与受训者的口传知识。"
         val dims = ODU_VERDICT[odu] ?: emptyList()
         val six = if (dims.size >= 6) dims.joinToString("") + "（艾法为约鲁巴传承的智慧，结果仅供文化娱乐参考）" else base
         val extra = when {
@@ -162,10 +168,18 @@ object Ifa {
             q.contains("健康") -> "（针对健康之问：身心平衡是此卦的重心。）"
             else -> ""
         }
-        return IfaResult(date, q, binary, odu, six + extra)
+        return IfaResult(date, q, binary, odu, six + extra, combination)
     }
 
     /** 16 主 Odu 一览 */
     fun oduTable(): List<Pair<String, String>> =
-        ODU_NAMES.distinct().map { it to (ODU_READINGS[it] ?: "") }
+        ODU_NAMES.distinct().map {
+            it to (ODU_READINGS[it]
+                ?: "主 Odu 名称索引；实际含义需结合仪式、求问语境与传承经文解读。")
+        }
+
+    fun combinations(): List<IfaCombination> = IfaCatalogue.all()
+
+    fun ese(combination: IfaCombination, provider: EseCorpusProvider = UnavailableEseCorpusProvider): EseEntry? =
+        provider.find(combination)
 }

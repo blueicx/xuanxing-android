@@ -3,7 +3,7 @@ package com.xuanji.app.domain.test
 /**
  * 大五人格（Big Five / OCEAN）测试
  * 50 题，五维度（开放性O/尽责性C/外向性E/宜人性A/神经质N）各 10 题（含反向计分）。
- * 提供超详细解读：高分/低分特征、职场、人际、成长、名人等。
+ * 这是自编的 Big Five 风格自我探索问卷，不是经过常模验证的临床量表。
  * 全离线、确定性计分。
  */
 
@@ -240,6 +240,12 @@ object BigFive {
 
     /** 计分：answers 为每题 1-5 的自评，返回结果 */
     fun calculate(answers: List<Int>): BigFiveResult {
+        require(answers.size == QUESTIONS.size) {
+            "Big Five 需要 ${QUESTIONS.size} 个答案，实际收到 ${answers.size} 个"
+        }
+        require(answers.all { it in 1..5 }) {
+            "Big Five 每个答案必须是 1 到 5"
+        }
         val raw = mutableMapOf("O" to 0, "C" to 0, "E" to 0, "A" to 0, "N" to 0)
         answers.forEachIndexed { i, ans ->
             val q = QUESTIONS[i]

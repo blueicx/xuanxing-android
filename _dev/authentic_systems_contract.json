@@ -1,0 +1,8 @@
+{
+  "version": 1,
+  "defaultMode": "offline",
+  "lunisolar": {"provider": "TableLunisolarCalendarProvider", "supportedYears": [1900, 2100], "leapMonthExplicit": true},
+  "ifa": {"combinationCount": 256, "indexOrder": "outer*16+inner", "ese": "provider-required", "fabrication": "forbidden"},
+  "nadi": {"leafText": "provider-required", "offlineFallback": "simulation", "provenanceRequired": true},
+  "psychometrics": {"open": ["ipip-big5-50"], "licensedOnly": ["mmpi", "mmpi-3", "raven", "16pf", "mbti"], "clinicalClaims": false, "officialNorms": "must-be-supplied-with-license"}
+}

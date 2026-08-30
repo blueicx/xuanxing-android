@@ -27,6 +27,7 @@ import java.time.LocalDate
 @Composable
 fun PersianAstrologyScreen() {
     val profile by AppModule.repository.userProfileFlow.collectAsStateWithLifecycle(initialValue = null)
+    val chart by AppModule.repository.natalChartFlow.collectAsStateWithLifecycle(initialValue = null)
 
     Column(
         Modifier
@@ -46,14 +47,14 @@ fun PersianAstrologyScreen() {
         if (p == null) {
             FortuneCard { Text("尚未设置出生信息，请先到「我的」填写。", style = MaterialTheme.typography.bodyMedium) }
         } else {
-            val chart = AppModule.repository.natalChartFlow.value
             if (chart == null) {
                 FortuneCard { Text("正在计算命盘…", style = MaterialTheme.typography.bodyMedium) }
             } else {
-                val lon = chart.planets.associate { it.name to it.longitude }
+                val natalChart = chart!!
+                val lon = natalChart.planets.associate { it.name to it.longitude }
                 val hour = p.birthHour + p.birthMinute / 60.0
                 val c = PersianChartData(
-                    ascendant = chart.ascendant,
+                    ascendant = natalChart.ascendant,
                     sun = lon["太阳"] ?: 0.0, moon = lon["月亮"] ?: 0.0,
                     mercury = lon["水星"] ?: 0.0, venus = lon["金星"] ?: 0.0,
                     mars = lon["火星"] ?: 0.0, jupiter = lon["木星"] ?: 0.0,

@@ -14,7 +14,9 @@ data class CompositeDailyFortune(
     val cautions: String,                       // 注意事项
     val eastern: EasternDailyFortune,           // 东方来源（用于标签展示）
     val western: WesternDailyFortune,           // 西方来源
-    val period: String = "day"                  // day / week / month
+    val period: String = "day",                 // day / week / month / year
+    val periodSummary: String = "",             // 本周期总评（融合东西方）
+    val insights: List<FortuneInsight> = emptyList()  // 可追溯的评分依据
 )
 
 /** 单个运势维度 */

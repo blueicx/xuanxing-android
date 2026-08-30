@@ -74,6 +74,7 @@ fun ProfileScreen() {
     var showClearProfileDialog by rememberSaveable { mutableStateOf(false) }
     var showClearDialog by rememberSaveable { mutableStateOf(false) }
     val dailyReminderOn by viewModel.dailyReminderOn.collectAsStateWithLifecycle()
+    val mysticGuideEnabled by viewModel.mysticGuideEnabled.collectAsStateWithLifecycle()
 
     val selectedLocation = if (
         provinceIndex >= 0 && cityIndex >= 0 && districtIndex >= 0 &&
@@ -339,6 +340,33 @@ fun ProfileScreen() {
                 ) {
                     Text("清除并重新设置")
                 }
+            }
+        }
+        FortuneCard {
+            SectionTitle("悬浮玄师")
+            Spacer(Modifier.height(8.dp))
+            Row(
+                Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        "运势页显示微光浮球",
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        if (mysticGuideEnabled) "已显示，点击浮球可召回完整玄师舞台" else "已完全隐藏，可从这里恢复浮球",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Switch(
+                    checked = mysticGuideEnabled,
+                    onCheckedChange = { enabled ->
+                        viewModel.setMysticGuideEnabled(enabled)
+                    }
+                )
             }
         }
         FortuneCard {

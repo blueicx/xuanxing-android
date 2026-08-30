@@ -36,7 +36,7 @@ jobs:
         run: chmod +x gradlew
 
       - name: Build debug APK
-        run: ./gradlew assembleDebug --no-daemon
+        run: ./gradlew testDebugUnitTest lintDebug assembleDebug --no-daemon
 
       - name: Upload APK artifact
         if: success()

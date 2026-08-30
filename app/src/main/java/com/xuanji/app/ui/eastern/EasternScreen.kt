@@ -63,6 +63,11 @@ import com.xuanji.app.ui.components.ElementBalance
 import com.xuanji.app.ui.components.CardLayouts
 import com.xuanji.app.ui.components.CardMeta
 import com.xuanji.app.ui.components.FortuneCard
+import com.xuanji.app.ui.components.FortuneDimensionDetail
+import com.xuanji.app.ui.components.FortuneInsightList
+import com.xuanji.app.ui.components.FortunePageWidth
+import com.xuanji.app.ui.components.FortuneProse
+import com.xuanji.app.ui.components.FortuneStickyHeader
 import com.xuanji.app.ui.components.HealthBodyAtlas
 import com.xuanji.app.ui.components.InfoRow
 import com.xuanji.app.ui.components.LocalCardLayout
@@ -73,6 +78,7 @@ import com.xuanji.app.ui.components.ResultShare
 import com.xuanji.app.ui.components.ResultShareCards
 import com.xuanji.app.ui.components.RestoreCardsBar
 import com.xuanji.app.ui.components.ScoreRow
+import com.xuanji.app.ui.components.ScoreRing
 import com.xuanji.app.ui.components.SectionTitle
 import com.xuanji.app.ui.components.ShareButton
 import com.xuanji.app.ui.components.rememberCardLayoutController
@@ -107,42 +113,56 @@ fun EasternScreen() {
             }
         }
         is EasternUiState.Ready -> {
-            {
-                Column(
-                    Modifier
-                        .fillMaxSize()
-                        .verticalScroll(it)
-                        .padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    val cards = easternCards(
-                        full = s.full,
-                        hourGuides = s.hourGuides,
-                        fortune = s.fortune,
-                        period = s.period
-                    )
-                    TodayFortuneSection(
-                        fortune = s.fortune,
-                        favorable = s.full.chart.favorableElements,
+            { scrollState ->
+                val cards = easternCards(
+                    full = s.full,
+                    hourGuides = s.hourGuides,
+                    fortune = s.fortune,
+                    period = s.period
+                )
+                Column(Modifier.fillMaxSize()) {
+                    FortuneStickyHeader(
                         period = s.period,
                         onPeriodChange = viewModel::setPeriod,
-                        shareCard = ResultShareCards.eastern(
-                            "fortune",
-                            s.period,
-                            s.full,
-                            s.fortune,
-                            s.hourGuides.firstOrNull()?.timeText
-                        )
+                        headline = "${periodTitle(s.period)}八字 ${s.fortune.overallScore} 分",
+                        subtitle = "${s.fortune.dateKey} · 论断干支 ${s.fortune.periodPillarText.ifBlank { s.fortune.dayPillarText }}"
                     )
-                    CardLayouts.ordered(cards, controller.state).forEach { card -> card.content() }
-                    if (controller.state.hiddenCount > 0) {
-                        RestoreCardsBar(controller)
+                    Column(
+                        Modifier
+                            .weight(1f)
+                            .verticalScroll(scrollState)
+                            .padding(bottom = 28.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        FortunePageWidth {
+                            Column(
+                                Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+                                verticalArrangement = Arrangement.spacedBy(16.dp)
+                            ) {
+                                TodayFortuneSection(
+                                    fortune = s.fortune,
+                                    favorable = s.full.chart.favorableElements,
+                                    period = s.period,
+                                    shareCard = ResultShareCards.eastern(
+                                        "fortune",
+                                        s.period,
+                                        s.full,
+                                        s.fortune,
+                                        s.hourGuides.firstOrNull()?.timeText
+                                    )
+                                )
+                                CardLayouts.ordered(cards, controller.state).forEach { card -> card.content() }
+                                if (controller.state.hiddenCount > 0) {
+                                    RestoreCardsBar(controller)
+                                }
+                                Text(
+                                    s.full.note,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
                     }
-                    Text(
-                        s.full.note,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
                 }
             }
         }
@@ -580,38 +600,44 @@ private fun TodayFortuneSection(
     fortune: EasternDailyFortune,
     favorable: List<Element>,
     period: String = "day",
-    onPeriodChange: (String) -> Unit,
     shareCard: com.xuanji.app.ui.components.ShareCard
 ) {
-    FortuneCard(cardId = "fortune", title = "周期运势", shareCard = shareCard) {
-        val periodTitle = when (period) {
-            "week" -> "本周"
-            "month" -> "本月"
-            else -> "今日"
+    val label = periodTitle(period)
+    FortuneCard(cardId = "fortune", title = "${label}命理解说", shareCard = shareCard) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            ScoreRing(fortune.overallScore, caption = "${label}总分")
+            Spacer(Modifier.width(14.dp))
+            Column(Modifier.weight(1f)) {
+                InfoRow("论断干支", fortune.periodPillarText.ifBlank { fortune.dayPillarText })
+                InfoRow("喜用神", favorable.joinToString("、") { elementName(it) })
+                InfoRow("幸运色", fortune.luckyColor)
+                InfoRow("吉利方位", fortune.luckyDirection)
+            }
         }
-        Text("${periodTitle}运势 · ${fortune.dateKey}", style = MaterialTheme.typography.titleMedium)
-        Spacer(Modifier.height(8.dp))
-        PeriodToggleRow(period, onPeriodChange)
-        Spacer(Modifier.height(8.dp))
-        Text(fortune.summary, style = MaterialTheme.typography.bodyLarge)
+        Spacer(Modifier.height(14.dp))
+        FortuneProse(fortune.summary)
         Spacer(Modifier.height(12.dp))
-        ScoreRow("综合", fortune.overallScore)
-        ScoreRow("事业", fortune.careerScore)
-        ScoreRow("财运", fortune.wealthScore)
-        ScoreRow("感情", fortune.loveScore)
-        ScoreRow("健康", fortune.healthScore)
-        Spacer(Modifier.height(8.dp))
-        InfoRow("今日干支", fortune.dayPillarText)
-        InfoRow("喜用神", favorable.joinToString("、") { elementName(it) })
-        InfoRow("幸运色", fortune.luckyColor)
-        InfoRow("吉利方位", fortune.luckyDirection)
-        Spacer(Modifier.height(8.dp))
-        Text(
-            fortune.advice,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
+        FortuneProse(fortune.advice, "怎么办")
+        if (fortune.dimensionNotes.isNotEmpty()) {
+            Spacer(Modifier.height(16.dp))
+            SectionTitle("${label}分项详批")
+            Spacer(Modifier.height(8.dp))
+            FortuneDimensionDetail(fortune.dimensionNotes)
+        }
+        if (fortune.insights.isNotEmpty()) {
+            Spacer(Modifier.height(16.dp))
+            SectionTitle("${label}加减分的依据")
+            Spacer(Modifier.height(8.dp))
+            FortuneInsightList(fortune.insights)
+        }
     }
+}
+
+private fun periodTitle(period: String): String = when (period) {
+    "week" -> "本周"
+    "month" -> "本月"
+    "year" -> "本年"
+    else -> "今日"
 }
 
 @Composable

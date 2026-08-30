@@ -19,6 +19,9 @@ class ProfileViewModel(private val repository: FortuneRepository) : ViewModel() 
     val dailyReminderOn: StateFlow<Boolean> = repository.dailyReminderFlow
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
+    val mysticGuideEnabled: StateFlow<Boolean> = repository.mysticGuideEnabledFlow
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), true)
+
     init {
         viewModelScope.launch {
             repository.userProfileFlow.collect { _profile.value = it }
@@ -63,6 +66,12 @@ class ProfileViewModel(private val repository: FortuneRepository) : ViewModel() 
     fun setDailyReminderOn(enabled: Boolean) {
         viewModelScope.launch {
             repository.setDailyReminderOn(enabled)
+        }
+    }
+
+    fun setMysticGuideEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            repository.setMysticGuideEnabled(enabled)
         }
     }
 }
