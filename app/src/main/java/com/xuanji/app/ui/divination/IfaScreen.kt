@@ -41,7 +41,7 @@ fun IfaScreen() {
     ) {
         Text("艾法预言", style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.primary)
         Text(
-            "约鲁巴文明的艾法预言体系（2008 年列入联合国非遗）：占卜者抛撒棕榈果生成 Odu 卦象，再依求问之事从诗节文集中给出指引。本页以「日期 + 求问内容」确定性生成 16 主 Odu（同题同果，无随机），仅供文化娱乐参考。",
+            "约鲁巴文明的艾法体系（2008 年列入联合国非遗）依赖棕榈果仪式、求问语境与 Ese 口传。本页仅以「日期 + 求问内容」确定性生成 16 主 Odu 名称索引，不替代实际占卜，仅供文化娱乐参考。",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -60,11 +60,13 @@ fun IfaScreen() {
 
         val r = Ifa.divine(today, question, askCount)
         FortuneCard {
-            SectionTitle("Odu · ${r.oduName}")
+            SectionTitle("Odu · ${r.combination.canonicalName}")
             Spacer(Modifier.height(8.dp))
-            Text("二进制模式：${r.binaryPattern}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("离线 256 组合索引：${r.combination.index}（${r.binaryPattern}）", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(Modifier.height(6.dp))
             Text(r.reading, style = MaterialTheme.typography.bodyMedium)
+            Spacer(Modifier.height(6.dp))
+            Text("Ese 经文正文未随应用内置；需要受权传承语料与受训者解读。", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
 
         FortuneCard {

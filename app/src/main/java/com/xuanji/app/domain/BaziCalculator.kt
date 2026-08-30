@@ -161,6 +161,25 @@ object BaziCalculator {
         return pillarFromIndex(idx)
     }
 
+    /** 给定日期的日干支序数（0 = 甲子），供需与八字共用日柱口径的模块调用。 */
+    fun dayPillarIndexForDate(date: LocalDate): Int {
+        val pillar = dayPillarForDate(date)
+        return pillarToIndex(pillar)
+    }
+
+    /** 给定日期的流年柱（立春为界，供年度运势使用） */
+    fun yearPillarForDate(date: LocalDate): Pillar =
+        calcYearPillar(LocalDateTime.of(date.year, date.monthValue, date.dayOfMonth, 12, 0))
+
+    /**
+     * 给定日期的流月柱：以十二「节」为界定月支，再由年干五虎遁推月干。
+     * 与排盘走同一套节气表，故流月干支与本命月柱口径一致。
+     */
+    fun monthPillarForDate(date: LocalDate): Pillar {
+        val noon = LocalDateTime.of(date.year, date.monthValue, date.dayOfMonth, 12, 0)
+        return calcMonthPillar(noon, calcYearPillar(noon).stem)
+    }
+
     // --- 年柱（立春为界） ---
     private fun calcYearPillar(birth: LocalDateTime): Pillar {
         val lichun = getTerm(birth.year, 2) // 立春
@@ -207,9 +226,12 @@ object BaziCalculator {
         return order.indexOf(branch)
     }
 
-    // --- 日柱（精确儒略日） ---
-    private fun calcDayPillar(birth: LocalDateTime): Pillar =
-        dayPillarForDate(LocalDate.of(birth.year, birth.month, birth.dayOfMonth))
+    // --- 日柱（精确儒略日；采用子初换日：23:00 起归入次日） ---
+    private fun calcDayPillar(birth: LocalDateTime): Pillar {
+        val civilDate = LocalDate.of(birth.year, birth.month, birth.dayOfMonth)
+        val baziDate = if (birth.hour == 23) civilDate.plusDays(1) else civilDate
+        return dayPillarForDate(baziDate)
+    }
 
     // --- 时柱 ---
     private fun calcHourPillar(birth: LocalDateTime, dayStem: Stem): Pillar {

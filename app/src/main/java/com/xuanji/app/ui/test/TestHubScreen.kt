@@ -61,7 +61,7 @@ fun TestHubScreen() {
         is TestEntry.Mbti -> TestShell("MBTI 职业性格测试", onBack = { current = null }) { MbtiScreen() }
         is TestEntry.BigFive -> TestShell("大五人格测试", onBack = { current = null }) { BigFiveScreen() }
         is TestEntry.Cattell16 -> TestShell("卡特尔 16PF 人格测试", onBack = { current = null }) { Cattell16Screen() }
-        is TestEntry.Mmpi -> TestShell("MMPI 心理测试", onBack = { current = null }) { MmpiScreen() }
+        is TestEntry.Mmpi -> TestShell("MMPI 风格自我探索", onBack = { current = null }) { MmpiScreen() }
         is TestEntry.Holland -> TestShell("霍兰德职业兴趣测试", onBack = { current = null }) { HollandScreen() }
         is TestEntry.Hogwarts -> TestShell("霍格沃茨学院测试", onBack = { current = null }) { HogwartsScreen() }
         is TestEntry.FunSub -> TestShell("性格 · 趣味合集", onBack = { current = null }) { FunTestsScreen(initialSubTest = entry.sub) }
@@ -127,7 +127,7 @@ private fun TestList(onPick: (TestEntry) -> Unit) {
                 CattellTestIcon, onPick = { onPick(TestEntry.Cattell16) })
             TestCard("霍兰德职业兴趣测试", "60 题 · 六型 RIASEC", "从现实、研究、艺术、社会、企业、常规六种职业兴趣认识你的偏好，生成三码与综合建议。",
                 HollandTestIcon, onPick = { onPick(TestEntry.Holland) })
-            TestCard("瑞文标准推理测验", "12 题 · 图形推理", "经典的非言语推理能力测评，通过图形逻辑题评估你的抽象推理与问题解决能力。",
+            TestCard("文字推理挑战（原创）", "10 题 · 数列/类比", "通过数列与类比进行趣味练习；不是标准瑞文非语言推理测验，不用于能力诊断。",
                 RavenTestIcon, onPick = { onPick(TestEntry.Fun3Sub("Raven")) })
         }
 
@@ -135,7 +135,7 @@ private fun TestList(onPick: (TestEntry) -> Unit) {
         CollapsibleGroup("性格 · 心理", "人格特质、心理倾向与内在动机", personalityOpen, { personalityOpen = !personalityOpen }) {
             TestCard("大五人格测试（Big Five）", "50 题 · 五大维度（OCEAN）", "从开放性、尽责性、外向性、宜人性、神经质五个维度全面认识自己，含超详细解读。",
                 BigFiveTestIcon, onPick = { onPick(TestEntry.BigFive) })
-            TestCard("MMPI 心理测试", "20 题 · 14 个量表", "包含效度量表与临床量表，评估你的心理健康倾向，T 分仅供参考。",
+            TestCard("MMPI 风格自我探索（简版）", "20 题 · 14 个演示维度", "自编的非临床自我探索问卷，不是 MMPI/MMPI-3，演示分数不代表心理健康或诊断。",
                 MmpiTestIcon, onPick = { onPick(TestEntry.Mmpi) })
             TestCard("九型人格", "10 题 · 9 种类型", "经典九型人格测评，识别驱动你行为的核心动机与性格模式。",
                 EnneagramTestIcon, onPick = { onPick(TestEntry.FunSub("Enneagram")) })

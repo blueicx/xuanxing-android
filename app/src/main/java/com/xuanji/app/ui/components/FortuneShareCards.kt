@@ -221,6 +221,7 @@ object ResultShareCards {
     private fun periodLabel(period: String): String = when (period) {
         "week" -> "本周"
         "month" -> "本月"
+        "year" -> "本年"
         else -> "今日"
     }
 }

@@ -194,7 +194,7 @@ private fun Fun3Intro(subTest: String, questionCount: Int, onStart: () -> Unit, 
 private fun Fun3ResultPage(result: Fun3Result, onRestart: () -> Unit, onBackToMenu: () -> Unit) {
     val info = FunTests3.SUBTESTS.first { it.id == result.subTest }
     val category = when (result.subTest) {
-        "Raven" -> "职业"        // 瑞文推理 → 认知能力/职业类
+        "Raven" -> "趣味推理"        // 原创文字推理，不等同瑞文标准测验
         "ColorPsych" -> "性格"   // 颜色心理 → 性格心理类
         else -> "趣味"
     }
@@ -268,7 +268,7 @@ private fun Fun3FbtiBody(result: Fun3Result) {
     }
 }
 
-/** 瑞文的结果:展示对题数与推理等级 */
+/** 原创文字推理挑战结果：展示对题数与趣味等级，不作能力诊断。 */
 @Composable
 private fun Fun3RavenBody(result: Fun3Result) {
     val correct = result.scores["正确"] ?: 0

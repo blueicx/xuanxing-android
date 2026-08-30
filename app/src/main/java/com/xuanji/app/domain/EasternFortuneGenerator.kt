@@ -3,194 +3,189 @@ package com.xuanji.app.domain
 import com.xuanji.app.data.model.BaziChart
 import com.xuanji.app.data.model.EasternDailyFortune
 import com.xuanji.app.data.model.Element
+import com.xuanji.app.data.model.FortuneDimension
 import com.xuanji.app.data.model.Pillar
 import java.time.LocalDate
+import java.time.DayOfWeek
 import java.time.format.DateTimeFormatter
-import kotlin.random.Random
+import java.time.temporal.TemporalAdjusters
 
 /**
- * 东方（八字）每日运势生成器。
- * 基于「今日日干支」与用户「日主 / 喜用神」的关系，得到稳定的每日评分。
- * 同一天结果固定，跨天自然变化。
+ * 东方（八字）周期运势生成器。
+ *
+ * 日 / 周 / 月 / 年 走同一条解盘管线（[EasternPeriodReader]），
+ * 差别只在「用哪一组干支论断」与「怎么加权」：
+ *
+ *  - 日：论当日流日柱，叠当前大运。
+ *  - 周：本周锚定周一，逐日读七日流日柱取平均，再按权重加进流月（六分）与流年（四分）背景。
+ *  - 月：论该日所在节气的流月柱，加流年（五分）背景。
+ *  - 年：论流年柱并按太岁立论，加当下流月（二分）背景。
+ *
+ * 评分与解说出自同一批信号：分数由信号累加，文字由信号展开。
+ * 同一命盘、同一日、同一周期，输出必完全相同。
  */
 object EasternFortuneGenerator {
 
-    fun generate(chart: BaziChart, date: LocalDate): EasternDailyFortune {
-        val dayPillar = BaziCalculator.dayPillarForDate(date)
-        val fav = chart.favorableElements.toSet()
-        val unfav = chart.unfavorableElements.toSet()
-
-        fun contribution(e: Element): Int = when {
-            e in fav -> 14
-            e in unfav -> -10
-            else -> 3
-        }
-        val base = 50 + contribution(dayPillar.stem.element) + contribution(dayPillar.branch.element)
-
-        val seed = run {
-            var s = date.toEpochDay() xor chart.display.hashCode().toLong()
-            if (s == 0L) s = date.toEpochDay()
-            s
-        }
-        val rnd = Random(seed)
-        val jitter = rnd.nextInt(21) - 10
-        val overall = (base + jitter).coerceIn(15, 96)
-
-        fun catScore(): Int = (overall + rnd.nextInt(25) - 12).coerceIn(10, 98)
-        val career = catScore()
-        val wealth = catScore()
-        val love = catScore()
-        val health = catScore()
-
-        val favElem = chart.favorableElements.firstOrNull() ?: Element.EARTH
-        val luckyColor = elementColor(favElem)
-        val luckyDirection = elementDirection(favElem)
-
-        val summary = buildSummary(overall, dayPillar, chart)
-        val advice = "今日日干为「${dayPillar.display}」，五行喜 " +
-            chart.favorableElements.joinToString("、") { elementName(it) } +
-            "。幸运色：$luckyColor；吉利方位：$luckyDirection。宜循序渐进，忌冒进躁动。"
-
-        return EasternDailyFortune(
-            dateKey = date.format(DateTimeFormatter.ISO_LOCAL_DATE),
-            overallScore = overall,
-            careerScore = career,
-            wealthScore = wealth,
-            loveScore = love,
-            healthScore = health,
-            summary = summary,
-            advice = advice,
-            dayPillarText = dayPillar.display,
-            favorableToday = chart.favorableElements,
-            luckyColor = luckyColor,
-            luckyDirection = luckyDirection
-        )
-    }
-
-    private fun buildSummary(overall: Int, dayPillar: Pillar, chart: BaziChart): String {
-        val band = when {
-            overall >= 80 -> "气场通达，诸事顺遂，宜把握良机"
-            overall >= 65 -> "运势上扬，主动出击多有所得"
-            overall >= 50 -> "平稳和顺，按部就班即可"
-            overall >= 35 -> "宜守宜稳，蓄势待发为佳"
-            else -> "宜低调内敛，凡事慎行多思"
-        }
-        return "今日干支「${dayPillar.display}」，日主${elementName(chart.dayMasterElement)}。整体$band。"
-    }
-
-    // --- 五行生克关系评分（与小程序 easternFortune.js 完全对齐） ---
-
-    private val shengMap = mapOf(
-        Element.WOOD to Element.FIRE, Element.FIRE to Element.EARTH,
-        Element.EARTH to Element.METAL, Element.METAL to Element.WATER,
-        Element.WATER to Element.WOOD
-    )
-    private val keMap = mapOf(
-        Element.WOOD to Element.EARTH, Element.EARTH to Element.WATER,
-        Element.WATER to Element.FIRE, Element.FIRE to Element.METAL,
-        Element.METAL to Element.WOOD
+    private val DIM_LABELS = linkedMapOf(
+        "career" to "事业运",
+        "wealth" to "财运",
+        "love" to "感情运",
+        "study" to "学业运",
+        "health" to "健康运"
     )
 
-    private fun relationScore(me: Element, other: Element): Int = when {
-        me == other -> 8          // 同我：比劫
-        shengMap[other] == me -> 12   // 生我：印星
-        shengMap[me] == other -> 2    // 我生：食伤
-        keMap[me] == other -> 5       // 我克：财星
-        keMap[other] == me -> -10     // 克我：官杀
-        else -> 0
-    }
+    /** 兼容旧调用：不传 period 时即今日流日。 */
+    fun generate(chart: BaziChart, date: LocalDate): EasternDailyFortune =
+        generate(chart, date, "day")
 
-    private fun relationName(score: Int) = when (score) {
-        12 -> "印星(生扶)"
-        8 -> "比劫(同气)"
-        5 -> "财星(可得)"
-        2 -> "食伤(泄秀)"
-        -10 -> "官杀(受制)"
-        else -> "平"
-    }
-
-    /** 计算流月干支（简化节气法） */
-    private fun monthPillarForDate(date: LocalDate): Pair<String, Pair<Element, Element>> {
-        // 用日柱推算近似月柱：取当月15日的月支
-        val midDate = LocalDate.of(date.year, date.month, 15)
-        val pillar = BaziCalculator.dayPillarForDate(midDate)
-        return pillar.display to (pillar.stem.element to pillar.branch.element)
-    }
-
-    /** 东方每周运势 — 用本周中位日的日柱做五行分析 */
-    fun generateWeekly(chart: BaziChart, date: LocalDate): EasternDailyFortune {
-        val midDate = date.plusDays(3)
-        val midPillar = BaziCalculator.dayPillarForDate(midDate)
-        return buildByRelation(chart, date, midPillar.display, midPillar.stem.element, midPillar.branch.element, "本周", "week")
-    }
-
-    /** 东方每月运势 — 用流月干支做五行分析 */
-    fun generateMonthly(chart: BaziChart, date: LocalDate): EasternDailyFortune {
-        val (gzText, elements) = monthPillarForDate(date)
-        return buildByRelation(chart, date, gzText, elements.first, elements.second, "本月", "month")
-    }
-
-    private fun buildByRelation(
+    fun generate(
         chart: BaziChart,
         date: LocalDate,
-        pillarGz: String,
-        stemElement: Element,
-        branchElement: Element,
-        periodLabel: String,
-        periodTag: String
+        period: String,
+        dayun: Pillar? = null
     ): EasternDailyFortune {
-        val me = chart.dayMasterElement
-        val fav = chart.favorableElements
-        val unfav = chart.unfavorableElements
-
-        val stemRel = relationScore(me, stemElement)
-        val branchRel = relationScore(me, branchElement)
-        var overall = 50 + stemRel + branchRel
-
-        val periodElems = setOf(stemElement, branchElement)
-        overall += fav.count { it in periodElems } * 6
-        overall += unfav.count { it in periodElems } * (-5)
-
-        overall = overall.coerceIn(15, 96)
-
-        fun cat(base: Int, bonus: Int) = (base + bonus).coerceIn(10, 98)
-        val career = cat(overall, if (stemRel >= 0) 3 else -3)
-        val wealth = cat(overall, if (branchRel >= 0) 3 else -3)
-        val love = cat(overall, if (stemRel > 5 && branchRel > 0) 4 else (if (stemRel < 0) -4 else 0))
-        val health = cat(overall, if (branchRel > 5) 4 else (if (branchRel < 0) -4 else 0))
-
-        val band = when {
-            overall >= 80 -> "气场通达，诸事顺遂，宜把握良机"
-            overall >= 65 -> "运势上扬，主动出击多有所得"
-            overall >= 50 -> "平稳和顺，按部就班即可"
-            overall >= 35 -> "宜守宜稳，蓄势待发为佳"
-            else -> "宜低调内敛，凡事慎行多思"
+        val (reading, periodKey) = when (period) {
+            "week" -> readWeek(chart, date, dayun) to "week"
+            "month" -> readMonth(chart, date, dayun) to "month"
+            "year" -> readYear(chart, date, dayun) to "year"
+            else -> EasternPeriodReader.read(
+                chart, BaziCalculator.dayPillarForDate(date), "今日", dayun
+            ) to "day"
         }
-        val summary = "${periodLabel}干支「$pillarGz」，日主「${elementName(me)}」。天干${relationName(stemRel)}、地支${relationName(branchRel)}。整体$band。"
+        return assemble(chart, date, periodKey, reading)
+    }
 
-        val favElem = fav.firstOrNull() ?: Element.EARTH
-        val luckyColor = elementColor(favElem)
-        val luckyDirection = elementDirection(favElem)
+    fun generateWeekly(chart: BaziChart, date: LocalDate, dayun: Pillar? = null): EasternDailyFortune =
+        generate(chart, date, "week", dayun)
 
-        val advice = "${periodLabel}流期「$pillarGz」，与日主${elementName(me)}形成" +
-            "${relationName(stemRel)}($stemRel)及${relationName(branchRel)}($branchRel)。" +
-            "五行喜 ${fav.joinToString("、") { elementName(it) }}。" +
-            "幸运色：$luckyColor；吉利方位：$luckyDirection。"
+    fun generateMonthly(chart: BaziChart, date: LocalDate, dayun: Pillar? = null): EasternDailyFortune =
+        generate(chart, date, "month", dayun)
+
+    fun generateYearly(chart: BaziChart, date: LocalDate, dayun: Pillar? = null): EasternDailyFortune =
+        generate(chart, date, "year", dayun)
+
+    // ==================================================== 四种周期的论断取数
+
+    /** 周：以周一为锚，七日逐日读数取平均，流月为势、流年为底。 */
+    private fun readWeek(chart: BaziChart, date: LocalDate, dayun: Pillar?): EasternReading {
+        val monday = date.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
+        val days = (0L..6L).map { monday.plusDays(it) }
+        val parts = mutableListOf<Pair<EasternReading, Int>>()
+        days.forEach { d ->
+            val label = WEEK_NAMES[d.dayOfWeek.value - 1]
+            parts += EasternPeriodReader.read(chart, BaziCalculator.dayPillarForDate(d), label, dayun) to 100
+        }
+        parts += EasternPeriodReader.read(chart, BaziCalculator.monthPillarForDate(monday), "本周所值流月", dayun) to 60
+        parts += EasternPeriodReader.read(chart, BaziCalculator.yearPillarForDate(monday), "本周所值流年", dayun) to 40
+        return EasternPeriodReader.merge(parts, "本周")
+    }
+
+    /** 月：流月柱为主，流年为底。 */
+    private fun readMonth(chart: BaziChart, date: LocalDate, dayun: Pillar?): EasternReading {
+        val parts = listOf(
+            EasternPeriodReader.read(chart, BaziCalculator.monthPillarForDate(date), "本月", dayun) to 100,
+            EasternPeriodReader.read(chart, BaziCalculator.yearPillarForDate(date), "本年大势", dayun) to 50
+        )
+        return EasternPeriodReader.merge(parts, "本月")
+    }
+
+    /** 年：流年柱按太岁立论为主，当下所值流月为近景。 */
+    private fun readYear(chart: BaziChart, date: LocalDate, dayun: Pillar?): EasternReading {
+        val parts = listOf(
+            EasternPeriodReader.read(
+                chart, BaziCalculator.yearPillarForDate(date), "本年", dayun, taiSui = true
+            ) to 100,
+            EasternPeriodReader.read(chart, BaziCalculator.monthPillarForDate(date), "当下流月", dayun) to 20
+        )
+        return EasternPeriodReader.merge(parts, "本年")
+    }
+
+    /** 固定中文称谓，避免设备 locale 改变解盘语气 */
+    private val WEEK_NAMES = listOf("周一", "周二", "周三", "周四", "周五", "周六", "周日")
+
+    // ==================================================== 汇总为运势对象
+
+    private fun assemble(
+        chart: BaziChart,
+        date: LocalDate,
+        periodKey: String,
+        reading: EasternReading
+    ): EasternDailyFortune {
+        val overall = (50 + reading.overallDelta).coerceIn(12, 97)
+        fun score(delta: Int): Int = (overall + delta).coerceIn(6, 99)
+
+        val lucky = reading.luckyElement
+        val notes = reading.notes
+        val dims = DIM_LABELS.entries.map { (key, label) ->
+            val delta = when (key) {
+                "career" -> reading.careerDelta
+                "wealth" -> reading.wealthDelta
+                "love" -> reading.loveDelta
+                "study" -> reading.studyDelta
+                else -> reading.healthDelta
+            }
+            FortuneDimension(
+                key = key,
+                label = label,
+                score = score(delta),
+                interpretation = interpret(key, label, score(delta), notes[key], reading)
+            )
+        }
 
         return EasternDailyFortune(
             dateKey = date.format(DateTimeFormatter.ISO_LOCAL_DATE),
             overallScore = overall,
-            careerScore = career,
-            wealthScore = wealth,
-            loveScore = love,
-            healthScore = health,
-            summary = summary,
-            advice = advice,
-            dayPillarText = pillarGz,
-            favorableToday = fav,
-            luckyColor = luckyColor,
-            luckyDirection = luckyDirection,
-            period = periodTag
+            careerScore = score(reading.careerDelta),
+            wealthScore = score(reading.wealthDelta),
+            loveScore = score(reading.loveDelta),
+            healthScore = score(reading.healthDelta),
+            summary = reading.summary,
+            advice = reading.advice,
+            dayPillarText = BaziCalculator.dayPillarForDate(date).display,
+            favorableToday = chart.favorableElements,
+            luckyColor = elementColor(lucky),
+            luckyDirection = elementDirection(lucky),
+            period = periodKey,
+            periodPillarText = reading.pillarText,
+            insights = reading.insights,
+            dimensionNotes = dims,
+            dimensionBasis = notes
         )
     }
+
+    /**
+     * 维度解说：先给这一维的实际得分差，再列命局依据，最后一句怎么办。
+     * 全部取自信号，不套模板。
+     */
+    private fun interpret(
+        key: String,
+        label: String,
+        score: Int,
+        rawNotes: List<String>?,
+        reading: EasternReading
+    ): String {
+        val basis = (rawNotes ?: emptyList()).distinct().take(2)
+        val trend = when {
+            score >= 82 -> "${label}在这段周期里明显得力"
+            score >= 68 -> "${label}偏顺，推一步动一步"
+            score >= 52 -> "${label}持平，全凭日常功夫"
+            score >= 38 -> "${label}受阻，宜减不宜加"
+            else -> "${label}处在低谷，先守住别丢东西"
+        }
+        val text = if (basis.isEmpty()) {
+            "$trend。这段周期${periodWord(reading)}在${label}上没有引发特别的刑冲合会，按常规节奏推进即可。"
+        } else {
+            "$trend。依据是：${basis.joinToString("；")}。"
+        }
+        return text + when (key) {
+            "career" -> if (score >= 68) "该争的位置这周期去争，晚了就得再等一轮。" else "这周期少开口多落纸，把口径留痕比表现自己有用。"
+            "wealth" -> if (score >= 68) "进财的路子会自己冒出来，把该要的钱当面要清。" else "不宜垫资、不宜借出、不宜在这段周期里做大额决策。"
+            "love" -> if (score >= 68) "关系里的气氛是软的，想说的话挑这周期说。" else "话到嘴边减三分，别把情绪的定量说成结论。"
+            "study" -> if (score >= 68) "记东西、出文字的效率高于平时，把最难的放前面。" else "读不进去就别硬读，换成动手的事反而有收获。"
+            else -> if (score >= 68) "精神头足，可以承担更大工作量。" else "作息与饮食先管住，旧毛病这周期容易回头。"
+        }
+    }
+
+    private fun periodWord(reading: EasternReading): String =
+        if (reading.pillarText.isBlank()) "干支" else "「${reading.pillarText}」"
 }
