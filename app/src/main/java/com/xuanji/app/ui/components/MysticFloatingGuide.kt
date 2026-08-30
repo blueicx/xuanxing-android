@@ -297,7 +297,7 @@ private fun MysticImmersiveStage(
 
     Surface(Modifier.fillMaxSize(), color = ink, contentColor = Color(0xFFF4EEE5)) {
         Box(Modifier.fillMaxSize()) {
-            Canvas(Modifier.fillMaxSize()) { StageBackdrop(gold, moodLevel) }
+            Canvas(Modifier.fillMaxSize()) { StageBackdrop(gold, moodLevel, skinId) }
 
             StageFigure(
                 half = half,
@@ -942,6 +942,7 @@ private fun DrawScope.drawMysticFigure(
         drawCulturalCostume(skinId, half, cx, w, h, garment, trim)
         drawSkinAccessory(skinId, half, cx, w, h, trim, hair, headL, headT, headW, headH)
     }
+    drawCultureProp(skinId, cx, w, h, trim)
 }
 
 private fun DrawScope.drawHalfHair(
@@ -2515,7 +2516,45 @@ private fun DrawScope.drawFan(
     )
 }
 
-private fun DrawScope.StageBackdrop(gold: Color, moodLevel: Float) {
+private fun DrawScope.drawCultureProp(skinId: String, cx: Float, w: Float, h: Float, trim: Color) {
+    val y = h * .66f
+    when (MysticCultureSpec.forSkin(skinId).scene) {
+        CulturalScene.JIANGNAN_GARDEN -> drawFan(cx - w * .20f, y, w * .20f, trim)
+        CulturalScene.ACADEMY_ARCHIVE -> {
+            drawRoundRect(Color(0xFFE6D2A7), Offset(cx - w * .21f, y), Size(w * .12f, h * .08f), CornerRadius(w * .012f))
+            drawLine(trim, Offset(cx - w * .20f, y + h * .018f), Offset(cx - w * .10f, y + h * .018f), w * .006f)
+        }
+        CulturalScene.SILKROAD_CARAVANSERAI -> {
+            drawCircle(trim.copy(alpha = .9f), w * .026f, Offset(cx + w * .18f, y + h * .045f))
+            drawLine(trim, Offset(cx + w * .18f, y), Offset(cx + w * .18f, y + h * .02f), w * .006f)
+        }
+        CulturalScene.NORTHLAND_FIRE -> {
+            drawLine(Color(0xFFD58B55), Offset(cx - w * .18f, y + h * .07f), Offset(cx - w * .04f, y + h * .02f), w * .014f)
+            drawLine(Color(0xFFD58B55), Offset(cx - w * .18f, y + h * .02f), Offset(cx - w * .04f, y + h * .07f), w * .014f)
+        }
+        CulturalScene.DAOIST_CLOUD_TERRACE -> {
+            drawRoundRect(Color(0xFFEBD9A8), Offset(cx + w * .10f, y), Size(w * .07f, h * .09f), CornerRadius(w * .008f))
+            drawLine(Color(0xFF8C6A3A), Offset(cx + w * .135f, y + h * .01f), Offset(cx + w * .135f, y + h * .08f), w * .004f)
+        }
+        CulturalScene.CITY_NIGHT -> {
+            drawArc(trim, 180f, 180f, false, style = Stroke(w * .012f), topLeft = Offset(cx + w * .12f, y - h * .01f), size = Size(w * .12f, h * .10f))
+            drawLine(trim, Offset(cx + w * .12f, y + h * .04f), Offset(cx + w * .24f, y + h * .04f), w * .008f)
+        }
+        CulturalScene.DESERT_DUSK -> {
+            drawLine(trim, Offset(cx + w * .14f, y + h * .02f), Offset(cx + w * .14f, y + h * .08f), w * .004f)
+            drawLine(trim, Offset(cx + w * .11f, y + h * .05f), Offset(cx + w * .17f, y + h * .05f), w * .004f)
+            drawLine(trim, Offset(cx + w * .14f, y + h * .02f), Offset(cx + w * .11f, y + h * .05f), w * .004f)
+            drawLine(trim, Offset(cx + w * .14f, y + h * .02f), Offset(cx + w * .17f, y + h * .05f), w * .004f)
+        }
+        CulturalScene.FESTIVAL_COURTYARD -> {
+            drawCircle(Color(0xFFB8462F), w * .045f, Offset(cx - w * .17f, y + h * .05f))
+            drawCircle(trim, w * .012f, Offset(cx - w * .17f, y + h * .05f))
+        }
+        CulturalScene.NEUTRAL_STAGE -> drawCircle(trim.copy(alpha = .65f), w * .014f, Offset(cx, y + h * .04f))
+    }
+}
+
+private fun DrawScope.StageBackdrop(gold: Color, moodLevel: Float, skinId: String) {
     val ink = Color(0xFF0D0817)
     val w = size.width
     val h = size.height
@@ -2527,6 +2566,8 @@ private fun DrawScope.StageBackdrop(gold: Color, moodLevel: Float) {
             endY = h
         )
     )
+
+    drawCulturalScene(MysticCultureSpec.forSkin(skinId), gold, w, h)
 
     repeat(54) { index ->
         val x = ((index * 137.508f) % 100f) / 100f * w
@@ -2593,4 +2634,51 @@ private fun DrawScope.StageBackdrop(gold: Color, moodLevel: Float) {
         },
         Color(0xFF1B1228).copy(alpha = .68f)
     )
+}
+
+private fun DrawScope.drawCulturalScene(spec: MysticCultureSpec, gold: Color, w: Float, h: Float) {
+    val horizon = h * .72f
+    when (spec.scene) {
+        CulturalScene.JIANGNAN_GARDEN -> {
+            repeat(4) { i -> drawArc(Color(0xFF6CA7A1).copy(alpha = .22f), 180f, 180f, false, style = Stroke(w * .004f), topLeft = Offset(w * (.10f + i * .22f), horizon + h * .03f), size = Size(w * .20f, h * .09f)) }
+            drawLine(gold.copy(alpha = .30f), Offset(w * .12f, horizon - h * .07f), Offset(w * .34f, horizon - h * .07f), w * .012f)
+            drawLine(gold.copy(alpha = .30f), Offset(w * .16f, horizon - h * .07f), Offset(w * .16f, horizon), w * .008f)
+            drawLine(gold.copy(alpha = .30f), Offset(w * .30f, horizon - h * .07f), Offset(w * .30f, horizon), w * .008f)
+        }
+        CulturalScene.ACADEMY_ARCHIVE -> {
+            repeat(3) { i -> drawRect(Color(0xFF6C587F).copy(alpha = .20f), Offset(w * (.07f + i * .12f), horizon - h * .23f), Size(w * .09f, h * .23f)) }
+            drawLine(gold.copy(alpha = .28f), Offset(w * .06f, horizon - h * .12f), Offset(w * .45f, horizon - h * .12f), w * .010f)
+        }
+        CulturalScene.SILKROAD_CARAVANSERAI -> {
+            drawArc(Color(0xFFD18D58).copy(alpha = .30f), 180f, 180f, false, style = Stroke(w * .018f), topLeft = Offset(w * .07f, horizon - h * .22f), size = Size(w * .25f, h * .30f))
+            drawCircle(Color(0xFFD18D58).copy(alpha = .45f), w * .018f, Offset(w * .80f, horizon - h * .14f))
+        }
+        CulturalScene.NORTHLAND_FIRE -> {
+            drawLine(Color(0xFFB9784F).copy(alpha = .45f), Offset(w * .30f, horizon), Offset(w * .46f, horizon - h * .08f), w * .018f)
+            drawLine(Color(0xFFB9784F).copy(alpha = .45f), Offset(w * .46f, horizon), Offset(w * .30f, horizon - h * .08f), w * .018f)
+            drawPath(Path().apply { moveTo(w * .38f, horizon - h * .02f); lineTo(w * .43f, horizon - h * .16f); lineTo(w * .48f, horizon - h * .02f); close() }, Color(0xFFE6A04E).copy(alpha = .34f))
+        }
+        CulturalScene.DAOIST_CLOUD_TERRACE -> {
+            repeat(3) { i -> drawArc(Color.White.copy(alpha = .18f), 180f, 180f, false, style = Stroke(w * .012f), topLeft = Offset(w * (.08f + i * .27f), horizon - h * .10f), size = Size(w * .23f, h * .10f)) }
+            drawLine(gold.copy(alpha = .35f), Offset(w * .50f, horizon - h * .30f), Offset(w * .50f, horizon - h * .04f), w * .010f)
+        }
+        CulturalScene.CITY_NIGHT -> {
+            listOf(.08f to .17f, .20f to .28f, .34f to .20f, .49f to .34f, .67f to .24f, .82f to .18f).forEach { (x, height) ->
+                drawRect(Color(0xFF5664B8).copy(alpha = .28f), Offset(w * x, horizon - h * height), Size(w * .10f, h * height))
+            }
+            drawLine(Color(0xFFE07AA7).copy(alpha = .40f), Offset(0f, horizon - h * .04f), Offset(w, horizon - h * .04f), w * .006f)
+        }
+        CulturalScene.DESERT_DUSK -> {
+            drawPath(Path().apply { moveTo(0f, horizon); quadraticBezierTo(w * .24f, horizon - h * .13f, w * .50f, horizon); quadraticBezierTo(w * .76f, horizon - h * .16f, w, horizon - h * .02f); lineTo(w, h); lineTo(0f, h); close() }, Color(0xFFAA704C).copy(alpha = .27f))
+            repeat(5) { i -> drawCircle(gold.copy(alpha = .35f), w * .006f, Offset(w * (.16f + i * .16f), horizon - h * (.16f + (i % 2) * .06f))) }
+        }
+        CulturalScene.FESTIVAL_COURTYARD -> {
+            drawLine(Color(0xFFD26A65).copy(alpha = .42f), Offset(w * .10f, horizon - h * .22f), Offset(w * .90f, horizon - h * .16f), w * .008f)
+            repeat(6) { i ->
+                val x = w * (.14f + i * .14f)
+                drawPath(Path().apply { moveTo(x, horizon - h * (.20f - i % 2 * .02f)); lineTo(x + w * .05f, horizon - h * .10f); lineTo(x + w * .10f, horizon - h * (.20f - i % 2 * .02f)); close() }, Color(0xFFB8462F).copy(alpha = .40f))
+            }
+        }
+        CulturalScene.NEUTRAL_STAGE -> Unit
+    }
 }
