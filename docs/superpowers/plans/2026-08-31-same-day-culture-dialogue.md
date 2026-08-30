@@ -78,6 +78,7 @@ git commit -m "feat: add deterministic same-day music and poetry catalog"
 
 **文件：**
 - 修改：`app/src/main/java/com/xuanji/app/ui/history/HistoryScreen.kt`
+- 创建：`app/src/main/java/com/xuanji/app/ui/history/HistoryCopy.kt`
 - 测试：`app/src/test/kotlin/com/xuanji/app/domain/SameDayWorksTest.kt`
 
 - [ ] **步骤 1：先增加纯函数显示规则测试**
@@ -94,9 +95,9 @@ git commit -m "feat: add deterministic same-day music and poetry catalog"
 运行：`.\gradlew.bat :app:testDebugUnitTest --tests com.xuanji.app.domain.SameDayWorksTest --no-daemon --console=plain`
 预期：FAIL，报错 `Unresolved reference: HistoryCopy`。
 
-- [ ] **步骤 3：实现 Compose 折叠和作品区域**
+- [ ] **步骤 3：实现摘要纯函数、Compose 折叠和作品区域**
 
-使用 `rememberSaveable(fig.name, fig.date) { mutableStateOf(false) }` 保存展开状态；摘要用 `fig.note.substringBefore("。").plus("。")`，全文放进 `AnimatedVisibility(visible = expanded)`，按钮使用 `TextButton` 且 contentDescription 为“展开评语/收起评语”。在同日生列表后调用 `SameDayWorks.forDate(sameDayDate).forEach { SameDayWorkCard(it) }`，公版 `excerpt` 才渲染正文，非公版仅渲染元数据。
+新增 `HistoryCopy.summary(text)`，以首个完整句作为折叠摘要并处理空文本；使用 `rememberSaveable(fig.name, fig.date) { mutableStateOf(false) }` 保存展开状态；全文放进 `AnimatedVisibility(visible = expanded)`，按钮使用 `TextButton` 且 contentDescription 为“展开评语/收起评语”。在同日生列表后调用 `SameDayWorks.forDate(sameDayDate).forEach { SameDayWorkCard(it) }`，公版 `excerpt` 才渲染正文，非公版仅渲染元数据。
 
 - [ ] **步骤 4：运行单测与编译**
 
@@ -106,7 +107,7 @@ git commit -m "feat: add deterministic same-day music and poetry catalog"
 - [ ] **步骤 5：Commit**
 
 ```bash
-git add app/src/main/java/com/xuanji/app/ui/history/HistoryScreen.kt app/src/test/kotlin/com/xuanji/app/domain/SameDayWorksTest.kt
+git add app/src/main/java/com/xuanji/app/ui/history/HistoryScreen.kt app/src/main/java/com/xuanji/app/ui/history/HistoryCopy.kt app/src/test/kotlin/com/xuanji/app/domain/SameDayWorksTest.kt
 git commit -m "feat: collapse same-day notes and show works"
 ```
 
