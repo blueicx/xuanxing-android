@@ -72,12 +72,13 @@ class DefaultMysticDialogueEngine : MysticDialogueEngine {
 
     override fun reply(context: DialogueContext, input: String): DialogueReply {
         val normalizedInput = input.trim().take(200)
-        val intent = classify(normalizedInput)
+        val continuity = MysticDialogueContinuity.resolve(normalizedInput, context.recentTurns)
+        val intent = continuity.intent
         val prefix = MysticGuideGenerator.customAnswerPrefix(normalizedInput)
         val text = MysticGuideGenerator.customAnswer(
             context.mode,
             context.topicKey,
-            normalizedInput,
+            continuity.generationInput,
             context.fortune,
             context.latestTest,
             context.skinId
