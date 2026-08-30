@@ -7,6 +7,8 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.border
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,6 +16,7 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -63,6 +66,15 @@ import com.xuanji.app.domain.MysticClarifierOption
 import com.xuanji.app.domain.MysticInteraction
 import com.xuanji.app.domain.MysticInteractionOption
 import com.xuanji.app.domain.MysticGuideGenerator
+import com.xuanji.app.domain.DefaultMysticDialogueEngine
+import com.xuanji.app.domain.DialogueContext
+import com.xuanji.app.domain.DialogueProvider
+import com.xuanji.app.domain.DialogueRequest
+import com.xuanji.app.domain.OfflineDialogueProvider
+import com.xuanji.app.domain.ProviderResult
+import com.xuanji.app.domain.MysticEvent
+import com.xuanji.app.domain.MysticSessionState
+import com.xuanji.app.domain.reduce
 import com.xuanji.app.domain.MysticOpeningCheckin
 import com.xuanji.app.domain.MysticOpeningOption
 import com.xuanji.app.domain.MysticGuestCameo
@@ -71,6 +83,7 @@ import com.xuanji.app.domain.MysticGuestExit
 import com.xuanji.app.domain.MysticRhythmCheckin
 import com.xuanji.app.domain.MysticSkin
 import com.xuanji.app.domain.MysticVisitMemory
+import com.xuanji.app.domain.MysticMemoryNote as DomainMysticMemoryNote
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.security.MessageDigest
@@ -223,8 +236,25 @@ fun MysticGuideCard(
         memoryExpanded = false
     }
     val latestTest = records.maxByOrNull { it.date }
-    val guide = remember(mode, topic, bazi, fortune, latestTest) {
-        MysticGuideGenerator.generate(mode, topic, bazi, fortune, latestTest)
+    val guide = remember(mode, topic, bazi, fortune, latestTest, companion.skinId) {
+        MysticGuideGenerator.generate(mode, topic, bazi, fortune, latestTest, skinId = companion.skinId)
+    }
+    val dialogueEngine = remember { DefaultMysticDialogueEngine() }
+    val dialogueProvider: DialogueProvider = remember { OfflineDialogueProvider(dialogueEngine) }
+    var sessionState by remember { mutableStateOf(MysticSessionState()) }
+    var pendingCustom by remember(guide) { mutableStateOf<String?>(null) }
+    LaunchedEffect(guide) {
+        sessionState = reduce(
+            sessionState,
+            MysticEvent.ChangeContext(
+                mode = mode,
+                topicKey = guide.topicKey,
+                styleKey = guide.styleKey,
+                skinId = companion.skinId
+            )
+        )
+        // Context changes invalidate any in-flight custom request.
+        pendingCustom = null
     }
     LaunchedEffect(visitProfile, fortune.dateKey) {
         val previousVisit = runCatching { visitStore.read(visitProfile) }.getOrNull()
@@ -253,7 +283,6 @@ fun MysticGuideCard(
     }?.key
     var pendingFollowUp by remember(guide) { mutableStateOf<String?>(null) }
     var pendingInteraction by remember(guide) { mutableStateOf<MysticInteractionOption?>(null) }
-    var pendingCustom by remember(guide) { mutableStateOf<String?>(null) }
     var pendingOpening by remember(guide) { mutableStateOf<MysticOpeningOption?>(null) }
     var openingAnswered by remember(guide) { mutableStateOf(false) }
     var selectedRhythm by remember(guide) { mutableStateOf<String?>(null) }
@@ -278,11 +307,12 @@ fun MysticGuideCard(
             companion.skinId
         )
     }
-    val opening: MysticOpeningCheckin? = remember(mode, guide.topicKey, guide.styleKey, fortune) {
+    val opening: MysticOpeningCheckin? = remember(mode, guide.topicKey, guide.styleKey, companion.skinId, fortune) {
         MysticGuideGenerator.openingCheckin(
             mode,
             guide.topicKey,
             guide.styleKey,
+            companion.skinId,
             fortune
         )
     }
@@ -322,6 +352,7 @@ fun MysticGuideCard(
         if (text.isBlank()) return
         val note = MysticMemoryNote("memory-$kind-$memorySequence", text)
         memoryNotes = (listOf(note) + memoryNotes).take(3)
+        sessionState = reduce(sessionState, MysticEvent.Remember(DomainMysticMemoryNote(note.id, note.text)))
         memorySequence += 1
     }
 
@@ -335,6 +366,7 @@ fun MysticGuideCard(
         if (text.isBlank()) return
         val note = MysticMemoryNote("memory-aside-$memorySequence", text)
         memoryNotes = (listOf(note) + memoryNotes).take(3)
+        sessionState = reduce(sessionState, MysticEvent.Remember(DomainMysticMemoryNote(note.id, note.text)))
         memorySequence += 1
     }
 
@@ -370,10 +402,28 @@ fun MysticGuideCard(
             pendingAsideActionTurnKey != null ||
             openAsideTurnKey != null
         ) return
-        val cleanQuestion = customQuestion.trim().take(60)
+        val cleanQuestion = customQuestion.trim().take(200)
         if (cleanQuestion.isEmpty()) return
+        sessionState = reduce(sessionState, MysticEvent.SendInput(cleanQuestion))
         pendingCustom = cleanQuestion
         customQuestion = ""
+    }
+
+    fun submitPanelInput(text: String) {
+        customQuestion = text
+        submitCustom()
+    }
+
+    fun cancelPanelReply() {
+        val pending = sessionState.requestState as? com.xuanji.app.domain.MysticRequestState.Pending ?: return
+        pendingCustom = null
+        sessionState = reduce(sessionState, MysticEvent.CancelReply(pending.sessionToken, pending.turnId))
+    }
+
+    fun retryPanelReply() {
+        val failed = sessionState.requestState as? com.xuanji.app.domain.MysticRequestState.Failed ?: return
+        sessionState = reduce(sessionState, MysticEvent.RetryTurn)
+        pendingCustom = failed.input
     }
 
     fun selectClarifier(option: MysticClarifierOption) {
@@ -534,7 +584,7 @@ fun MysticGuideCard(
         pendingAsideActionTurnKey = null
     }
 
-    fun switchPersona(targetMode: String) {
+    fun switchPersona(targetMode: String, targetSkinId: String? = null) {
         if (
             pendingFollowUp != null ||
             pendingInteraction != null ||
@@ -559,6 +609,8 @@ fun MysticGuideCard(
         memorySequence = 0
         memoryExpanded = false
         mode = targetMode
+        companion.skinId = targetSkinId
+            ?: MysticGuideGenerator.defaultMysticSkin(targetMode, fortune).id
         onStageModeChange(targetMode)
     }
 
@@ -678,6 +730,7 @@ fun MysticGuideCard(
             mode,
             guide.topicKey,
             guide.styleKey,
+            companion.skinId,
             fortune
         )?.options?.firstOrNull { it.key == option.key }
         val currentStyleKey = MysticGuideGenerator.styleKeyFor(mode, guide.topicKey, fortune)
@@ -856,18 +909,40 @@ fun MysticGuideCard(
 
     LaunchedEffect(pendingCustom, guide) {
         val question = pendingCustom ?: return@LaunchedEffect
+        val requestToken = sessionState.sessionToken
+        val requestTurnId = (sessionState.requestState as? com.xuanji.app.domain.MysticRequestState.Pending)?.turnId
+            ?: return@LaunchedEffect
         kotlinx.coroutines.delay(430)
+        if (requestToken != sessionState.sessionToken) return@LaunchedEffect
+        val dialogueContext = DialogueContext(
+            profileKey = visitProfile,
+            dateKey = fortune.dateKey,
+            mode = mode,
+            styleKey = guide.styleKey,
+            topicKey = guide.topicKey,
+            fortune = fortune,
+            latestTest = latestTest,
+            recentTurns = sessionState.recentTurns,
+            memoryNotes = sessionState.memoryNotes,
+            skinId = companion.skinId,
+            question = question
+        )
+        val providerResult = dialogueProvider.complete(
+            DialogueRequest(dialogueContext, question, requestToken)
+        )
+        if (requestToken != sessionState.sessionToken) {
+            pendingCustom = null
+            return@LaunchedEffect
+        }
+        val dialogueText = when (providerResult) {
+            is ProviderResult.Success -> providerResult.text
+            is ProviderResult.Failure -> "我先把这句记下了，盘面暂时没能接上；稍后再问一次就好。"
+        }
         conversation.add(
             MysticTurn(
                 key = "custom-$customCount-${question.hashCode()}",
                 question = question,
-                answer = "你问：「$question」\n\n" + MysticGuideGenerator.customAnswer(
-                    mode,
-                    guide.topicKey,
-                    question,
-                    fortune,
-                    latestTest
-                ),
+                answer = dialogueText,
                 reaction = MysticGuideGenerator.composeReaction(
                     MysticGuideGenerator.rhythmCarryover(
                         mode,
@@ -895,6 +970,22 @@ fun MysticGuideCard(
             )
         )
         while (conversation.size > 5) conversation.removeAt(0)
+        sessionState = reduce(
+            sessionState,
+            if (providerResult is ProviderResult.Success) {
+                MysticEvent.ReplySucceeded(
+                    requestToken,
+                    requestTurnId,
+                    com.xuanji.app.domain.DialogueReply(dialogueEngine.classify(question), "", dialogueText)
+                )
+            } else {
+                MysticEvent.ReplyFailed(
+                    requestToken,
+                    requestTurnId,
+                    (providerResult as ProviderResult.Failure).reason
+                )
+            }
+        )
         customCount += 1
         interactionCarryoverOption = null
         completedRhythmKey = null
@@ -1068,7 +1159,7 @@ fun MysticGuideCard(
         val (targetMode, targetSkinId) = request
         if (targetMode != mode) {
             pendingSkinId = targetSkinId
-            switchPersona(targetMode)
+            switchPersona(targetMode, targetSkinId)
         } else {
             val index = skins.indexOfFirst { it.id == targetSkinId }
             if (index >= 0) {
@@ -1089,70 +1180,73 @@ fun MysticGuideCard(
     }
 
     if (immersive) {
-        Column(
-            Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            if (revisitLine.isNotBlank()) {
-                MysticStageSpeech(revisitLine, accent)
-            }
-            MysticStageSpeech(guide.arrival, accent)
+        Box(Modifier.fillMaxSize()) {
+            Column(
+                Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(bottom = 86.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                if (revisitLine.isNotBlank()) {
+                    MysticStageSpeech(revisitLine, accent)
+                }
+                MysticStageSpeech(guide.arrival, accent)
 
-            conversation.forEach { turn ->
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                conversation.forEach { turn ->
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                        Surface(
+                            shape = RoundedCornerShape(16.dp),
+                            color = Color.White.copy(alpha = 0.10f)
+                        ) {
+                            Text(
+                                turn.question,
+                                modifier = Modifier.padding(horizontal = 13.dp, vertical = 9.dp),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color(0xFFF4EEE5)
+                            )
+                        }
+                    }
                     Surface(
-                        shape = RoundedCornerShape(16.dp),
-                        color = Color.White.copy(alpha = 0.10f)
+                        shape = RoundedCornerShape(topStart = 4.dp, topEnd = 16.dp, bottomStart = 16.dp, bottomEnd = 16.dp),
+                        color = accent.copy(alpha = 0.13f)
                     ) {
                         Text(
-                            turn.question,
-                            modifier = Modifier.padding(horizontal = 13.dp, vertical = 9.dp),
+                            if (turn.reaction.isBlank()) turn.answer else "${turn.answer}\n\n${turn.reaction}",
+                            modifier = Modifier.padding(horizontal = 13.dp, vertical = 10.dp),
                             style = MaterialTheme.typography.bodySmall,
-                            color = Color(0xFFF4EEE5)
+                            lineHeight = 21.sp,
+                            color = Color(0xFFEFE6D7)
                         )
                     }
                 }
-                Surface(
-                    shape = RoundedCornerShape(topStart = 4.dp, topEnd = 16.dp, bottomStart = 16.dp, bottomEnd = 16.dp),
-                    color = accent.copy(alpha = 0.13f)
-                ) {
+
+                if (pendingCustom != null) {
                     Text(
-                        if (turn.reaction.isBlank()) turn.answer else "${turn.answer}\n\n${turn.reaction}",
-                        modifier = Modifier.padding(horizontal = 13.dp, vertical = 10.dp),
-                        style = MaterialTheme.typography.bodySmall,
-                        lineHeight = 21.sp,
-                        color = Color(0xFFEFE6D7)
+                        "正在推演···",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = accent.copy(alpha = 0.78f)
                     )
                 }
             }
 
-            if (pendingCustom != null) {
-                Text(
-                    "正在推演···",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = accent.copy(alpha = 0.78f)
-                )
-            }
-
-            Row(
-                Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
+            Surface(
+                Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .background(Color(0xFF0D0817).copy(alpha = 0.97f))
+                    .padding(start = 8.dp, end = 8.dp, top = 8.dp, bottom = 18.dp),
+                color = Color.Transparent
             ) {
-                OutlinedTextField(
-                    value = customQuestion,
-                    onValueChange = { if (it.length <= 60) customQuestion = it },
-                    placeholder = { Text("问一句今天的事") },
-                    modifier = Modifier.weight(1f),
-                    singleLine = true,
-                    shape = RoundedCornerShape(16.dp)
+                MysticConversationPanel(
+                    state = sessionState,
+                    onSend = ::submitPanelInput,
+                    onQuickPrompt = ::submitPanelInput,
+                    onCancel = ::cancelPanelReply,
+                    onRetry = ::retryPanelReply,
+                    accent = accent,
+                    showMessages = false
                 )
-                OutlinedButton(
-                    onClick = ::submitCustom,
-                    enabled = customQuestion.isNotBlank() && pendingCustom == null
-                ) {
-                    Text("问")
-                }
             }
         }
         return
@@ -1780,35 +1874,15 @@ fun MysticGuideCard(
                             }
                         }
 
-                        Row(
-                            Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            OutlinedTextField(
-                                value = customQuestion,
-                                onValueChange = { if (it.length <= 60) customQuestion = it },
-                                placeholder = { Text("问一句今天的事") },
-                                modifier = Modifier.weight(1f),
-                                singleLine = true,
-                                shape = RoundedCornerShape(14.dp)
-                            )
-                            OutlinedButton(
-                                onClick = ::submitCustom,
-                                enabled = customQuestion.isNotBlank() &&
-                                    pendingFollowUp == null &&
-                                    pendingInteraction == null &&
-                                    pendingHandoff == null &&
-                                    pendingCustom == null &&
-                                    pendingOpening == null &&
-                                    pendingRhythm == null &&
-                                    !pendingGuest &&
-                                    pendingClarify == null &&
-                                    pendingAsideTurnKey == null
-                            ) {
-                                Text("问")
-                            }
-                        }
+                        MysticConversationPanel(
+                            state = sessionState,
+                            onSend = ::submitPanelInput,
+                            onQuickPrompt = ::submitPanelInput,
+                            onCancel = ::cancelPanelReply,
+                            onRetry = ::retryPanelReply,
+                            accent = accent,
+                            showMessages = false
+                        )
 
                         if (conversation.isNotEmpty()) {
                             Column(
