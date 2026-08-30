@@ -8,6 +8,8 @@
 
 **技术栈：** Kotlin/JUnit4、Jetpack Compose Material3、Canvas、现有离线确定性 hash。
 
+**执行状态（2026-08-31）：** 任务 1–5 已完成；Android 48 项单测、lint（0 errors）和 debug assemble 已通过。手机复测按需求暂缓，未将旧设备截图当作本轮证据。
+
 ---
 
 ### 任务 1：作品目录与同日生模型
