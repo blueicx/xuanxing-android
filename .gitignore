@@ -8,6 +8,9 @@
 *.keystore
 *.p12
 
+# The wrapper jar is the only jar that must be versioned, or ./gradlew cannot run on a fresh clone.
+!gradle/wrapper/gradle-wrapper.jar
+
 # Gradle / IDE / local config
 .gradle/
 .idea/
