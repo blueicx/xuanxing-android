@@ -41,6 +41,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
@@ -283,7 +284,7 @@ fun GameBoardCard(
                         GameBoardChip(
                             label = SmartBoardEngine.labelOf(level),
                             selected = level == difficulty,
-                            modifier = Modifier.weight(1f),
+                            modifier = Modifier.weight(1f).testTag("difficulty-$level"),
                             onClick = { if (!thinking) onDifficultyChange(level) }
                         )
                     }
@@ -457,6 +458,7 @@ private fun BoardGrid(
                                         }
                                     )
                                     .clickable { onSquareTap(square) }
+                                    .testTag("square-$file-$rank")
                                     .semantics {
                                         contentDescription = piece?.let { XiangqiPieceGlyphs.description(it) }
                                             ?: if (isTarget) "可落子格" else "空格"

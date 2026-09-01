@@ -78,4 +78,28 @@ assert(
   "uci row inversion must stay \"'9' - rank\" as documented"
 );
 
+// board UI locators and wording: the instrumented test needs a device to run, so its
+// premises are checked here against the sources it taps instead of being trusted.
+const UI_DIR = path.join(__dirname, '..', 'app', 'src', 'main', 'java', 'com', 'xuanji', 'app', 'ui', 'components', 'game');
+const cardSource = fs.readFileSync(path.join(UI_DIR, 'GameBoardCard.kt'), 'utf8');
+const glyphSource = fs.readFileSync(path.join(UI_DIR, 'XiangqiPieceGlyphs.kt'), 'utf8');
+const uiTestSource = fs.readFileSync(
+  path.join(__dirname, '..', 'app', 'src', 'androidTest', 'kotlin', 'com', 'xuanji', 'app', 'ui', 'components', 'game', 'GameBoardCardTest.kt'),
+  'utf8'
+);
+assert(cardSource.includes(contract.board_ui.square_tag), 'square testTag must stay "square-$file-$rank"');
+assert(cardSource.includes(contract.board_ui.difficulty_tag), 'difficulty testTag must stay "difficulty-$level"');
+contract.board_ui.status_text.forEach((phrase) => {
+  assert(cardSource.includes(`"${phrase}"`), `board status wording missing from GameBoardCard.kt: ${phrase}`);
+});
+assert(cardSource.includes(contract.board_ui.review_template), 'review label changed in GameBoardCard.kt');
+const target = contract.board_ui.legal_target_description;
+assert(cardSource.includes(`"${target}"`), 'legal-target description missing from GameBoardCard.kt');
+assert(uiTestSource.includes(`"${target}"`), 'the instrumented test no longer asserts the legal-target rings');
+contract.board_ui.piece_description_prefixes.forEach((side) => {
+  assert(glyphSource.includes(`"${side}"`), `piece description prefix missing: ${side}`);
+});
+const uiCases = [...uiTestSource.matchAll(/^\s+@Test$/gm)].length;
+assert(uiCases >= 12, `board UI must keep at least 12 instrumented cases, found ${uiCases}`);
+
 console.log('dialogue contract: PASS (' + contract.golden_wording.length + ' golden entries)');

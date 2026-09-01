@@ -62,6 +62,16 @@
     "settled_only": "only checkmate / stalemate / draw results move a number; spectated games are not scored",
     "once_per_session": "a session token tallies at most one result"
   },
+  "board_ui": {
+    "square_tag": "square-$file-$rank",
+    "difficulty_tag": "difficulty-$level",
+    "status_text": ["红方行棋", "黑方行棋", "引擎推演中···"],
+    "review_template": "回放第 $ply/$totalPly 手",
+    "legal_target_description": "可落子格",
+    "piece_description_prefixes": ["红方", "黑方"],
+    "instrumented_test": "app/src/androidTest/.../game/GameBoardCardTest.kt",
+    "note": "the instrumented cases are compiled by assembleDebugAndroidTest but have not been run on a device; their premises are pinned on the JVM by BoardUiFixtureTest"
+  },
   "golden_wording": [
     {"input": "来一盘象棋", "expect": "starts xiangqi, grounded=true", "verify": "GameAutoReplyTest.player_move_marks_engine_turn_pending"},
     {"input": "我执黑", "expect": "acknowledges color choice", "verify": "GameAutoReplyTest.color_change_before_the_first_move_switches_sides"},

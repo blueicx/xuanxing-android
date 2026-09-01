@@ -114,5 +114,5 @@
 | 「继续棋局」说没有存档 | 存档按档案 key 分仓，换档案后读不到上一档案的棋局；先在原档案里「保存棋局」 |
 | 恢复后提示「n 手未通过规则校验」 | 存档尾部被截断或篡改，已回退到最后合法一手；从该手继续下即可，不会静默丢弃整局 |
 | 保存后没有声音/落子音效 | **未实现**：当前未打包音频资源，属已知范围限制，不是开关被关掉 |
-| 棋子字形 | 使用系统字体渲染汉字棋子，未捆绑字体资源；缺字机会退回文字描述（`XiangqiPieceGlyphs.description`） |
-| 测试 | `.\gradlew.bat :app:testDebugUnitTest --console=plain`；契约：`node _dev\dialogue_contract_test.js` |
+| 棋子字形 | 只用系统字体渲染 `XiangqiPieceGlyphs.glyph` 的单个汉字，未捆绑字体，也没有缺字时的可视回退；`description` 仅作为 TalkBack 内容描述 |
+| 测试 | `.\gradlew.bat :app:testDebugUnitTest --console=plain`；契约：`node _dev\dialogue_contract_test.js`（含棋盘 UI 定位符与状态文案交叉校验）；棋盘交互用例在 `app/src/androidTest`，`assembleDebugAndroidTest` 只证明可编译，需接上设备跑 `connectedDebugAndroidTest` 才算运行时证据（当前未执行），其前提由 `BoardUiFixtureTest` 在 JVM 侧钉住 |

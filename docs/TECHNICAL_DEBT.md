@@ -5,17 +5,18 @@
 ## 当前基线
 
 - Android 门禁：`testDebugUnitTest`、`lintDebug`、`assembleDebug` 已建立并在最近一轮通过；lint 当前无 error，剩余主要是既有 unused 参数/变量和 SDK XML 版本提示。
-- Android 测试：纯 Kotlin domain/generator 测试已存在，覆盖对话分类、确定性、离线 provider、会话 token、生成器空输入与棋局规则 / 引擎 / 存档；**尚无 `androidTest` instrumentation 源码集**，UI 交互路径没有可执行测试。
+- Android 测试：纯 Kotlin domain/generator 测试已存在，覆盖对话分类、确定性、离线 provider、会话 token、生成器空输入与棋局规则 / 引擎 / 存档；`app/src/androidTest` 源码集已建立（棋盘 12 项 Compose 交互用例），能被 `assembleDebugAndroidTest` 编译，但**未在设备或 CI 上执行**。
 - 小程序：结构 lint 与 7 项引擎/题库测试已分开执行并通过；双端契约位于 `_dev/dialogue_contract.json`。
 - 设备证据：曾完成 `com.xuanji.app` AVD 安装、启动、综合/东方/西方浮球、召回舞台和关闭回浮球截图，证据保存在 `.superpowers/round46-*`。没有把当前无在线设备误报为实体机验证。
 - 同日生增强：`SameDayWorks` 已加入确定性音乐/诗歌卡，`HistoryCopy` 与 `AnimatedVisibility` 支持长评语折叠；后续可继续扩充经过版权核验的作品元数据。
 - B+C 视觉：`MysticCultureSpec` 已为 8 个皮肤提供结构化道具和舞台场景；后续仍需设备上检查人物比例、遮挡和不同屏幕密度的视觉细节。
 - 对话承接：`MysticDialogueContinuity` 已让省略式追问继承最近主题；后续应继续扩充中英文标点、连续 5 轮、换 persona/皮肤和跨端 golden wording。
-- 棋局功能（2026-09-01）：三个切片已交付并通过门禁。
+- 棋局功能（2026-09-01）：四个切片已交付并通过门禁。
   1. 引擎与对话：`SmartBoardEngine`（alpha-beta，难度 2/3/4 层 + 开局库）成为默认应手，走子后自动串接引擎回包，新增难度切换、换色 / 观战、威胁扫描、残局目录、重做与和棋措辞。
   2. 棋盘 UI：难度选择、回放控件、落子滑动动画（系统动画时长为 0 时跳过）、吃子记录与 TalkBack 描述。
   3. 持久化：「保存棋局 / 继续棋局 / 战绩」经 `GameArchive` + `GameArchiveStore` 落 DataStore，恢复时逐手过规则校验并回报被丢弃的尾部手数，战绩按 session token 去重且只记已结算对局；存档不含角色评语。
-  证据：`:app:testDebugUnitTest` 198 项通过（其中棋局相关 150 项）、`:app:lintDebug` 0 error、`:app:assembleDebug` 产出 APK、`node _dev/dialogue_contract_test.js` PASS（22 条 golden wording，并与 Kotlin 源码交叉校验）。**以上均为本机 JVM/编译证据，棋局 UI 未在设备执行。**
+  4. 交互测试：新增 `app/src/androidTest` 源码集与 Compose UI-Test 依赖，`GameBoardCardTest` 用坐标 `testTag` 驱动选子 / 落子 / 取消 / 难度 / 回放 / 思考锁 / 吃子记录 12 项用例；其前提由 `BoardUiFixtureTest` 在 JVM 上钉住，`_dev/dialogue_contract.json` 新增 `board_ui` 段交叉校验定位符与状态文案。
+  证据：`:app:testDebugUnitTest` 201 项通过（其中棋局相关 153 项）、`:app:lintDebug` 0 error、`:app:assembleDebug` 与 `:app:assembleDebugAndroidTest` 均产出 APK、`node _dev/dialogue_contract_test.js` PASS（22 条 golden wording，含 UI 定位符交叉校验，改坏一处状态文案即失败）。**以上均为本机 JVM/编译证据，12 项棋盘交互用例未在设备执行。**
   Pikafish UCI 协议 parser 与显式降级 seam 已交付。
 
 ## P1：继续拆分大文件
@@ -51,9 +52,9 @@
 - **围棋 GTP/KataGo**：仅有 `GoSessionAdapter` 契约（无 provider 返回 `go_provider_not_enabled`）；未实现规则、未接引擎、未显示模拟棋盘。
 - **国际象棋 Stockfish**：仅有 `ChessEngineAdapter` 契约（返回 `chess_provider_not_enabled`）与 FEN 起始局面值对象；未实现规则。
 - **落子音效**：**未实现**。仓库无音频资源，未接 `SoundPool`，也不引入在线素材；需要设计确认音源与许可后再补。
-- **棋子字形**：直接用系统字体渲染汉字棋子，未捆绑字体资源；缺字时退回 `XiangqiPieceGlyphs.description` 文字描述。若需保证跨机型一致，需要引入开源中文字体子集并核对许可。
+- **棋子字形**：直接用系统字体渲染 `XiangqiPieceGlyphs.glyph` 的单个汉字，未捆绑字体资源，也没有缺字时的可视回退——`description` 只作为 TalkBack 内容描述，不参与绘制。若需保证跨机型一致，需要引入开源中文字体子集并核对许可。
 - **引擎强度上限**：`SmartBoardEngine` 只有 alpha-beta + 简单子力/位置评估，无置换表、无静态搜索（quiescence）、无迭代加深，深度上限 4 层；horizon effect 与末端漏算未解决，不宣称任何等级分。
-- **UI 交互测试**：`app/src/androidTest` 源码集与依赖仍需建立；即便建立，也只在 CI/设备上真正运行后才算证据，`assembleDebugAndroidTest` 通过仅代表可编译。
+- **UI 交互测试执行**：`app/src/androidTest` 源码集与依赖已建立，`assembleDebugAndroidTest` 只能证明可编译；12 项棋盘用例尚未在任何设备或 CI 上跑过一次，真实点击结果、焦点顺序与动画豁免仍需运行时证据。
 - **设备复测**：棋盘 UI（浮球关闭/召回不丢局、TalkBack、reduced-motion）尚无实机证据；恢复设备验证时需重新采集 `adb devices`、安装、启动、截图与 Logcat，不以旧截图替代。
 
 ## P1：真实语料与官方常模接入条件
