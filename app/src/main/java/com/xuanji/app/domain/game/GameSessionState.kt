@@ -36,6 +36,22 @@ data class GameSessionState(
         history.takeLastWhile { it.captured == null }.size >= NO_CAPTURE_LIMIT -> "no_capture_limit"
         else -> null
     }
+
+    /**
+     * Board view after [ply] halfmoves of this session. Replayed through [XiangqiRules]
+     * from [startPosition], so a review frame is a position that was really on the board
+     * rather than a UI-side guess. Clamped: ply >= history.size returns the live position.
+     */
+    fun positionAt(ply: Int): BoardPosition {
+        val target = ply.coerceIn(0, history.size)
+        if (target == history.size) return position
+        var rebuilt = startPosition
+        for (move in history.take(target)) {
+            val applied = XiangqiRules.apply(rebuilt, move) as? RuleResult.Applied ?: return position
+            rebuilt = applied.position
+        }
+        return rebuilt
+    }
 }
 
 sealed interface GameEvent {

@@ -66,6 +66,48 @@ class GameSessionReducerTest {
         assertEquals(state, reduceGame(state, GameEvent.Undo(state.sessionToken)))
     }
 
+    /** Red rook shuffles on file 0, then captures the black soldier on the third halfmove. */
+    private fun captureSession(): GameSessionState {
+        val position = XiangqiBoard.empty(PlayerColor.RED)
+            .withPiece(Square(3, 9), Piece(PlayerColor.RED, PieceKind.GENERAL))
+            .withPiece(Square(5, 0), Piece(PlayerColor.BLACK, PieceKind.GENERAL))
+            .withPiece(Square(0, 9), Piece(PlayerColor.RED, PieceKind.ROOK))
+            .withPiece(Square(0, 5), Piece(PlayerColor.BLACK, PieceKind.SOLDIER))
+        var state = reduceGame(
+            GameSessionState(sessionToken = 8L),
+            GameEvent.Start(GameType.XIANGQI, token = 9L, position = position)
+        )
+        for (move in listOf(
+            BoardMove(Square(0, 9), Square(0, 8), "车一进一"),
+            BoardMove(Square(5, 0), Square(4, 0), "将5平4"),
+            BoardMove(Square(0, 8), Square(0, 5), "车一平五")
+        )) {
+            val applied = reduceGame(state, GameEvent.ApplyMove(state.sessionToken, move))
+            assertTrue("move ${move.from}->${move.to} rejected", applied != state)
+            state = applied
+        }
+        return state
+    }
+
+    @Test
+    fun position_at_replays_the_frame_that_was_really_on_the_board() {
+        val state = captureSession()
+        assertEquals(3, state.history.size)
+        assertEquals(Piece(PlayerColor.RED, PieceKind.ROOK), state.positionAt(1).pieceAt(Square(0, 8)))
+        // the soldier is alive one ply before the capture and gone right after it
+        assertEquals(
+            Piece(PlayerColor.BLACK, PieceKind.SOLDIER),
+            state.positionAt(2).pieceAt(Square(0, 5))
+        )
+        assertEquals(Piece(PlayerColor.RED, PieceKind.ROOK), state.positionAt(3).pieceAt(Square(0, 5)))
+        assertNull(state.positionAt(3).pieceAt(Square(0, 8)))
+        assertEquals(state.startPosition, state.positionAt(0))
+        assertEquals(state.position, state.positionAt(state.history.size))
+        // clamped: anything past the last ply is the live position, never a guess
+        assertEquals(state.position, state.positionAt(state.history.size + 5))
+        assertEquals(state.startPosition, state.positionAt(-3))
+    }
+
     @Test
     fun cancel_clears_pending_request_only_for_matching_token() {
         val state = started(9L).let { s ->

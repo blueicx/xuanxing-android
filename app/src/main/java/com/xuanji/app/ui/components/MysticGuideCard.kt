@@ -85,6 +85,7 @@ import com.xuanji.app.domain.MysticSkin
 import com.xuanji.app.domain.MysticVisitMemory
 import com.xuanji.app.domain.MysticMemoryNote as DomainMysticMemoryNote
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import java.security.MessageDigest
 
@@ -245,6 +246,8 @@ fun MysticGuideCard(
     var gameSession by remember { mutableStateOf(com.xuanji.app.domain.game.GameSessionState()) }
     var gameReply by remember { mutableStateOf("") }
     var gameInputEcho by remember { mutableStateOf<String?>(null) }
+    var gameThinking by remember { mutableStateOf(false) }
+    var gameViewPly by remember { mutableStateOf<Int?>(null) }
     val gameBridge = remember { com.xuanji.app.domain.game.GameDialogueBridge() }
     var pendingCustom by remember(guide) { mutableStateOf<String?>(null) }
     LaunchedEffect(guide) {
@@ -413,6 +416,42 @@ fun MysticGuideCard(
         customQuestion = ""
     }
 
+    /**
+     * Run one board action off the main thread, then keep playing until the human is to
+     * move again. The local search blocks while it evaluates, and spectating hands both
+     * sides to the engine, so a single command can produce several replies. Board state
+     * only changes through a bridge result — every move shown already passed the rules
+     * re-check inside the reducer.
+     */
+    fun driveGame(
+        echo: String? = null,
+        action: (com.xuanji.app.domain.game.GameSessionState) -> com.xuanji.app.domain.game.GameDialogueBridge.Result
+    ) {
+        if (gameThinking) return
+        gameThinking = true
+        gameViewPly = null
+        coroutineScope.launch(kotlinx.coroutines.Dispatchers.Default) {
+            suspend fun publish(result: com.xuanji.app.domain.game.GameDialogueBridge.Result) {
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    gameSession = result.state
+                    if (result.reply.isNotBlank()) gameReply = result.reply
+                    if (echo != null && (result.event != null || result.grounded)) gameInputEcho = echo
+                }
+            }
+            var result = action(gameSession)
+            publish(result)
+            while (result.awaitEngine && isActive) {
+                result = gameBridge.engineReply(result.state)
+                publish(result)
+            }
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) { gameThinking = false }
+        }
+    }
+
+    fun runGameText(text: String, echo: String = text) {
+        driveGame(echo) { gameBridge.handle(it, text) }
+    }
+
     fun submitPanelInput(text: String) {
         // Game path first: board-game intents bypass the generic pendingCustom reply so
         // character game commentary never mixes with fortune template wording.
@@ -421,10 +460,7 @@ fun MysticGuideCard(
             com.xuanji.app.domain.MysticIntent.Game ||
             gameBridge.activeGame(gameSession)
         if (gameIntent) {
-            val result = gameBridge.handle(gameSession, cleanText)
-            gameSession = result.state
-            if (result.reply.isNotBlank()) gameReply = result.reply
-            gameInputEcho = if (result.event != null || result.grounded) cleanText else null
+            runGameText(cleanText)
             return
         }
         customQuestion = text
@@ -1258,35 +1294,30 @@ fun MysticGuideCard(
                 Column {
                     if (gameBridge.activeGame(gameSession)) {
                         com.xuanji.app.ui.components.game.GameBoardCard(
-                            position = gameSession.position,
+                            position = gameSession.positionAt(gameViewPly ?: gameSession.history.size),
                             history = gameSession.history,
+                            viewPly = gameViewPly,
+                            outcome = gameSession.outcome,
+                            lineColor = Color(skin.garment),
+                            boardColor = Color(skin.back),
+                            difficulty = gameSession.difficulty,
+                            thinking = gameThinking,
+                            canRedo = gameSession.redo.isNotEmpty(),
                             onSquareTap = { tap ->
-                                val result = gameBridge.applySquareMove(
-                                    gameSession,
-                                    from = tap.first,
-                                    to = tap.second
-                                )
-                                gameSession = result.state
-                                if (result.reply.isNotBlank()) gameReply = result.reply
+                                driveGame {
+                                    gameBridge.applySquareMove(it, from = tap.first, to = tap.second)
+                                }
                             },
-                            onUndo = {
-                                val result = gameBridge.handle(gameSession, "悔棋")
-                                gameSession = result.state
-                                if (result.reply.isNotBlank()) gameReply = result.reply
+                            onUndo = { runGameText("悔棋") },
+                            onRedo = { runGameText("重做这一手") },
+                            onHint = { runGameText("给我提示") },
+                            onExit = { runGameText("退出棋局") },
+                            onRestart = { runGameText("来一盘象棋") },
+                            onDifficultyChange = { level ->
+                                runGameText(com.xuanji.app.domain.game.SmartBoardEngine.labelOf(level))
                             },
-                            onHint = {
-                                val result = gameBridge.handle(gameSession, "给我提示")
-                                if (result.reply.isNotBlank()) gameReply = result.reply
-                            },
-                            onExit = {
-                                val result = gameBridge.handle(gameSession, "退出棋局")
-                                gameSession = result.state
-                                gameReply = result.reply
-                            },
-                            onRestart = {
-                                val result = gameBridge.handle(gameSession, "来一盘象棋")
-                                gameSession = result.state
-                                if (result.reply.isNotBlank()) gameReply = result.reply
+                            onStep = { ply ->
+                                gameViewPly = ply.takeIf { it < gameSession.history.size }
                             },
                             footer = if (gameReply.isNotBlank()) {
                                 {

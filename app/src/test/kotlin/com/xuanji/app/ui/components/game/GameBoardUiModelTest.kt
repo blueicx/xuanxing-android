@@ -1,5 +1,7 @@
 package com.xuanji.app.ui.components.game
 
+import com.xuanji.app.domain.game.BoardMove
+import com.xuanji.app.domain.game.GameOutcome
 import com.xuanji.app.domain.game.Piece
 import com.xuanji.app.domain.game.PieceKind
 import com.xuanji.app.domain.game.PlayerColor
@@ -58,5 +60,32 @@ class GameBoardUiModelTest {
         val model = GameBoardUiModel.from(XiangqiBoard.initial(), null)
         assertNull(model.pieces[Square(4, 5)])
         assertFalse(model.pieces.containsKey(Square(4, 4)))
+    }
+
+    @Test
+    fun draw_label_requires_the_session_verdict() {
+        val position = XiangqiBoard.initial()
+        // rules alone never call a draw: repetition and the quiet-move limit live in the session
+        assertNull(GameBoardUiModel.from(position, null).outcomeText)
+        assertEquals("和棋", GameBoardUiModel.from(position, null, outcome = GameOutcome.Draw).outcomeText)
+    }
+
+    @Test
+    fun review_slice_never_leaks_a_later_capture() {
+        val first = BoardMove(Square(0, 9), Square(0, 8), "车一进一", player = PlayerColor.RED)
+        val reply = BoardMove(Square(5, 0), Square(4, 0), "将5平4", player = PlayerColor.BLACK)
+        val capture = BoardMove(
+            Square(0, 8),
+            Square(0, 5),
+            "车一平五",
+            captured = "卒",
+            player = PlayerColor.RED
+        )
+        val history = listOf(first, reply, capture)
+        assertEquals(listOf("卒"), GameBoardUiModel.from(XiangqiBoard.initial(), null, history).capturedByRed)
+        // the frame two plies back has not captured anything yet
+        val reviewed = GameBoardUiModel.from(XiangqiBoard.initial(), null, history.take(2))
+        assertTrue(reviewed.capturedByRed.isEmpty())
+        assertTrue(reviewed.capturedByBlack.isEmpty())
     }
 }
