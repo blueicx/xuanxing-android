@@ -212,6 +212,10 @@ object XiangqiNotation {
         }
     }
 
+    /** Human-readable square name for dialogue: 1-based column (file) and rank. */
+    fun coordinate(square: Square): String =
+        "第${square.file + 1}列第${square.rank + 1}线"
+
     // ---- UCI --------------------------------------------------------------------
 
     /** uci uses file letters a..i (file 0 = a) and row digits where Black back rank = '0', Red = '9'. */

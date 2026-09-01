@@ -94,6 +94,7 @@ data class GameBoardUiModel(
                 is GameOutcome.Checkmate -> "绝杀，${if (outcome.winner == PlayerColor.RED) "红方" else "黑方"}胜"
                 is GameOutcome.Stalemate -> "困毙，${if (outcome.winner == PlayerColor.RED) "红方" else "黑方"}胜"
                 is GameOutcome.Check -> "将军"
+                GameOutcome.Draw -> "和棋"
                 else -> null
             }
             // whose general is attacked right now (drives the pulsing highlight)

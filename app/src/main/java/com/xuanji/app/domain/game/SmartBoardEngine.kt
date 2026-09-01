@@ -11,7 +11,7 @@ import kotlinx.coroutines.withContext
  * Search convention: [evaluate] and every node score are from the ROOT side's
  * perspective; maximizing nodes are root-side turns, minimizing nodes are the opponent.
  */
-class SmartBoardEngine(private val difficulty: String = "normal") : BoardEngine {
+class SmartBoardEngine(private val difficulty: String = NORMAL) : BoardEngine {
 
     override suspend fun bestMove(position: BoardPosition, color: PlayerColor, token: Long): EngineResult =
         withContext(Dispatchers.Default) {
@@ -25,11 +25,7 @@ class SmartBoardEngine(private val difficulty: String = "normal") : BoardEngine 
             openingBookMove(position, color)?.let { return@withContext EngineResult.Move(EngineTurn(it)) }
             val legal = XiangqiRules.legalMoves(position, color)
             if (legal.isEmpty()) return@withContext EngineResult.NoMove("no_legal_move")
-            val depth = when (difficulty) {
-                "hard" -> 4
-                "normal" -> 3
-                else -> 2
-            }
+            val depth = depthOf(difficulty)
             var bestMove: BoardMove? = null
             var bestScore = Int.MIN_VALUE
             var alpha = Int.MIN_VALUE + 1
@@ -136,6 +132,33 @@ class SmartBoardEngine(private val difficulty: String = "normal") : BoardEngine 
 
     companion object {
         private const val MATE_SCORE = 100000
+
+        const val EASY = "easy"
+        const val NORMAL = "normal"
+        const val HARD = "hard"
+
+        /** Difficulty vocabulary shared by the dialogue bridge and the board UI. */
+        val LEVELS: List<String> = listOf(EASY, NORMAL, HARD)
+
+        fun depthOf(difficulty: String): Int = when (difficulty) {
+            HARD -> 4
+            NORMAL -> 3
+            else -> 2
+        }
+
+        fun labelOf(difficulty: String): String = when (difficulty) {
+            HARD -> "困难"
+            NORMAL -> "普通"
+            else -> "轻松"
+        }
+
+        /** Map a free-text difficulty request onto a known level; null when unrecognized. */
+        fun parseLabel(text: String): String? = when {
+            text.contains("困难") || text.contains("高手") || text.contains("最强") -> HARD
+            text.contains("简单") || text.contains("轻松") || text.contains("新手") -> EASY
+            text.contains("普通") || text.contains("标准") -> NORMAL
+            else -> null
+        }
 
         private val PIECE_VALUE = mapOf(
             PieceKind.GENERAL to 10000,
