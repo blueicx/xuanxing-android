@@ -242,6 +242,10 @@ fun MysticGuideCard(
     val dialogueEngine = remember { DefaultMysticDialogueEngine() }
     val dialogueProvider: DialogueProvider = remember { OfflineDialogueProvider(dialogueEngine) }
     var sessionState by remember { mutableStateOf(MysticSessionState()) }
+    var gameSession by remember { mutableStateOf(com.xuanji.app.domain.game.GameSessionState()) }
+    var gameReply by remember { mutableStateOf("") }
+    var gameInputEcho by remember { mutableStateOf<String?>(null) }
+    val gameBridge = remember { com.xuanji.app.domain.game.GameDialogueBridge() }
     var pendingCustom by remember(guide) { mutableStateOf<String?>(null) }
     LaunchedEffect(guide) {
         sessionState = reduce(
@@ -410,6 +414,19 @@ fun MysticGuideCard(
     }
 
     fun submitPanelInput(text: String) {
+        // Game path first: board-game intents bypass the generic pendingCustom reply so
+        // character game commentary never mixes with fortune template wording.
+        val cleanText = text.trim().take(200)
+        val gameIntent = com.xuanji.app.domain.MysticIntentClassifier.classify(cleanText) ==
+            com.xuanji.app.domain.MysticIntent.Game ||
+            gameBridge.activeGame(gameSession)
+        if (gameIntent) {
+            val result = gameBridge.handle(gameSession, cleanText)
+            gameSession = result.state
+            if (result.reply.isNotBlank()) gameReply = result.reply
+            gameInputEcho = if (result.event != null || result.grounded) cleanText else null
+            return
+        }
         customQuestion = text
         submitCustom()
     }
@@ -1238,15 +1255,63 @@ fun MysticGuideCard(
                     .padding(start = 8.dp, end = 8.dp, top = 8.dp, bottom = 18.dp),
                 color = Color.Transparent
             ) {
-                MysticConversationPanel(
-                    state = sessionState,
-                    onSend = ::submitPanelInput,
-                    onQuickPrompt = ::submitPanelInput,
-                    onCancel = ::cancelPanelReply,
-                    onRetry = ::retryPanelReply,
-                    accent = accent,
-                    showMessages = false
-                )
+                Column {
+                    if (gameBridge.activeGame(gameSession)) {
+                        com.xuanji.app.ui.components.game.GameBoardCard(
+                            position = gameSession.position,
+                            onSquareTap = { tap ->
+                                val from = tap.first
+                                val to = tap.second
+                                val move = com.xuanji.app.domain.game.BoardMove(
+                                    from = from,
+                                    to = to,
+                                    notation = "",
+                                    player = gameSession.position.sideToMove
+                                )
+                                val result = gameBridge.handle(gameSession, com.xuanji.app.domain.game.XiangqiNotation.format(move, gameSession.position))
+                                gameSession = result.state
+                                if (result.reply.isNotBlank()) gameReply = result.reply
+                            },
+                            onUndo = {
+                                val result = gameBridge.handle(gameSession, "悔棋")
+                                gameSession = result.state
+                                if (result.reply.isNotBlank()) gameReply = result.reply
+                            },
+                            onHint = {
+                                val result = gameBridge.handle(gameSession, "给我提示")
+                                if (result.reply.isNotBlank()) gameReply = result.reply
+                            },
+                            onExit = {
+                                val result = gameBridge.handle(gameSession, "退出棋局")
+                                gameSession = result.state
+                                gameReply = result.reply
+                            },
+                            footer = if (gameReply.isNotBlank()) {
+                                {
+                                    Text(
+                                        text = gameReply,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = Color(0xFFEFE6D7),
+                                        modifier = Modifier.semantics {
+                                            contentDescription = "基于当前局面的棋局解说"
+                                        }
+                                    )
+                                }
+                            } else {
+                                null
+                            }
+                        )
+                    }
+                    MysticConversationPanel(
+                        state = sessionState,
+                        onSend = ::submitPanelInput,
+                        onQuickPrompt = ::submitPanelInput,
+                        onCancel = ::cancelPanelReply,
+                        onRetry = ::retryPanelReply,
+                        accent = accent,
+                        showMessages = false
+                    )
+                }
             }
         }
         return
