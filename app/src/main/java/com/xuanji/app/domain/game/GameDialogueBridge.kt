@@ -59,6 +59,50 @@ class GameDialogueBridge(
 
     // ---- commands ----------------------------------------------------------------
 
+    /**
+     * Grid tap path: the UI already knows from/to squares, so this bypasses notation
+     * parsing entirely (eliminating same-file two-rook ambiguity). The move is still
+     * fully re-verified by [XiangqiRules] — identical discipline to typed moves.
+     */
+    fun applySquareMove(state: GameSessionState, from: Square, to: Square): Result {
+        val position = state.position
+        val piece = position.pieceAt(from)
+            ?: return Result(null, "起始格没有棋子。", state, grounded = true)
+        if (piece.color != position.sideToMove) {
+            return Result(
+                null,
+                "现在轮到${if (position.sideToMove == PlayerColor.RED) "红方" else "黑方"}行棋。",
+                state,
+                grounded = true
+            )
+        }
+        val notation = XiangqiNotation.format(
+            BoardMove(from, to, "", player = piece.color),
+            position
+        )
+        val result = XiangqiRules.apply(position, BoardMove(from, to, notation, player = piece.color))
+        return when (result) {
+            is RuleResult.Applied -> {
+                val next = reduceGame(state, GameEvent.ApplyMove(state.sessionToken, result.move))
+                val capture = result.move.captured?.let { "，吃掉${it}" } ?: ""
+                val outcome = XiangqiRules.outcome(result.position)
+                val outcomeText = when (outcome) {
+                    is GameOutcome.Checkmate -> "绝杀！${if (outcome.winner == PlayerColor.RED) "红方" else "黑方"}胜。"
+                    is GameOutcome.Stalemate -> "困毙！${if (outcome.winner == PlayerColor.RED) "红方" else "黑方"}胜。"
+                    is GameOutcome.Check -> "将军！"
+                    else -> ""
+                }
+                Result(
+                    GameEvent.ApplyMove(state.sessionToken, result.move),
+                    "已走「${result.move.notation}」$capture。$outcomeText",
+                    next,
+                    grounded = true
+                )
+            }
+            is RuleResult.Rejected -> Result(null, describeRejection(result.code), state, grounded = true)
+        }
+    }
+
     private fun startGame(state: GameSessionState, input: String): Result {
         val token = state.sessionToken + 1
         val next = reduceGame(state, GameEvent.Start(GameType.XIANGQI, token))

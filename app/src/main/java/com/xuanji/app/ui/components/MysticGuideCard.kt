@@ -1259,16 +1259,13 @@ fun MysticGuideCard(
                     if (gameBridge.activeGame(gameSession)) {
                         com.xuanji.app.ui.components.game.GameBoardCard(
                             position = gameSession.position,
+                            history = gameSession.history,
                             onSquareTap = { tap ->
-                                val from = tap.first
-                                val to = tap.second
-                                val move = com.xuanji.app.domain.game.BoardMove(
-                                    from = from,
-                                    to = to,
-                                    notation = "",
-                                    player = gameSession.position.sideToMove
+                                val result = gameBridge.applySquareMove(
+                                    gameSession,
+                                    from = tap.first,
+                                    to = tap.second
                                 )
-                                val result = gameBridge.handle(gameSession, com.xuanji.app.domain.game.XiangqiNotation.format(move, gameSession.position))
                                 gameSession = result.state
                                 if (result.reply.isNotBlank()) gameReply = result.reply
                             },
@@ -1285,6 +1282,11 @@ fun MysticGuideCard(
                                 val result = gameBridge.handle(gameSession, "退出棋局")
                                 gameSession = result.state
                                 gameReply = result.reply
+                            },
+                            onRestart = {
+                                val result = gameBridge.handle(gameSession, "来一盘象棋")
+                                gameSession = result.state
+                                if (result.reply.isNotBlank()) gameReply = result.reply
                             },
                             footer = if (gameReply.isNotBlank()) {
                                 {
