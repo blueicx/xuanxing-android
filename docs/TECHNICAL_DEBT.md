@@ -5,6 +5,7 @@
 ## 当前基线
 
 - Android 门禁：`testDebugUnitTest`、`lintDebug`、`assembleDebug` 已建立并在最近一轮通过；lint 当前无 error，剩余主要是既有 unused 参数/变量和 SDK XML 版本提示。
+- CI（`.github/workflows/build.yml`，2026-09-02 才可用）：此前 `Build Debug APK` 在 `eb4c3bb`/`887e1ee`/`7dc3b52` 连续失败且 Gradle 从未启动，因此**没有任何历史 CI 证据可引用**。两个根因已分别修复：`1dbe42f` 去掉 `sdkmanager` 中不存在的包 `build-tools;34.0`（真实包为 `34.0.0`，未知包会使该步骤退出码 1）；`457dc7a` 为 `.gitignore` 的笼统 `*.jar` 添加 `!gradle/wrapper/gradle-wrapper.jar` 例外并入库 wrapper jar——在此之前仓库从未 tracked 任何 jar，任何 fresh clone 运行 `./gradlew` 都会 `ClassNotFoundException: org.gradle.wrapper.GradleWrapperMain`，这不止是 CI 问题。`457dc7a` 的运行结果为 pass（7m20s，`BUILD SUCCESSFUL in 6m 41s`，产出 `xuanxing-debug-apk`）。CI 覆盖范围仅 `testDebugUnitTest` + `lintDebug` + `assembleDebug`；instrumented `app/src/androidTest`、真机与 DataStore 运行时行为不在其中，仍按下列条目视为未验证。
 - Android 测试：纯 Kotlin domain/generator 测试已存在，覆盖对话分类、确定性、离线 provider、会话 token、生成器空输入与棋局规则 / 引擎 / 存档 / 解释事实，以及本机长期记忆的编解码与存储（`PreferenceBridge` 用内存假桥，不需 Robolectric 即可验证读写与清除）；`app/src/androidTest` 源码集已建立（棋盘 12 项 Compose 交互用例），能被 `assembleDebugAndroidTest` 编译，但**未在设备或 CI 上执行**。
 - 小程序：结构 lint 与 7 项引擎/题库测试已分开执行并通过；双端契约位于 `_dev/dialogue_contract.json`。
 - 设备证据：曾完成 `com.xuanji.app` AVD 安装、启动、综合/东方/西方浮球、召回舞台和关闭回浮球截图，证据保存在 `.superpowers/round46-*`。没有把当前无在线设备误报为实体机验证。
@@ -19,10 +20,10 @@
   证据：`:app:testDebugUnitTest` 201 项通过（其中棋局相关 153 项）、`:app:lintDebug` 0 error、`:app:assembleDebug` 与 `:app:assembleDebugAndroidTest` 均产出 APK、`node _dev/dialogue_contract_test.js` PASS（22 条 golden wording，含 UI 定位符交叉校验，改坏一处状态文案即失败）。**以上均为本机 JVM/编译证据，12 项棋盘交互用例未在设备执行。**
   Pikafish UCI 协议 parser 与显式降级 seam 已交付。
 
-- 棋局解释与陪伴记忆（2026-09-02）：两个切片已交付并通过本机门禁。
+- 棋局解释与陪伴记忆（2026-09-02）：两个切片已交付并通过门禁。
   5. 讲棋：`BoardExplanation` 用 `XiangqiRules.legalMoves` 做回吃判定（先把攻击方挪到目标格再问能否合法吃回），`GameDialogueBridge` 新增 `WHY`「这步为什么不好」与 `SAFER`「换个稳一点的走法」，威胁报告与走子后评注改为区分「有子能回吃」与「没人能吃回，属于白送」，难度只决定话量；契约新增 `explanation` 段，扫描措辞禁词并断言 `SmartBoardEngine.evaluate` 仍为 `private`。
   6. 本机长期记忆：`RecollectionCodec`（三种 `RecollectionKind`、20 条上限、`dropped` 计数、损坏即诚实降级）+ `PreferenceBridge` seam + `ConversationMemoryStore`（key `talk_memory_<sha256>`，UTF-8 摘要）+ `MysticGuideGenerator.recallLine` + `MysticGuideCard` 接线（按档案载入、8 处用户动作写入、现场手记面板列表与「清除本机长期记忆」按钮）。契约新增 `conversation_memory` 段，把种类枚举、上限、键前缀互斥、召回措辞与 48dp/TalkBack 全部对齐源码。
-  证据：`:app:testDebugUnitTest` 264 项通过（0 失败 0 跳过）、`:app:lintDebug` 0 error（仅既有 `AutoboxingStateCreation` info 提示）、`:app:assembleDebug` 与 `:app:assembleDebugAndroidTest` 均成功、`node _dev/dialogue_contract_test.js` PASS（26 条 golden wording）。**全部为本机 JVM/编译证据**：DataStore 真机往返与跨进程存活、清除是否真的释放磁盘记录、召回句在气泡里的排布、清除按钮的实机触摸目标与 TalkBack 播报、困难档 `safest` 在低端机上的耗时，均未验证。
+  证据：`:app:testDebugUnitTest` 264 项通过（0 失败 0 跳过）、`:app:lintDebug` 0 error（仅既有 `AutoboxingStateCreation` info 提示）、`:app:assembleDebug` 与 `:app:assembleDebugAndroidTest` 均成功、`node _dev/dialogue_contract_test.js` PASS（26 条 golden wording）。其中 `testDebugUnitTest` / `lintDebug` / `assembleDebug` 已在 `457dc7a` 的干净 Linux runner 上重跑通过（见上方 CI 条目），`assembleDebugAndroidTest` 与契约脚本仍只有本机证据。二者都只是 JVM/编译证据：DataStore 真机往返与跨进程存活、清除是否真的释放磁盘记录、召回句在气泡里的排布、清除按钮的实机触摸目标与 TalkBack 播报、困难档 `safest` 在低端机上的耗时，均未验证。
 
 ## P1：继续拆分大文件
 
