@@ -1,0 +1,53 @@
+{
+  "version": 1,
+  "defaultMode": "offline",
+  "game_intents": {
+    "start_xiangqi": ["来一盘象棋", "来一盘中国象棋", "下一盘象棋", "陪我下象棋", "开一局象棋"],
+    "start_go": ["来一盘围棋"],
+    "start_chess": ["来一盘国际象棋"],
+    "move": ["走炮二平五", "马八进七", "炮二平五", "马8进7"],
+    "undo": ["悔棋"],
+    "hint": ["给我提示", "提示"],
+    "review": ["复盘刚才那步", "复盘"],
+    "exit": ["退出棋局"],
+    "save": ["保存棋局"],
+    "legality_question": ["马八进七这步能走吗", "这步能走吗"]
+  },
+  "game_events": ["Start", "ApplyMove", "EngineReply", "Undo", "Cancel", "Exit"],
+  "board_encoding": {
+    "square": "file 0..8 (left to right), rank 0..9 (rank 0 = black back rank, rank 9 = red back rank)",
+    "fenLike": "rows top(black rank 0) to bottom(red rank 9), uppercase = red, lowercase = black, side suffix ' r'/' b'",
+    "initial": "rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C5C1/9/RNBAKABNR r",
+    "uci": "file letter a..i (file 0 = a), row digit '9'-'rank' (rank 9 -> '0')"
+  },
+  "token_drop_rule": "any GameEvent whose token != state.sessionToken returns the state unchanged; Start/Exit reset the session",
+  "grounded_reply_required": true,
+  "rejection_codes": ["from_empty", "wrong_turn", "illegal_move", "self_check", "game_over"],
+  "unavailable_games": {
+    "go": "go_provider_not_enabled",
+    "chess": "chess_provider_not_enabled"
+  },
+  "golden_wording": [
+    {"input": "来一盘象棋", "expect": "starts xiangqi, grounded=true"},
+    {"input": "我执黑", "expect": "acknowledges color choice"},
+    {"input": "走炮二平五", "expect": "applies real move from (7,7) to (4,7)"},
+    {"input": "马八进七", "expect": "applies real move from (1,9) to (2,7)"},
+    {"input": "马八进七这步能走吗", "expect": "answers legality from rules, no turn consumed"},
+    {"input": "兵九进五", "expect": "rejects as illegal, names it as unplayable"},
+    {"input": "悔棋", "expect": "undoes one full round"},
+    {"input": "给我提示", "expect": "returns one real legal move as offline suggestion"},
+    {"input": "复盘刚才那步", "expect": "describes last real move with capture info"},
+    {"input": "退出棋局", "expect": "resets session to empty"},
+    {"input": "我运势不错这步一定赢", "expect": "refuses cross-domain claim, keeps legality focus"},
+    {"input": "保存棋局", "expect": "saves position+moves only, no character commentary"},
+    {"input": "来一盘围棋", "expect": "explicitly unavailable: go_provider_not_enabled"},
+    {"input": "来一盘国际象棋", "expect": "explicitly unavailable: chess_provider_not_enabled"}
+  ],
+  "everyday_guards": [
+    {"input": "你好", "expectIntent": "greeting"},
+    {"input": "今天运势怎么样", "expectIntent": "fortune"},
+    {"input": "最近睡眠不好", "expectIntent": "health"},
+    {"input": "最近财运如何", "expectIntent": "wealth"},
+    {"input": "车厘子好吃吗", "expectIntent": "chat"}
+  ]
+}

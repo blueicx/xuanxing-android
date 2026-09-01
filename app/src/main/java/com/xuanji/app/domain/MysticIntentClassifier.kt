@@ -5,7 +5,34 @@ object MysticIntentClassifier {
     fun classify(question: String): MysticIntent {
         val q = question.trim().lowercase()
         val normalized = q.trimEnd('.', ',', '，', '。', '!', '！', '?', '？', '~', '～')
-        return casual(normalized) ?: topic(q)
+        return casual(normalized) ?: game(normalized) ?: topic(q)
+    }
+
+    /**
+     * Game intents: starting a board game, board-game moves/commands. Runs before the
+     * topic classifier so "走炮二平五" is never eaten by generic wording, and guards
+     * Everyday wording (车厘子 / 将军肚) from being misread as game commands.
+     */
+    private fun game(q: String): MysticIntent? {
+        val isStart = setOf("来一盘", "来一局", "下一盘", "下一局", "下一把", "开一盘", "开一局", "陪我下")
+            .any { q.contains(it) } && (q.contains("象棋") || q.contains("围棋") || q.contains("国际象棋"))
+        val isCommand = q == "悔棋" || q.contains("悔棋") ||
+            (q.contains("提示") && q.length <= 8) ||
+            q.contains("复盘") || q.contains("退出棋局") || q.contains("保存棋局") ||
+            q.contains("执黑") || q.contains("执红")
+        val isNotation = isMoveNotation(q)
+        return if (isStart || isCommand || isNotation) MysticIntent.Game else null
+    }
+
+    private fun isMoveNotation(q: String): Boolean {
+        val body = q.removePrefix("走").removePrefix("下").trim()
+        if (body.length !in 3..5) return false
+        val pieceChar = body.first()
+        if (pieceChar !in "车俥马傌相象仕士帅将炮砲兵卒") return false
+        val hasVerb = body[1] in "进退平" || (body.length >= 3 && body[2] in "进退平")
+        val hasNumeral = body.any { it in "一二三四五六七八九123456789" }
+        // guard: 车厘子/将军肚-style everyday words contain a piece char but no verb+numeral
+        return hasVerb && hasNumeral
     }
 
     private fun casual(q: String): MysticIntent? = when {

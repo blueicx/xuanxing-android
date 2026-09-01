@@ -21,7 +21,8 @@ enum class MysticIntent(val value: String) {
     Why("why"),
     Care("care"),
     Outcome("outcome"),
-    Action("action")
+    Action("action"),
+    Game("game")
 }
 
 data class DialogueContext(
