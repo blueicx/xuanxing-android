@@ -256,4 +256,14 @@ class GameArchiveTest {
             GameRecord(wins = 2, draws = 1, lastResult = "和").summaryText()
         )
     }
+
+    @Test
+    fun settled_note_uses_the_same_words_as_the_scoreboard() {
+        assertEquals("象棋·胜", GameRecord.settledNote("win"))
+        assertEquals("象棋·负", GameRecord.settledNote("loss"))
+        assertEquals("象棋·和", GameRecord.settledNote("draw"))
+        // 没有结算就没有一行——调用方拿到空串，什么也不会记进长期记忆。
+        assertEquals("", GameRecord.settledNote(null))
+        assertEquals("", GameRecord.settledNote("resigned"))
+    }
 }

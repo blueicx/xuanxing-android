@@ -91,9 +91,9 @@ data class GameRecord(
     val games: Int get() = wins + losses + draws
 
     fun tally(result: String?): GameRecord = when (result) {
-        "win" -> copy(wins = wins + 1, lastResult = "胜")
-        "loss" -> copy(losses = losses + 1, lastResult = "负")
-        "draw" -> copy(draws = draws + 1, lastResult = "和")
+        "win" -> copy(wins = wins + 1, lastResult = resultLabel(result))
+        "loss" -> copy(losses = losses + 1, lastResult = resultLabel(result))
+        "draw" -> copy(draws = draws + 1, lastResult = resultLabel(result))
         else -> this
     }
 
@@ -101,5 +101,21 @@ data class GameRecord(
         "还没有已结束的棋局。"
     } else {
         "战绩 $wins 胜 $losses 负 $draws 和，共 $games 局。" + if (lastResult.isNotEmpty()) "上一局$lastResult。" else ""
+    }
+
+    companion object {
+        /** 结算令牌到战绩板上那一个字；没有对应令牌就没有说法。 */
+        fun resultLabel(result: String?): String = when (result) {
+            "win" -> "胜"
+            "loss" -> "负"
+            "draw" -> "和"
+            else -> ""
+        }
+
+        /** 长期记忆里的终局一行；没结算就返回空串，调用方因此无从伪造。 */
+        fun settledNote(result: String?): String {
+            val label = resultLabel(result)
+            return if (label.isEmpty()) "" else "象棋·$label"
+        }
     }
 }
