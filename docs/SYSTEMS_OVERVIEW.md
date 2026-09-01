@@ -10,7 +10,7 @@
 
 ## 对话与会话
 
-`MysticDialogueEngine` 负责输入分类和确定性本地回复，`MysticSessionState`/`reduce` 负责会话 token、上下文切换及旧异步结果丢弃。记忆仅接收用户主动输入或选择，不把生成内容伪装成长期记忆。
+`MysticDialogueEngine` 负责输入分类和确定性本地回复，`MysticSessionState`/`reduce` 负责会话 token、上下文切换及旧异步结果丢弃。跨会话的「本机长期记忆」由 `RecollectionKind` 限定种类，只有用户原话、用户主动选择与已结算棋局结果三种，生成文案在类型上无处可放，因此「不把生成内容伪装成长期记忆」不再依赖调用方自觉（见「本机长期记忆」一节）。
 
 意图规范化已抽到 `MysticIntentClassifier`，供 generator 与 engine 共用，避免两套关键词表继续漂移。
 
@@ -22,9 +22,20 @@ B+C 视觉方案采用统一人物骨架加文化道具和场景层：每个 `sk
 
 ## 棋局会话（2026-09）
 
-交流面板已接入真实中国象棋：`domain/game` 提供纯 Kotlin 规则核心（`XiangqiBoard`/`XiangqiRules`/`XiangqiNotation`）、会话级分析（`BoardAnalysis` 威胁扫描、`EndgameCatalog` 残局）、搜索引擎（`SmartBoardEngine`）、`GameSessionState`/`reduceGame` 会话 reducer 与 `GameDialogueBridge` 意图桥。游戏意图（`MysticIntent.Game`）优先于通用运势分类；游戏回复走独立卡片路径，不经过 `pendingCustom` 文本模板。角色棋局话术只引用 `BoardMove`/`RuleResult`/`GameOutcome` 中的事实，运势数据不参与棋局结论，反之亦然。Android 侧 `_dev/dialogue_contract.json` 由 `_dev/dialogue_contract_test.js` 直接与 Kotlin 源码交叉校验（事件枚举、错误码、判和措辞、存档字段、棋盘 UI 定位符与状态文案），文档措辞与代码漂移会导致契约测试失败。
+交流面板已接入真实中国象棋：`domain/game` 提供纯 Kotlin 规则核心（`XiangqiBoard`/`XiangqiRules`/`XiangqiNotation`）、会话级分析（`BoardAnalysis` 威胁扫描、`EndgameCatalog` 残局）、搜索引擎（`SmartBoardEngine`）、`GameSessionState`/`reduceGame` 会话 reducer 与 `GameDialogueBridge` 意图桥。游戏意图（`MysticIntent.Game`）优先于通用运势分类；游戏回复走独立卡片路径，不经过 `pendingCustom` 文本模板。角色棋局话术只引用 `BoardMove`/`RuleResult`/`GameOutcome` 中的事实，运势数据不参与棋局结论，反之亦然。Android 侧 `_dev/dialogue_contract.json` 由 `_dev/dialogue_contract_test.js` 直接与 Kotlin 源码交叉校验（事件枚举、错误码、判和措辞、存档字段、棋盘 UI 定位符与状态文案、`explanation` 与 `conversation_memory` 两段），文档措辞与代码漂移会导致契约测试失败。
 
 棋局异步纪律与会话一致：`GameEvent` 携带 token，token 不匹配即原样丢弃；悔棋一次回退一整回合并从初始局面重放恢复（含被吃子），重做沿 `redo` 列表逐手回放。默认引擎是 `SmartBoardEngine`（纯 Kotlin alpha-beta，难度对应 2/3/4 层搜索，红方开局走内置开局库），玩家走完后由 `Result.awaitEngine` 串接自动应手，「观战」模式下引擎走双方；`OfflineBoardEngine` 只保留为 `PikafishEngine` 的降级回退与测试接缝，`PikafishEngine` 的 UCI seam 已就绪但未打包原生引擎，所有请求显式回退。判和是会话级规则（三次重复局面 / 连续 60 个无吃子半回合，见 `GameSessionState.drawReason()`），`XiangqiRules.outcome` 本身不返回和棋。「保存棋局 / 继续棋局 / 战绩」由 `GameArchive`（FEN 起点 + UCI 棋谱）与 `GameArchiveStore` 落到 DataStore，恢复时逐手重放过规则校验、被拒的尾部手数显式回报；存档只含局面与棋谱，不含角色评语。围棋（GTP）与国际象棋（UCI）仅保留契约与 adapter，无 provider 时明确返回「尚未启用」。运行模式、指令清单、许可边界与排障见 `docs/BOARD_GAME_INTEGRATION.md`。
+
+棋局解释（2026-09-02）：`BoardExplanation` 只从 `XiangqiRules` 取事实——哪个子被谁盯住、攻击方落子后己方能否合法回吃——角色据此说清「这步为什么不好」「换个稳一点的走法」，措辞里不含胜率、等级分或任何强度数字，`SmartBoardEngine.evaluate` 保持 `private` 由契约脚本守住。细节见 `docs/BOARD_GAME_INTEGRATION.md` §2.3。
+
+## 本机长期记忆（2026-09-02）
+
+- **存什么**：只存用户自己打的字（`user_input`）、用户在卡面上主动点过的选项（`user_choice`）、以及棋盘规则已判定结束的棋局结果（`settled_game_result`）。角色生成的评语、现场手记文本一律不进这条路径。
+- **存哪里**：共享 `preferencesDataStore("xuanji_prefs")`，key 为 `talk_memory_<sha256(profileKey)>`（UTF-8 摘要），与 `game_save_` / `game_record_` / `mystic_visit_` / `card_layout_` / `user_profile` 互斥，换命盘读不到别人的记录。读写经 `PreferenceBridge` seam，因此 JVM 侧能用内存假桥验证存取与清除，而不只验证 JSON 编解码。
+- **上限与诚实降级**：本机最多留 20 条，超出挤掉最旧一条并把数量计入随记忆一起落盘的 `dropped`；「从没存过」与「存了但读不出来」是两种状态，后者必须明说「本机记录读不出来，这次不引旧话」，不假装什么都没丢。
+- **说什么**：召回文案的唯一输入是 `RecallFacts`（日期、话题键、终局结果、清理数、可读性），里面不含用户原话，所以角色只会说「你聊过「事业、财富」」而不会复述原句；开场句只陈述进来时本机已有的内容，本次访问新记的东西不改写它。
+- **可见与可清**：「现场手记」面板新增「本机长期记忆」区，列出最近 3 条与总数、说明只存哪三类，并提供「清除本机长期记忆」按钮（≥48dp，带 TalkBack 描述）；清除只删自己那一个键并立即回空态。卡面上的「重开对话」与切换 persona 只清会话状态，不动长期记忆。
+- **未验证**：真机上 DataStore 往返与跨进程存活、清除是否真的释放磁盘记录、召回句在气泡里的排布、按钮的实机触摸目标与播报，目前只有 JVM 与编译证据。
 
 ## Provider seam
 

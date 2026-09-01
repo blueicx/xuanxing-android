@@ -5,7 +5,7 @@
 ## 当前基线
 
 - Android 门禁：`testDebugUnitTest`、`lintDebug`、`assembleDebug` 已建立并在最近一轮通过；lint 当前无 error，剩余主要是既有 unused 参数/变量和 SDK XML 版本提示。
-- Android 测试：纯 Kotlin domain/generator 测试已存在，覆盖对话分类、确定性、离线 provider、会话 token、生成器空输入与棋局规则 / 引擎 / 存档；`app/src/androidTest` 源码集已建立（棋盘 12 项 Compose 交互用例），能被 `assembleDebugAndroidTest` 编译，但**未在设备或 CI 上执行**。
+- Android 测试：纯 Kotlin domain/generator 测试已存在，覆盖对话分类、确定性、离线 provider、会话 token、生成器空输入与棋局规则 / 引擎 / 存档 / 解释事实，以及本机长期记忆的编解码与存储（`PreferenceBridge` 用内存假桥，不需 Robolectric 即可验证读写与清除）；`app/src/androidTest` 源码集已建立（棋盘 12 项 Compose 交互用例），能被 `assembleDebugAndroidTest` 编译，但**未在设备或 CI 上执行**。
 - 小程序：结构 lint 与 7 项引擎/题库测试已分开执行并通过；双端契约位于 `_dev/dialogue_contract.json`。
 - 设备证据：曾完成 `com.xuanji.app` AVD 安装、启动、综合/东方/西方浮球、召回舞台和关闭回浮球截图，证据保存在 `.superpowers/round46-*`。没有把当前无在线设备误报为实体机验证。
 - 同日生增强：`SameDayWorks` 已加入确定性音乐/诗歌卡，`HistoryCopy` 与 `AnimatedVisibility` 支持长评语折叠；后续可继续扩充经过版权核验的作品元数据。
@@ -18,6 +18,11 @@
   4. 交互测试：新增 `app/src/androidTest` 源码集与 Compose UI-Test 依赖，`GameBoardCardTest` 用坐标 `testTag` 驱动选子 / 落子 / 取消 / 难度 / 回放 / 思考锁 / 吃子记录 12 项用例；其前提由 `BoardUiFixtureTest` 在 JVM 上钉住，`_dev/dialogue_contract.json` 新增 `board_ui` 段交叉校验定位符与状态文案。
   证据：`:app:testDebugUnitTest` 201 项通过（其中棋局相关 153 项）、`:app:lintDebug` 0 error、`:app:assembleDebug` 与 `:app:assembleDebugAndroidTest` 均产出 APK、`node _dev/dialogue_contract_test.js` PASS（22 条 golden wording，含 UI 定位符交叉校验，改坏一处状态文案即失败）。**以上均为本机 JVM/编译证据，12 项棋盘交互用例未在设备执行。**
   Pikafish UCI 协议 parser 与显式降级 seam 已交付。
+
+- 棋局解释与陪伴记忆（2026-09-02）：两个切片已交付并通过本机门禁。
+  5. 讲棋：`BoardExplanation` 用 `XiangqiRules.legalMoves` 做回吃判定（先把攻击方挪到目标格再问能否合法吃回），`GameDialogueBridge` 新增 `WHY`「这步为什么不好」与 `SAFER`「换个稳一点的走法」，威胁报告与走子后评注改为区分「有子能回吃」与「没人能吃回，属于白送」，难度只决定话量；契约新增 `explanation` 段，扫描措辞禁词并断言 `SmartBoardEngine.evaluate` 仍为 `private`。
+  6. 本机长期记忆：`RecollectionCodec`（三种 `RecollectionKind`、20 条上限、`dropped` 计数、损坏即诚实降级）+ `PreferenceBridge` seam + `ConversationMemoryStore`（key `talk_memory_<sha256>`，UTF-8 摘要）+ `MysticGuideGenerator.recallLine` + `MysticGuideCard` 接线（按档案载入、8 处用户动作写入、现场手记面板列表与「清除本机长期记忆」按钮）。契约新增 `conversation_memory` 段，把种类枚举、上限、键前缀互斥、召回措辞与 48dp/TalkBack 全部对齐源码。
+  证据：`:app:testDebugUnitTest` 264 项通过（0 失败 0 跳过）、`:app:lintDebug` 0 error（仅既有 `AutoboxingStateCreation` info 提示）、`:app:assembleDebug` 与 `:app:assembleDebugAndroidTest` 均成功、`node _dev/dialogue_contract_test.js` PASS（26 条 golden wording）。**全部为本机 JVM/编译证据**：DataStore 真机往返与跨进程存活、清除是否真的释放磁盘记录、召回句在气泡里的排布、清除按钮的实机触摸目标与 TalkBack 播报、困难档 `safest` 在低端机上的耗时，均未验证。
 
 ## P1：继续拆分大文件
 
@@ -35,11 +40,14 @@
 
 交流面板已新增统一的消息/请求状态控件，后续只需继续扩充 golden wording，不再为每个入口维护独立的输入状态。
 
+persona 命名漂移（本轮接线时发现，未在本轮处理）：同两个模式在 `MysticGuideCard.kt` 叫「玄学家 / 半仙」、在 `MysticFloatingGuide.kt` 叫「慈翁 / 魔师」、`MysticOrb.kt` 的 TalkBack 里还有第三种「玄师」，且浮球动画速度靠字符串比较 `"魔师"` 分支。这是用户能直接看见的身份不一致，应单开一片收口（统一到一个枚举 + 一份 label 表，动画改为按枚举分支），不与棋局/记忆功能混做。
+
 ## P2：可访问性与运动偏好
 
 - 浮球保持 52dp 视觉尺寸和可点击语义；继续用 UI dump 或 TalkBack 实机检查焦点顺序。
 - reduced-motion 已关闭浮球位移和持续旋转；后续检查完整舞台呼吸动画、键盘导航和旋转/返回键状态恢复。
 - 复测 safe area：浮球不遮挡分数卡、底部导航和系统手势区。
+- 本机长期记忆面板：召回句在气泡里的排布、「清除本机长期记忆」的焦点顺序与实机 48dp 命中区、清除后是否回到空态，均只有源码级证据；恢复设备验证时按 TalkBack 顺序复测，不以截图替代。
 - 本轮手机复测暂缓，恢复时优先覆盖同日生折叠按钮的 TalkBack 标签、作品卡阅读顺序和舞台文化场景的对比度。
 
 ## P2：Provider seam
@@ -55,6 +63,8 @@
 - **棋子字形**：直接用系统字体渲染 `XiangqiPieceGlyphs.glyph` 的单个汉字，未捆绑字体资源，也没有缺字时的可视回退——`description` 只作为 TalkBack 内容描述，不参与绘制。若需保证跨机型一致，需要引入开源中文字体子集并核对许可。
 - **引擎强度上限**：`SmartBoardEngine` 只有 alpha-beta + 简单子力/位置评估，无置换表、无静态搜索（quiescence）、无迭代加深，深度上限 4 层；horizon effect 与末端漏算未解决，不宣称任何等级分。
 - **UI 交互测试执行**：`app/src/androidTest` 源码集与依赖已建立，`assembleDebugAndroidTest` 只能证明可编译；12 项棋盘用例尚未在任何设备或 CI 上跑过一次，真实点击结果、焦点顺序与动画豁免仍需运行时证据。
+- **解释的边界**：`safest` 只按「走完后己方被盯住的子数」挑一手，看一步、无静态搜索、候选数按难度封顶（6/14/40），低端机耗时未实测；不做开局名与战术术语表（无来源即编造），不显示任何强度数字。
+- **记忆的边界**：本机长期记忆是 20 条滚动缓冲，只有整体清除一个动作，没有逐条删除与导出；同 kind+日期+文本会去重，因此同一天重复的终局结果只记一次——它不是第二个战绩板。
 - **设备复测**：棋盘 UI（浮球关闭/召回不丢局、TalkBack、reduced-motion）尚无实机证据；恢复设备验证时需重新采集 `adb devices`、安装、启动、截图与 Logcat，不以旧截图替代。
 
 ## P1：真实语料与官方常模接入条件

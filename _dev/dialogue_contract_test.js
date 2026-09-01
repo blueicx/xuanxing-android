@@ -50,17 +50,31 @@ assert(!/Mystic|fortune|bazi/i.test(archiveSource), 'archive codec must never to
 assert(contract.golden_wording.length >= 12, 'golden wording must have >= 12 entries');
 
 // every golden line must name the Kotlin test that proves it, and that test must exist
-const testFiles = fs.readdirSync(TEST_DIR, { recursive: true })
+const testRelPaths = fs.readdirSync(TEST_DIR, { recursive: true })
   .filter((file) => String(file).endsWith('.kt'))
-  .map((file) => path.basename(String(file), '.kt'));
+  .map((file) => String(file));
+const testFiles = testRelPaths.map((file) => path.basename(file, '.kt'));
+const readTest = (suite) => {
+  const rel = testRelPaths.find((file) => path.basename(file, '.kt') === suite);
+  assert(rel, `no such test suite: ${suite}`);
+  return fs.readFileSync(path.join(TEST_DIR, rel), 'utf8');
+};
+// a verify reference may go as deep as Suite.case, and that case must be the real method name
+const requireVerify = (ref, label) => {
+  const [suite, testCase] = ref.split('.');
+  assert(suite, `${label} must name a verifying test`);
+  assert(testFiles.includes(suite), `${label} points at a missing test: ${suite}`);
+  if (testCase) {
+    assert(readTest(suite).includes(testCase), `${label} names ${suite}.${testCase}, which no longer exists`);
+  }
+  return suite;
+};
 const seenInputs = new Set();
 contract.golden_wording.forEach((entry) => {
   assert(entry.input && entry.expect, 'golden entries need an input and an expectation');
   assert(!seenInputs.has(entry.input), `duplicate golden input: ${entry.input}`);
   seenInputs.add(entry.input);
-  const suite = entry.verify.split('.')[0];
-  assert(suite, `golden entry "${entry.input}" must name a verifying test`);
-  assert(testFiles.includes(suite), `golden entry "${entry.input}" points at a missing test: ${suite}`);
+  requireVerify(entry.verify, `golden entry "${entry.input}"`);
 });
 
 // everyday guards: safety intents must keep priority over game misreads
@@ -101,5 +115,88 @@ contract.board_ui.piece_description_prefixes.forEach((side) => {
 });
 const uiCases = [...uiTestSource.matchAll(/^\s+@Test$/gm)].length;
 assert(uiCases >= 12, `board UI must keep at least 12 instrumented cases, found ${uiCases}`);
+
+// ---- 讲棋：解释只能来自规则，绝不来自引擎评分 --------------------------------------
+const explanationSource = readGame('BoardExplanation.kt');
+assert(!/evaluate|bestScore|Search\b/.test(explanationSource), 'BoardExplanation must never reach an engine evaluation');
+['exposed', 'critique', 'safest', 'recapturersOf', 'XiangqiRules.legalMoves'].forEach((symbol) => {
+  assert(explanationSource.includes(symbol), `BoardExplanation missing ${symbol}`);
+});
+assert(
+  explanationSource.includes('position.withPiece(attacker, null).withPiece(square, piece)'),
+  'the recapture probe must move the attacker onto the square before asking for a reply'
+);
+['InGameCommand.WHY', 'InGameCommand.SAFER', 'asksWhy', 'asksSafer'].forEach((symbol) => {
+  assert(bridgeSource.includes(symbol), `bridge missing the explanation command ${symbol}`);
+});
+Object.values(contract.explanation.triggers).forEach((cues) => cues.forEach((cue) => {
+  assert(bridgeSource.includes(`"${cue}"`), `classification cue changed: ${cue}`);
+}));
+['没人能吃回', '属于白送', '有子护着'].forEach((phrase) => {
+  assert(bridgeSource.includes(phrase), `recapture wording missing from the bridge: ${phrase}`);
+});
+// a public evaluate() is how a rating would sneak back into a sentence
+assert(engineSource.includes(contract.explanation.private_eval), 'SmartBoardEngine.evaluate must stay private');
+assert(!/^\s*(?:suspend\s+)?fun evaluate\(/m.test(engineSource), 'evaluate() must not become callable from outside the engine');
+const ratingBan = new RegExp(contract.explanation.forbidden_pattern, 'u');
+[bridgeSource, explanationSource, engineSource].forEach((source, index) => {
+  const hit = source.split('\n').find((line) => ratingBan.test(line));
+  assert(!hit, `rating wording leaked into ${['GameDialogueBridge', 'BoardExplanation', 'SmartBoardEngine'][index]}: ${hit}`);
+});
+[contract.explanation.verify, contract.explanation.determinism_verify, contract.explanation.premise_verify]
+  .forEach((ref) => requireVerify(ref, `explanation ${ref}`));
+
+// ---- 本机长期记忆：只存用户自己的话，且必须能清掉 ----------------------------------
+const APP_SRC = path.join(__dirname, '..', 'app', 'src', 'main', 'java', 'com', 'xuanji', 'app');
+const recollectionSource = fs.readFileSync(path.join(APP_SRC, 'domain', 'MysticRecollection.kt'), 'utf8');
+const memoryStoreSource = fs.readFileSync(path.join(APP_SRC, 'data', 'local', 'ConversationMemoryStore.kt'), 'utf8');
+const generatorSource = fs.readFileSync(path.join(APP_SRC, 'domain', 'MysticGuideGenerator.kt'), 'utf8');
+const mysticCardSource = fs.readFileSync(path.join(APP_SRC, 'ui', 'components', 'MysticGuideCard.kt'), 'utf8');
+const cm = contract.conversation_memory;
+
+// the kinds are the red line: a fourth wire means generated copy has found a place to hide
+const kindBlock = recollectionSource.split('enum class RecollectionKind')[1].split('\n}')[0];
+const declaredKinds = [...kindBlock.matchAll(/\("(\w+)"\)/g)].map((match) => match[1]);
+assert.deepStrictEqual(cm.kinds, declaredKinds, 'conversation_memory.kinds must mirror RecollectionKind');
+assert(recollectionSource.includes(`const val MAX_ENTRIES = ${cm.max_entries}`), 'the local cap moved without the contract');
+assert(recollectionSource.includes('val isEmpty: Boolean'), 'RecallFacts must keep saying when there is nothing to recall');
+assert(memoryStoreSource.includes(`KEY_PREFIX = "${cm.key_prefix}"`), 'memory key prefix changed in ConversationMemoryStore');
+assert(memoryStoreSource.includes(`Charsets.${cm.digest_charset}`), 'the memory key digest must not follow the platform charset');
+Object.entries(cm.neighbours).forEach(([prefix, file]) => {
+  const neighbour = fs.readFileSync(path.join(APP_SRC, file), 'utf8');
+  assert(neighbour.includes(`"${prefix}`), `${file} no longer writes ${prefix} — the neighbour list is stale`);
+  assert(
+    prefix !== cm.key_prefix && !prefix.startsWith(cm.key_prefix) && !cm.key_prefix.startsWith(prefix),
+    `memory key ${cm.key_prefix} would collide with ${prefix}`
+  );
+});
+
+// generated session notes must never reach the long-term write path
+const rememberCalls = [...mysticCardSource.matchAll(/rememberLongTerm\((?:[^()]|\([^()]*\))*\)/g)].map((m) => m[0]);
+assert(rememberCalls.length >= 8, `the memory write path must keep covering every user action, found ${rememberCalls.length}`);
+rememberCalls.forEach((call) => {
+  assert(!/memoryNote|memoryNotes/.test(call), `generated copy must not be stored long-term: ${call}`);
+});
+cm.fragments.forEach((fragment) => {
+  assert(generatorSource.includes(fragment), `recall wording fragment missing from the generator: ${fragment}`);
+});
+cm.golden_wording.forEach((line) => {
+  const pinned = generatorSource.includes(line) || mysticCardSource.includes(line) ||
+    readTest('MysticGuideGeneratorTest').includes(line) ||
+    readTest('ConversationMemoryStoreTest').includes(line);
+  assert(pinned, `golden memory wording is no longer pinned anywhere: ${line}`);
+});
+assert(mysticCardSource.includes(`heightIn(min = ${cm.clear_button.min_height_dp}.dp)`), 'the clear button lost its 48dp target');
+assert(
+  mysticCardSource.includes(`contentDescription = "${cm.clear_button.content_description}"`),
+  'the clear button lost its TalkBack label'
+);
+requireVerify(cm.verify, `conversation_memory ${cm.verify}`);
+requireVerify(cm.codec_verify, `conversation_memory ${cm.codec_verify}`);
+assert(cm.unverified.length >= 5, 'the unverified list must keep naming what no JVM gate can prove');
+assert(
+  /本机长期记忆/.test(fs.readFileSync(path.join(__dirname, '..', 'docs', 'SYSTEMS_OVERVIEW.md'), 'utf8')),
+  'docs/SYSTEMS_OVERVIEW.md must document the on-device recollection'
+);
 
 console.log('dialogue contract: PASS (' + contract.golden_wording.length + ' golden entries)');

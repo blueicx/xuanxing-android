@@ -1,6 +1,6 @@
 # 棋局集成说明（BOARD_GAME_INTEGRATION）
 
-> 更新日期：2026-09-01。本文档说明人物对话面板中真实棋局能力的运行模式、扩展接口、离线行为、开源许可边界与排障。
+> 更新日期：2026-09-02。本文档说明人物对话面板中真实棋局能力的运行模式、扩展接口、离线行为、开源许可边界与排障。本版新增「讲棋」一侧：角色除播报着法外，可按规则解释一步棋为什么弱、哪个子是白送的。
 
 ## 1. 当前支持范围
 
@@ -40,7 +40,8 @@
 | 颜色 / 观战 | 「我执黑」「我执红」「观战」「替我下」 | 观战 = `playerColor = WHITE`，双方均由引擎应手 |
 | 走子 | 「走炮二平五」「马8进7」/ 点格子 | 中文纵线记法与 UCI 均可 |
 | 合法性询问 | 「马八进七这步能走吗」 | 只查规则，不消耗行棋权 |
-| 威胁 | 「有哪些威胁」「会被吃吗」 | `BoardAnalysis.threatsAgainst` 逐子扫描 |
+| 威胁 | 「有哪些威胁」「会被吃吗」 | `BoardExplanation.exposed` 逐子扫描，明说「有子能回吃」还是「没人能吃回，属于白送」 |
+| 讲棋 | 「这步为什么不好」「换个稳一点的走法」 | 见 §2.3，只引用规则事实 |
 | 提示 / 复盘 | 「给我提示」「复盘刚才那步」 | 提示为真实合法走法 + 搜索层数，非强度评级 |
 | 悔棋 / 重做 | 「悔棋」「重做」 | 悔棋回退一整回合；重做沿 `redo` 列表逐手回放 |
 | 残局 | 「来局残局」 | `EndgameCatalog` 3 则已验证可胜局面 |
@@ -67,6 +68,34 @@
   `profileKey` 由档案生辰信息派生，因此换档案不会读到别人的棋局。
 - **桥接层不碰 Android**：`GameDialogueBridge` 只在 `Result.archive` 上标 `SAVE` / `RESUME`，
   真正的 DataStore 读写由 Compose 侧完成；写失败回复「本机存储不可用，这一局没能保存。」
+
+## 2.3 讲棋：解释、白送与更稳一手（`BoardExplanation`）
+
+- **事实来源**：`domain/game/BoardExplanation.kt` 只调用 `XiangqiRules.legalMoves` / `apply`
+  与 `BoardAnalysis`，不引用 `SmartBoardEngine` 的任何分值。文件内不出现 `evaluate`，
+  契约脚本另有断言把这条守住。
+- **被攻击 ≠ 白送**：判定回吃时先把攻击方棋子挪到目标格（`withPiece(attacker, null)`
+  + `withPiece(square, piece)`），再问 `legalMoves` 己方能不能合法吃回。因此被牵死的保护子
+  不会被算成有根，规则不会生成的着法也不会被当成保护。将/帅永远不会被报成可吃子，
+  因为规则本身不产出吃将的着法。
+- **三条命令**：
+  - `WHY`「这步为什么不好」——优先评价玩家自己最后一手（观战模式取实际最后一手），
+    说清走到哪格被谁盯住、这手松开哪个没人能吃回的子；看不出问题时明确说
+    「按当前规则看不出问题」，不为了显得有用而编造理由。
+  - `SAFER`「换个稳一点的走法」——按棋盘扫描序取前 N 个合法着法（轻松 6 / 普通 14 / 困难 40），
+    只比较「走完后己方被盯住的子数」，平手保留先出现的着法；回答里带上这个计数和落点后
+    还剩几个没人能吃回，并显式声明「只按当前局面的被攻击子数挑，看一步，非强度评级」。
+  - `THREATS`「有哪些威胁」——逐子列出攻击者坐标与回吃情况，最多展开 4 个子，其余提示用「提示」查看。
+- **难度只改话量，不改事实**：`easy` 走子后不加评注；`normal` 说落点被谁盯住与新送出的子；
+  `hard` 再多报「被盯住但有子护着」的个数。`WHY` / `SAFER` 不受难度影响。
+- **确定性与成本**：不读随机值、不读哈希，同一局面 + 难度重复回答以及两个独立 bridge 实例
+  字符串全等（`GameExplanationTest.two_bridges_explain_the_same_board_identically`）。
+  回吃深查只在需要时跑，`safest` 的候选数由难度上限固定。
+- **禁评分**：JVM 侧 `GameExplanationTest.no_in_game_reply_states_a_rating_or_a_probability`
+  遍历全部棋局命令 × 3 难度并按 `胜率|等级分|Elo|评分|棋力|[0-9]+\.[0-9]+%?` 扫描；
+  `SmartBoardEngine.evaluate` 必须保持 `private`，契约脚本同时校验这一点与措辞禁词。
+- **未验证**：困难档 `safest` 在低端机上的实际耗时、以及解释文案在气泡里的排布，
+  目前只有 JVM 证据。
 
 ## 3. 会话与 token 规则
 
@@ -115,4 +144,5 @@
 | 恢复后提示「n 手未通过规则校验」 | 存档尾部被截断或篡改，已回退到最后合法一手；从该手继续下即可，不会静默丢弃整局 |
 | 保存后没有声音/落子音效 | **未实现**：当前未打包音频资源，属已知范围限制，不是开关被关掉 |
 | 棋子字形 | 只用系统字体渲染 `XiangqiPieceGlyphs.glyph` 的单个汉字，未捆绑字体，也没有缺字时的可视回退；`description` 仅作为 TalkBack 内容描述 |
-| 测试 | `.\gradlew.bat :app:testDebugUnitTest --console=plain`；契约：`node _dev\dialogue_contract_test.js`（含棋盘 UI 定位符与状态文案交叉校验）；棋盘交互用例在 `app/src/androidTest`，`assembleDebugAndroidTest` 只证明可编译，需接上设备跑 `connectedDebugAndroidTest` 才算运行时证据（当前未执行），其前提由 `BoardUiFixtureTest` 在 JVM 侧钉住 |
+| 「这步为什么不好」答得简单 | 评价只看已发生的真实一手与被攻击子数；要看更细的换着法说「换个稳一点的走法」，它只按「走完后己方被盯住的子数」挑一手，看一步，不给强度数字 |
+| 测试 | `.\gradlew.bat :app:testDebugUnitTest --console=plain`；契约：`node _dev\dialogue_contract_test.js`（含棋盘 UI 定位符与状态文案、`explanation` 措辞与 `evaluate` 私有性、`conversation_memory` 键位与禁词交叉校验）；棋盘交互用例在 `app/src/androidTest`，`assembleDebugAndroidTest` 只证明可编译，需接上设备跑 `connectedDebugAndroidTest` 才算运行时证据（当前未执行），其前提由 `BoardUiFixtureTest` 在 JVM 侧钉住 |

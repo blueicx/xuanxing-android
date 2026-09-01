@@ -72,6 +72,81 @@
     "instrumented_test": "app/src/androidTest/.../game/GameBoardCardTest.kt",
     "note": "the instrumented cases are compiled by assembleDebugAndroidTest but have not been run on a device; their premises are pinned on the JVM by BoardUiFixtureTest"
   },
+  "explanation": {
+    "commands": {
+      "why": ["这步为什么不好", "刚才那步走错了吗", "这手怎么样"],
+      "safer": ["换个稳一点的走法", "更安全的一手", "走法稳些"]
+    },
+    "triggers": {
+      "why": ["这步", "刚才", "为什么", "走错", "不好"],
+      "safer": ["更稳", "稳一点", "安全"]
+    },
+    "facts_source": "BoardExplanation reads only XiangqiRules.legalMoves: which enemy moves land on a square, and whether a legal recapture still exists after the attacker is moved onto it",
+    "recapture_rule": "被攻击不等于白送——只有攻击方落子之后己方无合法回吃才算白送；被牵死的保护子不计入保护，这一点交给 legalMoves 判定，不另写规则",
+    "king_rule": "规则不会生成吃掉将/帅的着法，因此被照住的将/帅永远不会被报成白送",
+    "difficulty_scaling": "easy 不加评注；normal 只说落点被谁盯住与新送出的子；hard 再多报几个「被盯住但有子护着」",
+    "safer_scan": "候选按棋盘扫描序取前 N（easy 6 / normal 14 / hard 40），只比较「走完后己方被盯住的子数」，平手取先出现的，因此不依赖随机值也能复现",
+    "forbidden_pattern": "胜率|等级分|Elo|评分|棋力|[0-9]+\\.[0-9]+%?",
+    "private_eval": "private fun evaluate",
+    "private_eval_file": "SmartBoardEngine.kt",
+    "determinism": "同一局面+同一难度重复回答、以及两个独立 bridge 实例，字符串必须全等",
+    "verify": "GameExplanationTest.no_in_game_reply_states_a_rating_or_a_probability",
+    "determinism_verify": "GameExplanationTest.two_bridges_explain_the_same_board_identically",
+    "premise_verify": "BoardExplanationTest.aPinnedProtectorDoesNotMakeAPieceSafe"
+  },
+  "conversation_memory": {
+    "kinds": ["user_input", "user_choice", "settled_game_result"],
+    "red_line": "角色的生成文案在 RecollectionKind 里没有对应种类，所以「不把生成内容伪装成长期记忆」在类型上成立，而不是靠调用方自觉",
+    "key": "talk_memory_<sha256(profileKey)>",
+    "key_prefix": "talk_memory_",
+    "digest_charset": "UTF_8",
+    "max_entries": 20,
+    "overflow": "超出上限挤掉最旧的一条并计入 dropped（随记忆一起写盘）；同 kind+date+text 的去重不算损失",
+    "read_states": "没存过→空记忆；整块读不出→null。开场文案必须区分「本机从没记过」和「本机记录读不出来」，后者不得假装什么都没丢",
+    "opening_line": "开场召回句只反映进面板时本机已存的内容，在本次访问里不再变；「现场手记」里的记忆列表则实时更新",
+    "gated_styles": {
+      "scholar": ["archive", "harbor", "compass"],
+      "half": ["herald", "alley", "intern"]
+    },
+    "golden_wording": [
+      "8月30日、9月1日你聊过「事业、财富」。这几句是你自己留在本机的，我不加判词。",
+      "——都是你自己压在本机上的话，我可没现编。",
+      "棋本上记着象棋·胜、象棋·负",
+      "更早的 7 条已清理，本机只留最近 20 条。",
+      "本机那几页记录读不出来，这次不引旧话。",
+      "摊子上那本旧账我翻不开，这次不装记得。",
+      "这里只存你自己打的字、点过的选项和终局结果；角色说的话不留档。",
+      "清除本机长期记忆"
+    ],
+    "rating_pattern": "胜率|等级分|Elo|评分|棋力|[0-9]+\\.[0-9]+",
+    "fragments": [
+      "你聊过",
+      "棋本上记着",
+      "这几句是你自己留在本机的，我不加判词。",
+      "——都是你自己压在本机上的话，我可没现编。",
+      "本机只留最近",
+      "本机那几页记录读不出来，这次不引旧话。",
+      "摊子上那本旧账我翻不开，这次不装记得。"
+    ],
+    "neighbours": {
+      "game_save_": "data/local/GameArchiveStore.kt",
+      "game_record_": "data/local/GameArchiveStore.kt",
+      "mystic_visit_": "ui/components/MysticGuideCard.kt",
+      "card_layout_": "ui/components/CardLayout.kt",
+      "user_profile": "data/repository/FortuneRepository.kt"
+    },
+    "settled_note": "终局一行的文字来自 GameRecord.settledNote，与战绩板同一个令牌表；没结算就返回空串，调用方无从伪造",
+    "clear_button": {"min_height_dp": 48, "content_description": "清除本机长期记忆"},
+    "verify": "ConversationMemoryStoreTest.clearing_removes_exactly_the_one_key_it_owns",
+    "codec_verify": "MysticRecollectionTest.generated_copy_has_no_kind_it_could_be_stored_under",
+    "unverified": [
+      "DataStore 真机往返与跨进程存活",
+      "清除是否真的释放磁盘上的那条记录",
+      "召回文案在气泡里的实际排布",
+      "清除按钮的 TalkBack 播报与 ≥48dp 触摸目标",
+      "safest 在困难档低端机上的耗时"
+    ]
+  },
   "golden_wording": [
     {"input": "来一盘象棋", "expect": "starts xiangqi, grounded=true", "verify": "GameAutoReplyTest.player_move_marks_engine_turn_pending"},
     {"input": "我执黑", "expect": "acknowledges color choice", "verify": "GameAutoReplyTest.color_change_before_the_first_move_switches_sides"},
@@ -83,7 +158,9 @@
     {"input": "重做这一手", "expect": "replays the undone round move by move", "verify": "GameAutoReplyTest.redo_replays_the_undone_round_move_by_move"},
     {"input": "给我提示", "expect": "returns one real legal move as offline suggestion", "verify": "GameDialogueBridgeTest"},
     {"input": "复盘刚才那步", "expect": "describes last real move with capture info", "verify": "GameDialogueBridgeTest"},
-    {"input": "有哪些威胁", "expect": "names the real attacked piece and its coordinate from the attack map", "verify": "GameAutoReplyTest.threat_report_names_the_real_attacked_piece"},
+    {"input": "有哪些威胁", "expect": "names the real attacked piece and its coordinate, and says out loud whether it can be taken back or really hangs", "verify": "GameExplanationTest.threat_report_says_which_pieces_are_really_free"},
+    {"input": "这步为什么不好", "expect": "judges a halfmove that really happened from rules only: square walked into, piece left with no recapture; admits when nothing is wrong", "verify": "GameExplanationTest.why_names_the_square_walked_into_and_the_piece_left_free"},
+    {"input": "换个稳一点的走法", "expect": "returns a real legal move chosen by attacked-piece counts and states it is not a strength rating", "verify": "GameExplanationTest.safer_quotes_the_move_the_scan_actually_picked"},
     {"input": "难度困难", "expect": "switches the session difficulty and states the real search depth", "verify": "GameAutoReplyTest.difficulty_command_updates_the_session"},
     {"input": "这局我观战", "expect": "hands both sides to the engine (playerColor WHITE)", "verify": "GameAutoReplyTest.spectate_hands_both_sides_to_the_engine"},
     {"input": "残局", "expect": "lists the catalog with its real size", "verify": "GameAutoReplyTest.endgame_catalog_is_listed_and_loadable"},
@@ -94,7 +171,9 @@
     {"input": "继续棋局", "expect": "asks the caller to read the archive; a live session refuses instead of being overwritten", "verify": "GameArchiveTest.resume_command_asks_the_caller_to_read"},
     {"input": "战绩", "expect": "reads the persisted scoreboard, counts settled results only", "verify": "GameArchiveTest.record_command_reads_the_injected_scoreboard"},
     {"input": "来一盘围棋", "expect": "explicitly unavailable: go_provider_not_enabled", "verify": "GoAndChessSeamsTest"},
-    {"input": "来一盘国际象棋", "expect": "explicitly unavailable: chess_provider_not_enabled", "verify": "GoAndChessSeamsTest"}
+    {"input": "来一盘国际象棋", "expect": "explicitly unavailable: chess_provider_not_enabled", "verify": "GoAndChessSeamsTest"},
+    {"input": "上次我聊过什么", "expect": "recites only what this device stored from the user (dates, topic keys, settled results) and adds no verdict", "verify": "MysticGuideGeneratorTest.the_scholar_quotes_the_record_and_adds_no_verdict"},
+    {"input": "清除本机长期记忆", "expect": "deletes exactly this profile's talk_memory key and the panel returns to the empty state; the session-only 「重开对话」 does not", "verify": "ConversationMemoryStoreTest.clearing_removes_exactly_the_one_key_it_owns"}
   ],
   "everyday_guards": [
     {"input": "你好", "expectIntent": "greeting"},
