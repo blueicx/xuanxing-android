@@ -20,6 +20,12 @@
 
 B+C 视觉方案采用统一人物骨架加文化道具和场景层：每个 `skinId` 都映射到独立的 `MysticCultureSpec`，舞台会绘制对应的水榭、档案室、驿站、火塘、云台、城市夜景、沙海或节庆院落。它是文化视觉演绎，不宣称还原真实服饰、仪式或族群身份。
 
+## 棋局会话（2026-09）
+
+交流面板已接入真实中国象棋：`domain/game` 提供纯 Kotlin 规则核心（`XiangqiBoard`/`XiangqiRules`/`XiangqiNotation`）、`GameSessionState`/`reduceGame` 会话 reducer 与 `GameDialogueBridge` 意图桥。游戏意图（`MysticIntent.Game`）优先于通用运势分类；游戏回复走独立卡片路径，不经过 `pendingCustom` 文本模板。角色棋局话术只引用 `BoardMove`/`RuleResult`/`GameOutcome` 中的事实，运势数据不参与棋局结论，反之亦然。
+
+棋局异步纪律与会话一致：`GameEvent` 携带 token，token 不匹配即原样丢弃；悔棋一次回退一整回合并从初始局面重放恢复（含被吃子）。默认应手为 `OfflineBoardEngine` 确定性离线实现（稳定哈希选子，不显示胜率）；`PikafishEngine` UCI seam 已就绪但未打包原生引擎，所有请求显式回退离线应手。围棋（GTP）与国际象棋（UCI）仅保留契约与 adapter，无 provider 时明确返回「尚未启用」。运行模式、许可边界与排障见 `docs/BOARD_GAME_INTEGRATION.md`。
+
 ## Provider seam
 
 `DialogueProvider` 与 `OfflineDialogueProvider` 只提供扩展接口；当前默认实现完全离线，不请求网络、不写入密钥，也不改变现有盘面、健康和财务边界。未来接入在线 provider 时，结果仍需经过本地 persona/safety guard。

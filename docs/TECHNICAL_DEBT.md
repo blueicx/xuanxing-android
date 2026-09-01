@@ -11,6 +11,7 @@
 - 同日生增强：`SameDayWorks` 已加入确定性音乐/诗歌卡，`HistoryCopy` 与 `AnimatedVisibility` 支持长评语折叠；后续可继续扩充经过版权核验的作品元数据。
 - B+C 视觉：`MysticCultureSpec` 已为 8 个皮肤提供结构化道具和舞台场景；后续仍需设备上检查人物比例、遮挡和不同屏幕密度的视觉细节。
 - 对话承接：`MysticDialogueContinuity` 已让省略式追问继承最近主题；后续应继续扩充中英文标点、连续 5 轮、换 persona/皮肤和跨端 golden wording。
+- 棋局功能（2026-09-01）：中国象棋规则核心、确定性离线应手、对话 grounding、Compose 棋盘卡片与 token 纪律均已完成并有单测（122 项通过，lint 0 error，assembleDebug 通过）；`_dev/dialogue_contract.json` 新增 14 条游戏 golden wording 与 node 契约测试。Pikafish UCI 协议 parser 与显式降级 seam 已交付。
 
 ## P1：继续拆分大文件
 
@@ -38,6 +39,13 @@
 ## P2：Provider seam
 
 `DialogueProvider` 当前只提供离线实现。在线 provider 仅允许作为未来 seam：需要显式同意、超时、取消、失败回退和本地安全复核；本轮不接厂商、不写入密钥、不改变默认离线行为。
+
+## P2：棋局引擎与扩展（真实状态）
+
+- **Pikafish 原生包**：UCI 行协议 parser（`UciProtocolParser`）与降级 seam（`PikafishEngine` → `OfflineBoardEngine`）已完成并有 11 项协议测试；NDK/CMake、`arm64-v8a` 构建与引擎二进制**未打包**。接入前置条件：GPLv3 NOTICE、许可文本与 source offer 齐全（见 `NOTICE-THIRD-PARTY.md`），接入后 `bestmove` 仍须过 `XiangqiRules` 校验。
+- **围棋 GTP/KataGo**：仅有 `GoSessionAdapter` 契约（无 provider 返回 `go_provider_not_enabled`）；未实现规则、未接引擎、未显示模拟棋盘。
+- **国际象棋 Stockfish**：仅有 `ChessEngineAdapter` 契约（返回 `chess_provider_not_enabled`）与 FEN 起始局面值对象；未实现规则。
+- **设备复测**：棋盘 UI（浮球关闭/召回不丢局、TalkBack、reduced-motion）尚无实机证据；恢复设备验证时需重新采集 `adb devices`、安装、启动、截图与 Logcat，不以旧截图替代。
 
 ## P1：真实语料与官方常模接入条件
 
