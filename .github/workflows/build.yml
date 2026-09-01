@@ -26,7 +26,7 @@ jobs:
 
       - name: Install Android SDK packages
         run: |
-          sdkmanager "platforms;android-34" "build-tools;34.0" "build-tools;34.0.0"
+          sdkmanager "platforms;android-34" "build-tools;34.0.0"
           yes | sdkmanager --licenses
 
       - name: Setup Gradle
