@@ -8,8 +8,13 @@ package com.xuanji.app.domain.game
  */
 class GameDialogueBridge(
     /** Injected for tests or a native engine; null selects the local search per difficulty. */
-    private val engine: BoardEngine? = null
+    private val engine: BoardEngine? = null,
+    /** Reads the persisted scoreboard. Injected so this class stays storage-free. */
+    private val recordOf: () -> GameRecord = { GameRecord() }
 ) {
+
+    /** Storage work the caller owes after a command: the bridge never touches a disk itself. */
+    enum class ArchiveRequest { SAVE, RESUME }
 
     /** Result of handling one user input inside the game domain. */
     data class Result(
@@ -18,7 +23,9 @@ class GameDialogueBridge(
         val state: GameSessionState,
         val grounded: Boolean,
         /** True when the position now awaits an engine move: callers must drive [engineReply]. */
-        val awaitEngine: Boolean = false
+        val awaitEngine: Boolean = false,
+        /** Non-null when the caller must read or write the archive before continuing. */
+        val archive: ArchiveRequest? = null
     )
 
     /** True while a board game session is open (started but not exited, or has moves). */
@@ -47,6 +54,8 @@ class GameDialogueBridge(
             GlobalCommand.START_CHESS -> return unavailable(state, "国际象棋")
             GlobalCommand.EXIT -> return exitGame(state)
             GlobalCommand.SAVE -> return saveGame(state)
+            GlobalCommand.RESUME -> return resumeGame(state)
+            GlobalCommand.RECORD -> return Result(null, recordOf().summaryText(), state, grounded = true)
             GlobalCommand.ENDGAMES -> return listEndgames(state)
             null -> Unit
         }
@@ -55,7 +64,7 @@ class GameDialogueBridge(
         // in-game commands require an active session (non-initial or explicitly started)
         val inGame = state.sessionToken != 0L || state.history.isNotEmpty()
         if (!inGame) {
-            return Result(null, "还没有棋局。说「来一盘象棋」开始对弈。", state, grounded = false)
+            return Result(null, "还没有棋局。说「来一盘象棋」开始对弈，或「继续棋局」接着上次保存的那局。", state, grounded = false)
         }
 
         return when (classifyInGame(trimmed)) {
@@ -68,7 +77,7 @@ class GameDialogueBridge(
             InGameCommand.SPECTATE -> spectate(state)
             InGameCommand.COLOR_BLACK -> colorChoice(state, black = true)
             InGameCommand.COLOR_RED -> colorChoice(state, black = false)
-            InGameCommand.CHAT -> Result(null, "棋局进行中——可以说着法（如「走炮二平五」）、「悔棋」、「提示」、「有哪些威胁」、「复盘」，或「退出棋局」。", state, grounded = true)
+            InGameCommand.CHAT -> Result(null, "棋局进行中——可以说着法（如「走炮二平五」）、「悔棋」、「提示」、「有哪些威胁」、「复盘」、「保存棋局」，或「退出棋局」。", state, grounded = true)
             null -> tryMove(state, trimmed)
         }
     }
@@ -226,8 +235,65 @@ class GameDialogueBridge(
             null,
             "已保存局面与 ${state.history.size} 手走法（仅棋谱数据，不含角色评语）。",
             state,
-            grounded = true
+            grounded = true,
+            archive = ArchiveRequest.SAVE
         )
+    }
+
+    /** The bridge has no disk access: the caller reads the archive and feeds it back. */
+    private fun resumeGame(state: GameSessionState): Result {
+        if (activeGame(state) && state.history.isNotEmpty()) {
+            return Result(null, "这局还在进行中（已走 ${state.history.size} 手），无需续局。", state, grounded = true)
+        }
+        return Result(
+            null,
+            "正在读取上次的棋局……",
+            state,
+            grounded = true,
+            archive = ArchiveRequest.RESUME
+        )
+    }
+
+    /**
+     * Turn a loaded archive back into a live session. The reply states the real replayed
+     * halfmove count, and a partially verified save says so instead of hiding it.
+     */
+    fun resumeWith(state: GameSessionState, save: GameSave?): Result {
+        if (save == null) {
+            return Result(null, "没有找到可继续的棋局。说「来一盘象棋」开新一局。", state, grounded = true)
+        }
+        return when (val restored = GameArchive.restore(save, token = state.sessionToken + 1)) {
+            is GameRestore.Rejected -> Result(
+                null,
+                "存档未能通过规则校验（${restored.reason}），本局未继续。",
+                state,
+                grounded = true
+            )
+            is GameRestore.Loaded -> {
+                val session = restored.state
+                val mover = if (session.position.sideToMove == PlayerColor.RED) "红方" else "黑方"
+                val title = session.title.ifEmpty { "棋局" }
+                Result(
+                    GameEvent.Start(
+                        type = GameType.XIANGQI,
+                        token = session.sessionToken,
+                        playerColor = session.playerColor,
+                        difficulty = session.difficulty,
+                        position = session.startPosition,
+                        title = session.title
+                    ),
+                    "已继续「$title」，回到第 ${session.history.size} 手，轮${mover}行棋。" +
+                        if (restored.dropped > 0) {
+                            " 其后 ${restored.dropped} 手未通过规则校验，已停在最后一个有效局面。"
+                        } else {
+                            ""
+                        } + resultText(session),
+                    session,
+                    grounded = true,
+                    awaitEngine = shouldAskEngine(session)
+                )
+            }
+        }
     }
 
     private fun undo(state: GameSessionState): Result {
@@ -545,7 +611,9 @@ class GameDialogueBridge(
 
     // ---- classification ------------------------------------------------------------
 
-    private enum class GlobalCommand { START_XIANGQI, START_GO, START_CHESS, EXIT, SAVE, ENDGAMES }
+    private enum class GlobalCommand {
+        START_XIANGQI, START_GO, START_CHESS, EXIT, SAVE, RESUME, RECORD, ENDGAMES
+    }
 
     private enum class InGameCommand {
         UNDO, REDO, HINT, REVIEW, THREATS, DIFFICULTY, SPECTATE,
@@ -555,9 +623,13 @@ class GameDialogueBridge(
     private fun classifyGlobal(input: String): GlobalCommand? = when {
         input.contains("围棋") -> GlobalCommand.START_GO
         input.contains("国际象棋") -> GlobalCommand.START_CHESS
+        input.contains("继续") && (input.contains("棋局") || input.contains("那局") || input.contains("上局") || input.contains("上次")) ->
+            GlobalCommand.RESUME
+        input == "继续" -> GlobalCommand.RESUME
+        input.contains("战绩") || input.contains("比分") || input.contains("胜败") -> GlobalCommand.RECORD
         containsXiangqiStart(input) -> GlobalCommand.START_XIANGQI
         input.contains("退出棋局") || input == "退出" -> GlobalCommand.EXIT
-        input.contains("保存棋局") || input == "保存" -> GlobalCommand.SAVE
+        input.contains("保存棋局") || input.contains("存档") || input == "保存" -> GlobalCommand.SAVE
         input.contains("残局") -> GlobalCommand.ENDGAMES
         else -> null
     }

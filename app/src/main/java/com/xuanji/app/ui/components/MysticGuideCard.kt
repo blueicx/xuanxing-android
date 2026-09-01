@@ -54,6 +54,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -248,8 +249,19 @@ fun MysticGuideCard(
     var gameInputEcho by remember { mutableStateOf<String?>(null) }
     var gameThinking by remember { mutableStateOf(false) }
     var gameViewPly by remember { mutableStateOf<Int?>(null) }
-    val gameBridge = remember { com.xuanji.app.domain.game.GameDialogueBridge() }
+    val gameArchiveStore = remember(context) { com.xuanji.app.data.local.GameArchiveStore(context) }
+    var gameRecord by remember { mutableStateOf(com.xuanji.app.domain.game.GameRecord()) }
+    var gameArchive by remember { mutableStateOf<com.xuanji.app.domain.game.GameSave?>(null) }
+    var gameRecordedToken by remember { mutableStateOf<Long?>(null) }
+    val gameBridge = remember {
+        com.xuanji.app.domain.game.GameDialogueBridge(recordOf = { gameRecord })
+    }
     var pendingCustom by remember(guide) { mutableStateOf<String?>(null) }
+    LaunchedEffect(visitProfile) {
+        gameRecord = runCatching { gameArchiveStore.loadRecord(visitProfile) }
+            .getOrElse { com.xuanji.app.domain.game.GameRecord() }
+        gameArchive = runCatching { gameArchiveStore.load(visitProfile) }.getOrNull()
+    }
     LaunchedEffect(guide) {
         sessionState = reduce(
             sessionState,
@@ -431,18 +443,51 @@ fun MysticGuideCard(
         gameThinking = true
         gameViewPly = null
         coroutineScope.launch(kotlinx.coroutines.Dispatchers.Default) {
+            suspend fun fulfil(
+                result: com.xuanji.app.domain.game.GameDialogueBridge.Result
+            ): com.xuanji.app.domain.game.GameDialogueBridge.Result = when (result.archive) {
+                com.xuanji.app.domain.game.GameDialogueBridge.ArchiveRequest.SAVE -> {
+                    val save = com.xuanji.app.domain.game.GameArchive.saveOf(
+                        result.state,
+                        savedAt = System.currentTimeMillis()
+                    )
+                    if (runCatching { gameArchiveStore.save(visitProfile, save) }.isSuccess) {
+                        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) { gameArchive = save }
+                        result
+                    } else {
+                        result.copy(reply = "本机存储不可用，这一局没能保存。")
+                    }
+                }
+                com.xuanji.app.domain.game.GameDialogueBridge.ArchiveRequest.RESUME -> {
+                    val save = runCatching { gameArchiveStore.load(visitProfile) }.getOrNull()
+                    gameBridge.resumeWith(result.state, save)
+                }
+                null -> result
+            }
             suspend fun publish(result: com.xuanji.app.domain.game.GameDialogueBridge.Result) {
                 kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    if (result.event is com.xuanji.app.domain.game.GameEvent.Start) {
+                        gameRecordedToken = null
+                    }
                     gameSession = result.state
                     if (result.reply.isNotBlank()) gameReply = result.reply
                     if (echo != null && (result.event != null || result.grounded)) gameInputEcho = echo
                 }
             }
-            var result = action(gameSession)
+            var result = fulfil(action(gameSession))
             publish(result)
             while (result.awaitEngine && isActive) {
                 result = gameBridge.engineReply(result.state)
                 publish(result)
+            }
+            val settled = gameBridge.settledResult(result.state)
+            val token = result.state.sessionToken
+            if (settled != null && gameRecordedToken != token) {
+                gameRecordedToken = token
+                val updated = runCatching { gameArchiveStore.record(visitProfile, settled) }.getOrNull()
+                if (updated != null) {
+                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) { gameRecord = updated }
+                }
             }
             kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) { gameThinking = false }
         }
@@ -1334,6 +1379,43 @@ fun MysticGuideCard(
                                 null
                             }
                         )
+                    }
+                    val archiveLive = gameBridge.activeGame(gameSession)
+                    if (archiveLive || gameArchive != null || gameRecord.games > 0) {
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 6.dp, vertical = 2.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Text(
+                                text = gameRecord.summaryText(),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .semantics { contentDescription = "棋局战绩" },
+                                style = MaterialTheme.typography.labelSmall,
+                                color = accent.copy(alpha = 0.72f)
+                            )
+                            if (gameSession.history.isNotEmpty()) {
+                                OutlinedButton(
+                                    onClick = { runGameText("保存棋局") },
+                                    enabled = !gameThinking,
+                                    modifier = Modifier.testTag("game-save")
+                                ) {
+                                    Text("保存棋局", style = MaterialTheme.typography.labelSmall)
+                                }
+                            }
+                            if (!archiveLive && gameArchive != null) {
+                                OutlinedButton(
+                                    onClick = { runGameText("继续棋局") },
+                                    enabled = !gameThinking,
+                                    modifier = Modifier.testTag("game-resume")
+                                ) {
+                                    Text("继续棋局", style = MaterialTheme.typography.labelSmall)
+                                }
+                            }
+                        }
                     }
                     MysticConversationPanel(
                         state = sessionState,
