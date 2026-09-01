@@ -23,9 +23,12 @@ object BoardExplanation {
 
     /** What the last halfmove really did to the mover's own safety. */
     data class Critique(
-        val landedUnderFire: Boolean,
+        /** Enemy pieces that now cover the square the move landed on. */
+        val landedUnderBy: List<Square>,
         val newlyUndefended: List<Hanging>
-    )
+    ) {
+        val landedUnderFire: Boolean get() = landedUnderBy.isNotEmpty()
+    }
 
     /**
      * The calmest move found by scanning legal moves, with attacked-piece counts on both frames
@@ -73,7 +76,7 @@ object BoardExplanation {
         val mover = move.player
         val alreadyUndefended = exposed(before, mover).filter { it.isUndefended }.map { it.square }.toSet()
         return Critique(
-            landedUnderFire = attackersOf(after, move.to, mover).isNotEmpty(),
+            landedUnderBy = attackersOf(after, move.to, mover),
             newlyUndefended = exposed(after, mover).filter { it.isUndefended && it.square !in alreadyUndefended }
         )
     }
