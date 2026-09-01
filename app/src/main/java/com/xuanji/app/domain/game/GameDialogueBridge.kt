@@ -18,6 +18,11 @@ class GameDialogueBridge(
         val grounded: Boolean
     )
 
+    /** True while a board game session is open (started but not exited, or has moves). */
+    fun activeGame(state: GameSessionState): Boolean =
+        state.sessionToken != 0L || state.history.isNotEmpty() ||
+            state.outcome is GameOutcome.Checkmate || state.outcome is GameOutcome.Stalemate
+
     fun handle(state: GameSessionState, raw: String): Result {
         val input = normalize(raw)
         if (input.isEmpty()) {
