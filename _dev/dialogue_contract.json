@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "defaultMode": "offline",
   "game_intents": {
     "start_xiangqi": ["来一盘象棋", "来一盘中国象棋", "下一盘象棋", "陪我下象棋", "开一局象棋"],
@@ -7,13 +7,21 @@
     "start_chess": ["来一盘国际象棋"],
     "move": ["走炮二平五", "马八进七", "炮二平五", "马8进7"],
     "undo": ["悔棋"],
+    "redo": ["重做这一手"],
     "hint": ["给我提示", "提示"],
     "review": ["复盘刚才那步", "复盘"],
+    "threats": ["有哪些威胁", "我有哪些子被威胁"],
+    "difficulty": ["难度困难", "轻松一点"],
+    "spectate": ["这局我观战", "替我下"],
+    "endgame_list": ["残局"],
+    "endgame_start": ["开第一关", "来局残局"],
     "exit": ["退出棋局"],
-    "save": ["保存棋局"],
+    "save": ["保存棋局", "存档"],
+    "resume": ["继续棋局", "接着上次那局"],
+    "record": ["战绩", "比分"],
     "legality_question": ["马八进七这步能走吗", "这步能走吗"]
   },
-  "game_events": ["Start", "ApplyMove", "EngineReply", "Undo", "Cancel", "Exit"],
+  "game_events": ["Start", "ApplyMove", "EngineReply", "Undo", "Redo", "SetDifficulty", "SetColor", "Cancel", "Exit"],
   "board_encoding": {
     "square": "file 0..8 (left to right), rank 0..9 (rank 0 = black back rank, rank 9 = red back rank)",
     "fenLike": "rows top(black rank 0) to bottom(red rank 9), uppercase = red, lowercase = black, side suffix ' r'/' b'",
@@ -27,21 +35,56 @@
     "go": "go_provider_not_enabled",
     "chess": "chess_provider_not_enabled"
   },
+  "engine": {
+    "levels": ["easy", "normal", "hard"],
+    "default": "normal",
+    "auto_reply": "when a result sets awaitEngine, callers must keep driving engineReply until shouldAskEngine is false; every engine move is re-verified by XiangqiRules before it reaches the board",
+    "spectate": "playerColor WHITE means the engine plays both sides",
+    "reply_voice": "engine replies are first person (我走「…」) so they never read as the human's move",
+    "verify": "GameAutoReplyTest.engine_reply_lands_a_rules_verified_move_and_returns_the_turn"
+  },
+  "draw_rules": {
+    "repetition": "same position encoding three times in the session positionLog",
+    "no_capture_limit": "60 consecutive halfmoves without a capture",
+    "wording": "和棋（双方不变作和） / 和棋（无吃子限着判和）",
+    "note": "draws are a session-level verdict: XiangqiRules.outcome alone can never report 和棋",
+    "verify": "GameAutoReplyTest.draw_reply_text_comes_from_the_draw_reason"
+  },
+  "archive_codec": {
+    "dto": "GameSave = { version, start (FEN-like), moves (UCI list), playerColor, difficulty, title, savedAt }",
+    "why_uci": "same-file twin rooks are ambiguous in Chinese notation, so archives store coordinates",
+    "restore": "every halfmove replays through reduceGame + XiangqiRules; replay stops at the first rejection and the reply states how many halfmoves were dropped",
+    "scope": "board data only — character commentary is never written to or read from an archive",
+    "storage": "bridge returns an archive request (SAVE/RESUME); the Compose caller performs the DataStore work"
+  },
+  "scoreboard": {
+    "keys": "game_save_<sha256(profileKey)> and game_record_<sha256(profileKey)>",
+    "settled_only": "only checkmate / stalemate / draw results move a number; spectated games are not scored",
+    "once_per_session": "a session token tallies at most one result"
+  },
   "golden_wording": [
-    {"input": "来一盘象棋", "expect": "starts xiangqi, grounded=true"},
-    {"input": "我执黑", "expect": "acknowledges color choice"},
-    {"input": "走炮二平五", "expect": "applies real move from (7,7) to (4,7)"},
-    {"input": "马八进七", "expect": "applies real move from (1,9) to (2,7)"},
-    {"input": "马八进七这步能走吗", "expect": "answers legality from rules, no turn consumed"},
-    {"input": "兵九进五", "expect": "rejects as illegal, names it as unplayable"},
-    {"input": "悔棋", "expect": "undoes one full round"},
-    {"input": "给我提示", "expect": "returns one real legal move as offline suggestion"},
-    {"input": "复盘刚才那步", "expect": "describes last real move with capture info"},
-    {"input": "退出棋局", "expect": "resets session to empty"},
-    {"input": "我运势不错这步一定赢", "expect": "refuses cross-domain claim, keeps legality focus"},
-    {"input": "保存棋局", "expect": "saves position+moves only, no character commentary"},
-    {"input": "来一盘围棋", "expect": "explicitly unavailable: go_provider_not_enabled"},
-    {"input": "来一盘国际象棋", "expect": "explicitly unavailable: chess_provider_not_enabled"}
+    {"input": "来一盘象棋", "expect": "starts xiangqi, grounded=true", "verify": "GameAutoReplyTest.player_move_marks_engine_turn_pending"},
+    {"input": "我执黑", "expect": "acknowledges color choice", "verify": "GameAutoReplyTest.color_change_before_the_first_move_switches_sides"},
+    {"input": "走炮二平五", "expect": "applies real move from (7,7) to (4,7)", "verify": "GameAutoReplyTest.player_move_marks_engine_turn_pending"},
+    {"input": "马八进七", "expect": "applies real move from (1,9) to (2,7)", "verify": "XiangqiNotationTest"},
+    {"input": "马八进七这步能走吗", "expect": "answers legality from rules, no turn consumed", "verify": "GameDialogueBridgeTest"},
+    {"input": "兵九进五", "expect": "rejects as illegal, names it as unplayable", "verify": "GameDialogueBridgeTest"},
+    {"input": "悔棋", "expect": "undoes one full round", "verify": "GameSessionReducerTest"},
+    {"input": "重做这一手", "expect": "replays the undone round move by move", "verify": "GameAutoReplyTest.redo_replays_the_undone_round_move_by_move"},
+    {"input": "给我提示", "expect": "returns one real legal move as offline suggestion", "verify": "GameDialogueBridgeTest"},
+    {"input": "复盘刚才那步", "expect": "describes last real move with capture info", "verify": "GameDialogueBridgeTest"},
+    {"input": "有哪些威胁", "expect": "names the real attacked piece and its coordinate from the attack map", "verify": "GameAutoReplyTest.threat_report_names_the_real_attacked_piece"},
+    {"input": "难度困难", "expect": "switches the session difficulty and states the real search depth", "verify": "GameAutoReplyTest.difficulty_command_updates_the_session"},
+    {"input": "这局我观战", "expect": "hands both sides to the engine (playerColor WHITE)", "verify": "GameAutoReplyTest.spectate_hands_both_sides_to_the_engine"},
+    {"input": "残局", "expect": "lists the catalog with its real size", "verify": "GameAutoReplyTest.endgame_catalog_is_listed_and_loadable"},
+    {"input": "开第一关", "expect": "loads the puzzle position, title and solver as a real session", "verify": "GameArchiveTest.endgame_archive_keeps_its_puzzle_position_and_solver"},
+    {"input": "退出棋局", "expect": "resets session to empty", "verify": "GameSessionReducerTest"},
+    {"input": "我运势不错这步一定赢", "expect": "refuses cross-domain claim, keeps legality focus", "verify": "GameDialogueBridgeTest"},
+    {"input": "保存棋局", "expect": "asks the caller to persist position+moves only, no character commentary", "verify": "GameArchiveTest.save_command_asks_the_caller_to_write_and_keeps_the_session"},
+    {"input": "继续棋局", "expect": "asks the caller to read the archive; a live session refuses instead of being overwritten", "verify": "GameArchiveTest.resume_command_asks_the_caller_to_read"},
+    {"input": "战绩", "expect": "reads the persisted scoreboard, counts settled results only", "verify": "GameArchiveTest.record_command_reads_the_injected_scoreboard"},
+    {"input": "来一盘围棋", "expect": "explicitly unavailable: go_provider_not_enabled", "verify": "GoAndChessSeamsTest"},
+    {"input": "来一盘国际象棋", "expect": "explicitly unavailable: chess_provider_not_enabled", "verify": "GoAndChessSeamsTest"}
   ],
   "everyday_guards": [
     {"input": "你好", "expectIntent": "greeting"},

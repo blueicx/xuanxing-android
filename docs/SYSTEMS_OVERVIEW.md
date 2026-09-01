@@ -22,15 +22,15 @@ B+C 视觉方案采用统一人物骨架加文化道具和场景层：每个 `sk
 
 ## 棋局会话（2026-09）
 
-交流面板已接入真实中国象棋：`domain/game` 提供纯 Kotlin 规则核心（`XiangqiBoard`/`XiangqiRules`/`XiangqiNotation`）、`GameSessionState`/`reduceGame` 会话 reducer 与 `GameDialogueBridge` 意图桥。游戏意图（`MysticIntent.Game`）优先于通用运势分类；游戏回复走独立卡片路径，不经过 `pendingCustom` 文本模板。角色棋局话术只引用 `BoardMove`/`RuleResult`/`GameOutcome` 中的事实，运势数据不参与棋局结论，反之亦然。
+交流面板已接入真实中国象棋：`domain/game` 提供纯 Kotlin 规则核心（`XiangqiBoard`/`XiangqiRules`/`XiangqiNotation`）、会话级分析（`BoardAnalysis` 威胁扫描、`EndgameCatalog` 残局）、搜索引擎（`SmartBoardEngine`）、`GameSessionState`/`reduceGame` 会话 reducer 与 `GameDialogueBridge` 意图桥。游戏意图（`MysticIntent.Game`）优先于通用运势分类；游戏回复走独立卡片路径，不经过 `pendingCustom` 文本模板。角色棋局话术只引用 `BoardMove`/`RuleResult`/`GameOutcome` 中的事实，运势数据不参与棋局结论，反之亦然。Android 侧 `_dev/dialogue_contract.json` 由 `_dev/dialogue_contract_test.js` 直接与 Kotlin 源码交叉校验（事件枚举、错误码、判和措辞、存档字段），文档措辞与代码漂移会导致契约测试失败。
 
-棋局异步纪律与会话一致：`GameEvent` 携带 token，token 不匹配即原样丢弃；悔棋一次回退一整回合并从初始局面重放恢复（含被吃子）。默认应手为 `OfflineBoardEngine` 确定性离线实现（稳定哈希选子，不显示胜率）；`PikafishEngine` UCI seam 已就绪但未打包原生引擎，所有请求显式回退离线应手。围棋（GTP）与国际象棋（UCI）仅保留契约与 adapter，无 provider 时明确返回「尚未启用」。运行模式、许可边界与排障见 `docs/BOARD_GAME_INTEGRATION.md`。
+棋局异步纪律与会话一致：`GameEvent` 携带 token，token 不匹配即原样丢弃；悔棋一次回退一整回合并从初始局面重放恢复（含被吃子），重做沿 `redo` 列表逐手回放。默认引擎是 `SmartBoardEngine`（纯 Kotlin alpha-beta，难度对应 2/3/4 层搜索，红方开局走内置开局库），玩家走完后由 `Result.awaitEngine` 串接自动应手，「观战」模式下引擎走双方；`OfflineBoardEngine` 只保留为 `PikafishEngine` 的降级回退与测试接缝，`PikafishEngine` 的 UCI seam 已就绪但未打包原生引擎，所有请求显式回退。判和是会话级规则（三次重复局面 / 连续 60 个无吃子半回合，见 `GameSessionState.drawReason()`），`XiangqiRules.outcome` 本身不返回和棋。「保存棋局 / 继续棋局 / 战绩」由 `GameArchive`（FEN 起点 + UCI 棋谱）与 `GameArchiveStore` 落到 DataStore，恢复时逐手重放过规则校验、被拒的尾部手数显式回报；存档只含局面与棋谱，不含角色评语。围棋（GTP）与国际象棋（UCI）仅保留契约与 adapter，无 provider 时明确返回「尚未启用」。运行模式、指令清单、许可边界与排障见 `docs/BOARD_GAME_INTEGRATION.md`。
 
 ## Provider seam
 
 `DialogueProvider` 与 `OfflineDialogueProvider` 只提供扩展接口；当前默认实现完全离线，不请求网络、不写入密钥，也不改变现有盘面、健康和财务边界。未来接入在线 provider 时，结果仍需经过本地 persona/safety guard。
 
-双端契约草案同步在小程序 `_dev/dialogue_contract.json`，固定意图枚举、规范化规则、seed 组成、session token 迁移和安全边界，便于后续 golden wording 对照测试。
+两端各有一份同名但不同职责的契约：小程序 `_dev/dialogue_contract.json` 是双端共享的对话契约（意图枚举、规范化、seed 组成、session token、安全边界）；Android `_dev/dialogue_contract.json` 是棋局契约（事件、判和、存档、golden wording），只随本仓库的 Kotlin 源码演进，两者不互为副本。
 
 ## 体系一致性分级
 
