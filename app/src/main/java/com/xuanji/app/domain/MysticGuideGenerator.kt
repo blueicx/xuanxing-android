@@ -375,6 +375,51 @@ object MysticGuideGenerator {
         }
     }
 
+    /**
+     * 本机长期记忆的召回句：只复述用户自己留下过的话题、日期和已结算的棋局，
+     * 不补剧情、不加判决；记录被清理或读不出来时必须说出来，不能装作什么都没发生。
+     */
+    fun recallLine(mode: String, styleKey: String, facts: RecallFacts): String {
+        val familyStyles = when (mode) {
+            "scholar" -> setOf("archive", "harbor", "compass")
+            "half" -> setOf("herald", "alley", "intern")
+            else -> return ""
+        }
+        if (styleKey !in familyStyles) return ""
+        if (facts.unreadable) {
+            return if (mode == "half") {
+                "摊子上那本旧账我翻不开，这次不装记得。"
+            } else {
+                "本机那几页记录读不出来，这次不引旧话。"
+            }
+        }
+        if (facts.isEmpty) return ""
+
+        val half = mode == "half"
+        val labels = facts.userTopics.mapNotNull { topics[it] }.distinct()
+        val days = facts.dates.map { recollectionDateLabel(it) }.filter { it.isNotEmpty() }.distinct().takeLast(2)
+        val games = facts.results.takeLast(2)
+        val cleanedNote = if (facts.dropped > 0) {
+            val cap = "本机只留最近 ${RecollectionCodec.MAX_ENTRIES} 条。"
+            if (half) "更早的 ${facts.dropped} 条已经清了，$cap" else "更早的 ${facts.dropped} 条已清理，$cap"
+        } else ""
+        val clauses = buildList {
+            if (labels.isNotEmpty()) {
+                val lead = if (days.isEmpty()) "你聊过" else "${days.joinToString("、")}你聊过"
+                add("$lead「${labels.joinToString("、")}」")
+            }
+            if (games.isNotEmpty()) add("棋本上记着${games.joinToString("、")}")
+        }
+        if (clauses.isEmpty()) return cleanedNote
+
+        val body = clauses.joinToString("；")
+        return if (half) {
+            "$body——都是你自己压在本机上的话，我可没现编。$cleanedNote"
+        } else {
+            "$body。这几句是你自己留在本机的，我不加判词。$cleanedNote"
+        }
+    }
+
     fun composeReaction(carryover: String?, reaction: String): String {
         val echo = carryover?.trim().orEmpty()
         val base = reaction.trim()
@@ -3115,6 +3160,16 @@ object MysticGuideGenerator {
         val month = parts[1].toIntOrNull() ?: return value
         val day = parts[2].toIntOrNull() ?: return value
         return "$year-$month-$day"
+    }
+
+    /** 召回句里的日期只到月日；不是一张真的日期卡就整段不提。 */
+    private fun recollectionDateLabel(value: String): String {
+        val parts = canonicalDateKey(value).split("-")
+        if (parts.size != 3) return ""
+        val month = parts[1].toIntOrNull() ?: return ""
+        val day = parts[2].toIntOrNull() ?: return ""
+        if (month !in 1..12 || day !in 1..31) return ""
+        return "${month}月${day}日"
     }
 
     private fun civilDayNumber(value: String): Long {
