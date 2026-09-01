@@ -21,6 +21,11 @@ sealed interface GameOutcome {
         override val isIllegalPosition: Boolean = false
     }
 
+    /** Threefold repetition or the 60-halfmove no-capture limit: game drawn. */
+    data object Draw : GameOutcome {
+        override val isIllegalPosition: Boolean = false
+    }
+
     /** Generals facing each other (双将对脸) or other rule violations. */
     data class IllegalPosition(val reason: String) : GameOutcome {
         override val isIllegalPosition: Boolean = true
@@ -67,9 +72,9 @@ object XiangqiRules : BoardRules {
         if (piece.color != position.sideToMove) return RuleResult.Rejected(ERR_WRONG_TURN)
         val currentOutcome = outcome(position)
         when (currentOutcome) {
-            is GameOutcome.Checkmate, is GameOutcome.Stalemate ->
+            is GameOutcome.Checkmate, is GameOutcome.Stalemate, is GameOutcome.IllegalPosition ->
                 return RuleResult.Rejected(ERR_GAME_OVER)
-            is GameOutcome.IllegalPosition ->
+            GameOutcome.Draw ->
                 return RuleResult.Rejected(ERR_GAME_OVER)
             GameOutcome.InProgress, is GameOutcome.Check -> Unit
         }
@@ -118,7 +123,7 @@ object XiangqiRules : BoardRules {
             val piece = position.pieceAt(Square(file, rank)) ?: continue
             if (piece.color != opponent) continue
             val attack = BoardMove(Square(file, rank), general, "", player = opponent)
-            if (pseudoLegal(position, piece, attack)) return true
+            if (pseudoLegal(position, piece, attack, allowKingCapture = true)) return true
         }
         // flying general rule: facing generals count as an attack too
         if (general.file == findGeneral(position, opponent)?.file) {
@@ -141,13 +146,26 @@ object XiangqiRules : BoardRules {
 
     // ---- pseudo-legal movement -------------------------------------------------
 
-    private fun pseudoLegal(position: BoardPosition, piece: Piece, move: BoardMove): Boolean {
+    /**
+     * Moving onto the enemy GENERAL is not a legal board move in xiangqi (the game ends
+     * in mate before it can happen); attack detection ([isGeneralAttacked]) still needs
+     * "can this piece strike the general" semantics, so it opts in via [allowKingCapture].
+     */
+    private fun pseudoLegal(
+        position: BoardPosition,
+        piece: Piece,
+        move: BoardMove,
+        allowKingCapture: Boolean = false
+    ): Boolean {
         val from = move.from ?: return false
         val to = move.to
         if (to.file !in 0..8 || to.rank !in 0..9) return false
         if (from == to) return false
         val target = position.pieceAt(to)
         if (target != null && target.color == piece.color) return false
+        if (!allowKingCapture && target != null && target.kind == PieceKind.GENERAL && target.color != piece.color) {
+            return false
+        }
         return when (piece.kind) {
             PieceKind.GENERAL -> generalMove(from, to, piece.color)
             PieceKind.ADVISOR -> advisorMove(from, to, piece.color)

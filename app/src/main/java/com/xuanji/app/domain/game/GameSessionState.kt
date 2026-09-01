@@ -54,31 +54,59 @@ fun reduceGame(state: GameSessionState, event: GameEvent): GameSessionState = wh
 }
 
 private fun GameSessionState.applyPlayerMove(move: BoardMove): GameSessionState {
-    if (outcome is GameOutcome.Checkmate || outcome is GameOutcome.Stalemate) return this
+    if (outcome is GameOutcome.Checkmate || outcome is GameOutcome.Stalemate || outcome is GameOutcome.Draw) return this
     val side = position.sideToMove
     val result = XiangqiRules.apply(position, move.copy(player = side))
     val applied = result as? RuleResult.Applied ?: return this
+    val newHistory = history + applied.move
     return copy(
         position = applied.position,
-        history = history + applied.move,
+        history = newHistory,
         redo = emptyList(),
-        outcome = XiangqiRules.outcome(applied.position)
+        outcome = evaluateOutcome(applied.position, newHistory)
     )
 }
 
 private fun GameSessionState.applyEngineTurn(turn: EngineTurn): GameSessionState {
-    if (outcome is GameOutcome.Checkmate || outcome is GameOutcome.Stalemate) return this
+    if (outcome is GameOutcome.Checkmate || outcome is GameOutcome.Stalemate || outcome is GameOutcome.Draw) return this
     val side = position.sideToMove
     // engine replies are re-verified against local rules before touching state
     val result = XiangqiRules.apply(position, turn.move.copy(player = side))
     val applied = result as? RuleResult.Applied ?: return this
+    val newHistory = history + applied.move
     return copy(
         position = applied.position,
-        history = history + applied.move,
+        history = newHistory,
         redo = emptyList(),
-        outcome = XiangqiRules.outcome(applied.position),
+        outcome = evaluateOutcome(applied.position, newHistory),
         request = GameRequest.Idle
     )
+}
+
+/**
+ * Outcome evaluation for settled positions. Pure rule checks first (mate/stalemate/
+ * illegal), then draw rules: threefold repetition of any position encoding and the
+ * 60-halfmove no-capture limit.
+ */
+private fun evaluateOutcome(position: BoardPosition, history: List<BoardMove>): GameOutcome {
+    val ruleOutcome = XiangqiRules.outcome(position)
+    when (ruleOutcome) {
+        is GameOutcome.Checkmate, is GameOutcome.Stalemate, is GameOutcome.IllegalPosition ->
+            return ruleOutcome
+        else -> Unit
+    }
+    val encodings = mutableListOf(XiangqiBoard.encode(XiangqiBoard.initial()))
+    var current = XiangqiBoard.initial()
+    for (move in history) {
+        val applied = XiangqiRules.apply(current, move) as? RuleResult.Applied ?: break
+        current = applied.position
+        encodings += XiangqiBoard.encode(current)
+    }
+    val finalEncoding = encodings.last()
+    if (encodings.count { it == finalEncoding } >= 3) return GameOutcome.Draw
+    val quietHalfmoves = history.takeLastWhile { it.captured == null }.size
+    if (quietHalfmoves >= 60) return GameOutcome.Draw
+    return ruleOutcome
 }
 
 private fun GameSessionState.undoLastPair(): GameSessionState {
