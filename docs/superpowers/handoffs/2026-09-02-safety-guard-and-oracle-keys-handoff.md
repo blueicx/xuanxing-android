@@ -4,7 +4,7 @@
 **项目目录：** `F:\huny\xuanji-android`
 **当前分支：** `codex/system-consistency`
 **交接范围：** 两片同属一类问题——门禁给的是假信心。`fb17087` 立起医疗/财务红线并掏空契约里的空转断言；`bef5fbb` 把 `TodayOracle` 的分支依据从显示名换成稳定键。
-**当前状态：** 两笔已提交，本机四项门禁全绿；契约脚本从未在 CI 上跑过（见第 5 节），设备面全部未验证。
+**当前状态：** 两笔已提交并随分支推送（`f26c876..f89f2f1`）；本机四项门禁全绿，干净 runner 上 PR #1 的 run #17 也 pass。但契约脚本仍不在 CI 内（见第 5 节），设备面全部未验证。
 
 ## 1. 给下一位执行者的第一句话
 
@@ -39,6 +39,7 @@
 - `./gradlew :app:testDebugUnitTest --rerun -Pkotlin.compiler.execution.strategy=in-process` → exit 0，284 项 / 0 失败 / 0 跳过（266 → 278 → 284）。
 - `./gradlew :app:lintDebug :app:assembleDebug :app:assembleDebugAndroidTest` → BUILD SUCCESSFUL，lint 0 errors / 81 warnings（均既有），`app-debug.apk` 重新产出（23,845,578 B）。`compileDebugAndroidTestKotlin` 针对改动后的 main 重新编译通过，但 `packageDebugAndroidTest` 判定 UP-TO-DATE，磁盘上的 androidTest APK 仍是旧的。
 - 两次反证，都真失败过：把 `customAnswer` 临时改回直接 `return when (intent)`，只有那条接线用例失败（10 项中 1 failed）；往 `TodayOracle.kt` 塞回一行 `private val PROBE_BANNED = "玄学家"`，脚本以 `TodayOracle must never key a branch on "玄学家": …` 退出 1。还原后恢复全绿。
+- 推送后 CI：run #17（`Assemble debug APK`，干净 Linux runner，head `f89f2f1`）**pass**，`BUILD SUCCESSFUL in 6m 30s`、`52 actionable tasks: 52 executed`（无缓存复用），`testDebugUnitTest` / `assembleDebug` / `lintDebug` 均真实执行，APK 已上传。边界：Gradle 成功日志不打印逐条测试数，所以 284 / 0 / 0 仍是本机计数；workflow 里没有 node 步骤，契约脚本依旧没在 CI 跑过。
 - 路上真实踩到的两个坑，别重复：`the_cached_oracle_shape_is_unchanged` 首跑失败，因为 Compose 的 `@StabilityInferred` 会给 data class 加一个 `public static final int $stable`（javap flags 0x0019，**未**标 ACC_SYNTHETIC），断言必须按 Gson 自己的口径过滤 static / transient；另外 `Field.isTransient` 在本模块不能作为属性访问，要用 `Modifier.isTransient(...)`。
 
 ## 4. 明确未验证（不得当作已完成）
@@ -72,7 +73,7 @@
 
 - 本机 Gradle 需 `-Pkotlin.compiler.execution.strategy=in-process`；日志写 `/tmp`，不要落在仓库里。注意后台命令的 exit code 可能被管道吃掉，判断成败要看 Gradle 自己写在日志尾的行。
 - `git status --porcelain` 有 29 项未跟踪内容（`.superpowers/`、`device-*-20260831.xml`、`ui*.xml`、两份 plan/handoff 文档），一律按显式路径 stage，提交后复核数量不变。
-- 远端是 `blueicx/xuanxing-android`，PR #1 是本分支的常驻 PR；CI 只在 `457dc7a` 之后可用。push 需逐次授权，本文件所属那笔推送此前被环境分类器拦下过。
+- 远端是 `blueicx/xuanxing-android`，PR #1 是本分支的常驻 PR；CI 只在 `457dc7a` 之后可用。push 需逐次授权，本轮已获授权并推送成功：`f26c876..f89f2f1`（2026-09-02 10:12Z，共 6 笔）。
 
 ## 9. 交付定义（接手时同样适用）
 
