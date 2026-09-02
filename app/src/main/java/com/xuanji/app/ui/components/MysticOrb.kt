@@ -55,6 +55,7 @@ internal fun rememberReducedMotion(): Boolean {
 @Composable
 internal fun MysticOrb(
     roleName: String,
+    half: Boolean,
     color: Color,
     trimColor: Color,
     onClick: () -> Unit,
@@ -67,7 +68,7 @@ internal fun MysticOrb(
         initialValue = 0f,
         targetValue = (2 * Math.PI).toFloat(),
         animationSpec = infiniteRepeatable(
-            animation = tween(if (roleName == "魔师") 3500 else 5200, easing = LinearEasing),
+            animation = tween(if (half) 3500 else 5200, easing = LinearEasing),
             repeatMode = RepeatMode.Restart
         ),
         label = "mysticWave"
@@ -80,7 +81,7 @@ internal fun MysticOrb(
                 IntOffset(
                     (Math.sin(wave.toDouble()) * 3).roundToInt(),
                     (Math.sin(scrollValue / 72.0) * 5).roundToInt() +
-                        (Math.cos(wave.toDouble()) * if (roleName == "魔师") 3f else 2f).roundToInt()
+                        (Math.cos(wave.toDouble()) * if (half) 3f else 2f).roundToInt()
                 )
             }
             .padding(12.dp),

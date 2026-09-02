@@ -147,6 +147,30 @@
       "safest 在困难档低端机上的耗时"
     ]
   },
+  "persona": {
+    "umbrella": "玄师",
+    "names": { "scholar": "玄学家", "half": "半仙" },
+    "retired": ["慈翁", "魔师"],
+    "name_fn": "fun personaName(mode: String): String = if (mode == \"half\") \"半仙\" else \"玄学家\"",
+    "orb_motion": "tween(if (half) 3500 else 5200, easing = LinearEasing)",
+    "orb_amplitude": "if (half) 3f else 2f",
+    "orb_role_binding": "roleName = MysticGuideGenerator.personaName(stageMode)",
+    "orb_mode_binding": "half = stageMode == \"half\"",
+    "stage_close_label": "关闭玄师台",
+    "identity_answers": [
+      "$name，一个守旧档的人。我不替你判命，只帮你看清手边能做的事。",
+      "我叫$name。夜里守灯，白天听人说话；算盘有几把，但从不吓人。",
+      "$name。罗盘在我手里，方向盘仍在你手里。",
+      "街口$name。收费随缘，实话管饱。",
+      "$name！台前能镇场，幕后会记账；命理这行，也得讲证据。",
+      "云端实习$name。天机会看，大话不说。"
+    ],
+    "verify": "MysticGuideGeneratorTest.identity_answers_name_the_persona_exactly_once",
+    "unverified": [
+      "浮球与舞台在实机上的称谓渲染、TalkBack 实际播报",
+      "换装按钮标签在窄屏上是否被截断"
+    ]
+  },
   "golden_wording": [
     {"input": "来一盘象棋", "expect": "starts xiangqi, grounded=true", "verify": "GameAutoReplyTest.player_move_marks_engine_turn_pending"},
     {"input": "我执黑", "expect": "acknowledges color choice", "verify": "GameAutoReplyTest.color_change_before_the_first_move_switches_sides"},

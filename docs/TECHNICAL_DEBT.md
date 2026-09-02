@@ -25,6 +25,12 @@
   6. 本机长期记忆：`RecollectionCodec`（三种 `RecollectionKind`、20 条上限、`dropped` 计数、损坏即诚实降级）+ `PreferenceBridge` seam + `ConversationMemoryStore`（key `talk_memory_<sha256>`，UTF-8 摘要）+ `MysticGuideGenerator.recallLine` + `MysticGuideCard` 接线（按档案载入、8 处用户动作写入、现场手记面板列表与「清除本机长期记忆」按钮）。契约新增 `conversation_memory` 段，把种类枚举、上限、键前缀互斥、召回措辞与 48dp/TalkBack 全部对齐源码。
   证据：`:app:testDebugUnitTest` 264 项通过（0 失败 0 跳过）、`:app:lintDebug` 0 error（仅既有 `AutoboxingStateCreation` info 提示）、`:app:assembleDebug` 与 `:app:assembleDebugAndroidTest` 均成功、`node _dev/dialogue_contract_test.js` PASS（26 条 golden wording）。其中 `testDebugUnitTest` / `lintDebug` / `assembleDebug` 已在 `457dc7a` 的干净 Linux runner 上重跑通过（见上方 CI 条目），`assembleDebugAndroidTest` 与契约脚本仍只有本机证据。二者都只是 JVM/编译证据：DataStore 真机往返与跨进程存活、清除是否真的释放磁盘记录、召回句在气泡里的排布、清除按钮的实机触摸目标与 TalkBack 播报、困难档 `safest` 在低端机上的耗时，均未验证。
 
+- 身份称谓与作风键（2026-09-02）：两个独立提交。
+  7. 称谓收口：`MysticGuideGenerator.personaName(mode)` 成为双面角色对外称谓的唯一来源（scholar→「玄学家」、half→「半仙」），「玄师」退回为这套陪伴功能的统称（舞台关闭键、会话气泡、设置项标题），浮球舞台那套「慈翁 / 魔师」全部退役；`MysticOrb` 的漂移周期与幅度改为按 `half` 分支，不再比较显示字符串，`MysticImmersiveStage` 中从未被读取的 `roleName` 形参删除；`identityAnswer` 六条自我介绍改为每条只自称一次（原先「半仙，街口半仙」这类重复是把「魔师」换成「半仙」后才会显形，已并入作风名）。契约新增 `persona` 段：全量扫描 `app/src` 下所有 `.kt` 断言退役名 0 命中，并钉住 `personaName` 的实现、浮球按模式分支的写法、六条自我介绍与统称「玄师」。
+  8. `styleKeyFor` 回归：该函数自 `f3ad6a8`（2026-08-24，「feat: add mystic opening check-in」）起返回 `style(...).second`，即作风**显示名**「档案室学者」而非作风**键** `archive`；下游一律按键匹配，因此有两处可见后果——`customAnswer` 里所有 `when (styleKey)` 永远落到 `else`（学者只会说「慢速罗盘」的话、半仙只会说「云端的实习生」的话，而卡面标题却按 `generate()` 的正确键显示「档案室学者」等六种作风），以及 `MysticGuideCard` 两处 `guide.styleKey == styleKeyFor(...)` 守卫永远为假、签到与节奏选择后的延后应答每次都被静默丢弃。已改为返回 `.first`。
+  证据：`:app:testDebugUnitTest` 266 项通过（新增 `personaName_labels_the_two_modes_and_never_the_umbrella`、`identity_answers_name_the_persona_exactly_once`；后者遍历 5 组盘面 × 7 个话题 × 2 个模式，断言六种作风全部可达且每条身份回答只自称一次）、`:app:lintDebug` 0 error、`:app:assembleDebug` 重新产出 `app-debug.apk`、`node _dev/dialogue_contract_test.js` PASS。`assembleDebugAndroidTest` 判定 UP-TO-DATE，但 `compileDebugAndroidTestKotlin` 已针对改动后的 main 源码重新编译通过——12 项棋盘交互用例仍未在任何设备或 CI 上执行。**以上均为本机 JVM / 静态扫描 / 编译证据**：实机上浮球与舞台的称谓渲染、TalkBack 实际播报、换装标签在窄屏是否截断，以及签到 / 节奏延后应答修复后是否真的出现在界面上，都未验证。
+  同类残留（未在本轮处理）：`TodayOracle` 仍以显示名作查询键——`oracleRole` 返回「玄学家 / 半仙」，`when (role)`、`if (firstRole == "玄学家")` 与 12 条对照表都依赖这两个字面量；称谓改名不会像浮球动画那样静默走错分支（`when` 不匹配会落到 `else`），但仍属「行为依赖显示字符串」，若要收口应改为稳定的 role 键。
+
 ## P1：继续拆分大文件
 
 | 文件 | 当前规模（约） | 已完成 | 下一步 |
@@ -41,7 +47,7 @@
 
 交流面板已新增统一的消息/请求状态控件，后续只需继续扩充 golden wording，不再为每个入口维护独立的输入状态。
 
-persona 命名漂移（本轮接线时发现，未在本轮处理）：同两个模式在 `MysticGuideCard.kt` 叫「玄学家 / 半仙」、在 `MysticFloatingGuide.kt` 叫「慈翁 / 魔师」、`MysticOrb.kt` 的 TalkBack 里还有第三种「玄师」，且浮球动画速度靠字符串比较 `"魔师"` 分支。这是用户能直接看见的身份不一致，应单开一片收口（统一到一个枚举 + 一份 label 表，动画改为按枚举分支），不与棋局/记忆功能混做。
+persona 命名漂移（已收口，见「当前基线」第 7 条）：同两个模式曾分别在 `MysticGuideCard.kt` 叫「玄学家 / 半仙」、在 `MysticFloatingGuide.kt` 叫「慈翁 / 魔师」，`MysticOrb.kt` 的 TalkBack 里还有第三种「玄师」，且浮球动画速度靠字符串比较 `"魔师"` 分支。现在称谓只有 `MysticGuideGenerator.personaName` 一个来源，「玄师」固定为统称，动画按模式分支，退役名由 `_dev/dialogue_contract_test.js` 全量扫描 `app/src` 把关。仍开放的同源问题：`TodayOracle` 用显示名当查询键。
 
 ## P2：可访问性与运动偏好
 

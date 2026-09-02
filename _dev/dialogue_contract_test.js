@@ -199,4 +199,54 @@ assert(
   'docs/SYSTEMS_OVERVIEW.md must document the on-device recollection'
 );
 
+// ---- 人物身份：称谓只有一套，行为不再靠显示字符串分支 --------------------------------
+const pp = contract.persona;
+const UI_SRC = path.join(APP_SRC, 'ui');
+assert(generatorSource.includes(pp.name_fn), 'personaName must stay the single source of the two persona labels');
+Object.values(pp.names).forEach((name) => {
+  assert(pp.name_fn.includes(`"${name}"`), `personaName must still return ${name}`);
+});
+assert(pp.name_fn.includes('mode == "half"'), 'personaName must still branch on the half mode');
+
+// 退役称谓一旦在任何 Kotlin 源码里复活，说明又有人给同两个模式起了第二套名字
+const retiredPattern = new RegExp(pp.retired.join('|'), 'u');
+fs.readdirSync(APP_SRC, { recursive: true })
+  .filter((file) => String(file).endsWith('.kt'))
+  .forEach((file) => {
+    const source = fs.readFileSync(path.join(APP_SRC, String(file)), 'utf8');
+    const hit = source.split('\n').find((line) => retiredPattern.test(line));
+    assert(!hit, `${file} still uses a retired persona name: ${hit}`);
+  });
+
+const orbSource = fs.readFileSync(path.join(UI_SRC, 'components', 'MysticOrb.kt'), 'utf8');
+const floatingSource = fs.readFileSync(path.join(UI_SRC, 'components', 'MysticFloatingGuide.kt'), 'utf8');
+const panelSource = fs.readFileSync(path.join(UI_SRC, 'components', 'MysticConversationPanel.kt'), 'utf8');
+assert(
+  orbSource.includes(pp.orb_motion) && orbSource.includes(pp.orb_amplitude),
+  'the orb motion must be driven by the mode itself'
+);
+assert(!/roleName\s*==/.test(orbSource), 'the orb must never branch on a display string');
+assert(
+  floatingSource.includes(pp.orb_role_binding) && floatingSource.includes(pp.orb_mode_binding),
+  'the orb must take its label from personaName and its motion from the mode'
+);
+assert(!floatingSource.includes('roleName: String'), 'the stage kept a roleName parameter it never reads');
+assert(
+  floatingSource.includes('MysticGuideGenerator.personaName(key)') &&
+    mysticCardSource.includes('MysticGuideGenerator.personaName(mode)'),
+  'the persona buttons and the costume switch must read the labels from personaName'
+);
+pp.identity_answers.forEach((line) => {
+  assert.strictEqual(line.split('$name').length - 1, 1, `an identity answer must name the persona once: ${line}`);
+  assert(generatorSource.includes(line), `identity wording changed: ${line}`);
+});
+
+// 「玄师」是这套陪伴功能的统称，不落到任何一个模式上
+[panelSource, floatingSource].forEach((source) => {
+  assert(source.includes(pp.umbrella), `the umbrella name ${pp.umbrella} disappeared from the companion UI`);
+});
+assert(floatingSource.includes(`label = "${pp.stage_close_label}"`), 'the stage close label changed');
+assert(pp.unverified.length >= 2, 'the persona slice must keep naming what only a device can prove');
+requireVerify(pp.verify, `persona ${pp.verify}`);
+
 console.log('dialogue contract: PASS (' + contract.golden_wording.length + ' golden entries)');

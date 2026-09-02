@@ -182,8 +182,9 @@ fun MysticFloatingGuide(
         content(pageScroll)
 
         if (skin != null && companionUiState.presence == CompanionPresence.OrbVisible && !companionUiState.stageOpen) {
-                MysticOrb(
-                    roleName = if (stageMode == "half") "魔师" else "慈翁",
+            MysticOrb(
+                roleName = MysticGuideGenerator.personaName(stageMode),
+                half = stageMode == "half",
                 color = Color(skin.garment),
                 trimColor = Color(skin.trim),
                 onClick = { detailOpen = true },
@@ -211,7 +212,6 @@ fun MysticFloatingGuide(
                     garment = Color(skin.garment),
                     trimColor = Color(skin.trim),
                     moodLevel = mysticMoodLevel(fortune!!.overallScore),
-                    roleName = if (stageMode == "half") "魔师" else "慈翁",
                     onClose = { detailOpen = false },
                     topStartContent = {
                         MysticStageCostumeSwitch(
@@ -244,7 +244,6 @@ private fun MysticImmersiveStage(
     garment: Color,
     trimColor: Color,
     moodLevel: Float,
-    roleName: String,
     onClose: () -> Unit,
     topStartContent: @Composable () -> Unit,
     content: @Composable () -> Unit
@@ -374,7 +373,7 @@ private fun MysticStageCostumeSwitch(
     selectedSkinId: String,
     onSelect: (Pair<String, String>) -> Unit
 ) {
-    val modes = listOf("scholar" to "慈翁", "half" to "魔师")
+    val modes = listOf("scholar", "half").map { key -> key to MysticGuideGenerator.personaName(key) }
     Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
         modes.forEach { (mode, label) ->
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {

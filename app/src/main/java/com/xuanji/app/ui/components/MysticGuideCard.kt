@@ -1538,7 +1538,7 @@ fun MysticGuideCard(
                 }
                 Column(Modifier.weight(1f)) {
                     Text(
-                        if (mode == "half") "半仙" else "玄学家",
+                        MysticGuideGenerator.personaName(mode),
                         style = MaterialTheme.typography.titleSmall,
                         color = MaterialTheme.colorScheme.onSurface
                     )
@@ -1930,14 +1930,14 @@ fun MysticGuideCard(
                 val scholarAccent = MaterialTheme.colorScheme.primary
                 val halfAccent = MaterialTheme.colorScheme.tertiary
                 MysticPersonaButton(
-                    "玄学家",
+                    MysticGuideGenerator.personaName("scholar"),
                     "心理按摩",
                     mode == "scholar",
                     scholarAccent,
                     Modifier.weight(1f)
                 ) { switchPersona("scholar") }
                 MysticPersonaButton(
-                    "半仙",
+                    MysticGuideGenerator.personaName("half"),
                     "浮夸吐槽",
                     mode == "half",
                     halfAccent,

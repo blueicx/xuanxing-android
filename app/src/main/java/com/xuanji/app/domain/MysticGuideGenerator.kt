@@ -134,6 +134,12 @@ object MysticGuideGenerator {
 
     fun topicLabels(): List<Pair<String, String>> = topics.map { it.key to it.value }
 
+    /**
+     * 双面角色对外的唯一称谓：scholar=玄学家，half=半仙。
+     * 「玄师」是这套陪伴功能的统称（舞台、会话气泡、设置项都用它），不是任何一个模式的标签。
+     */
+    fun personaName(mode: String): String = if (mode == "half") "半仙" else "玄学家"
+
     fun mysticSkins(mode: String): List<MysticSkin> = if (mode == "half") {
         listOf(
             MysticSkin(
@@ -1850,7 +1856,7 @@ object MysticGuideGenerator {
                 else -> "罗盘转稳了。方向可以慢定，边界现在就要画。"
             }
             "cloud-daoist" -> when (topicKey) {
-                "composite" -> "云缝开了半寸，本魔师先看了一眼——你想问前程，还是想问退路？"
+                "composite" -> "云缝开了半寸，本半仙先看了一眼——你想问前程，还是想问退路？"
                 "career" -> "事业的云聚得好看，可惜有人只给你看了正面。先问谁受益。"
                 "love" -> "情丝缠在云轴上。松一半，才看得清对方攥着哪头。"
                 "wealth" -> "钱袋挂在云边，铃铛没响。先查契约，再查贪念。"
@@ -2877,7 +2883,7 @@ object MysticGuideGenerator {
         }
 
     private fun identityAnswer(scholar: Boolean, styleKey: String, mode: String): String {
-        val name = if (mode == "half") "魔师" else "慈翁"
+        val name = personaName(mode)
         return if (scholar) {
             when (styleKey) {
                 "archive" -> "$name，一个守旧档的人。我不替你判命，只帮你看清手边能做的事。"
@@ -2886,9 +2892,9 @@ object MysticGuideGenerator {
             }
         } else {
             when (styleKey) {
-                "alley" -> "$name，街口半仙。收费随缘，实话管饱。"
+                "alley" -> "街口$name。收费随缘，实话管饱。"
                 "herald" -> "$name！台前能镇场，幕后会记账；命理这行，也得讲证据。"
-                else -> "$name，云端实习半仙。天机会看，大话不说。"
+                else -> "云端实习$name。天机会看，大话不说。"
             }
         }
     }
@@ -3061,7 +3067,7 @@ object MysticGuideGenerator {
             lateNight -> "收云，闭账。晚安，梦里别签契。"
             variant == 0 -> "哟，云缝里掉下来一单生意。坐，先说清楚：天机可以聊，保票不卖。"
             variant == 1 -> "你好啊。今天天机打烊，人话倒还剩几句。"
-            else -> "来了？本魔师刚好有空。便宜话管够，真话另算。"
+            else -> "来了？本半仙刚好有空。便宜话管够，真话另算。"
         }
         "street-jacket" -> when {
             lateNight -> "这么晚？茶扣上，回去睡，明儿再折腾。"
