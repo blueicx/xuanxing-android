@@ -319,4 +319,38 @@ assert(sg.unverified.length >= 2, 'the safety slice must keep naming what only a
 [sg.verify, sg.router_gap_verify, sg.wiring_verify, sg.false_positive_verify]
   .forEach((ref) => requireVerify(ref, `safety ${ref}`));
 
+// ---- 今日灵签：分支依据必须是稳定键，不是显示名 --------------------------------------
+const to = contract.today_oracle;
+const oracleSource = fs.readFileSync(path.join(APP_SRC, to.file), 'utf8');
+to.banned_key_literals.forEach((literal) => {
+  const hit = oracleSource.split('\n').find((line) => line.includes(literal));
+  assert(!hit, `TodayOracle must never key a branch on ${literal}: ${hit}`);
+});
+assert(oracleSource.includes(to.label_source), 'the oracle label must come from personaName');
+assert(/enum class OracleRole\(val modeKey: String\)/.test(oracleSource), 'OracleRole must carry a stable mode key');
+assert(/enum class OracleTier \{ High, Mid, Low \}/.test(oracleSource), 'OracleTier must stay the three declared tiers');
+assert(
+  oracleSource.includes('val tier: OracleTier get() = TIER_BY_LEVEL.getValue(level)'),
+  'tier must stay a computed read — a stored field would change the cached draw shape'
+);
+assert(oracleSource.includes('POEMS.associate { it.level to it.tier }'), 'level→tier must be derived from the poem table');
+assert(!/private fun oracleTier\(/.test(oracleSource), 'the string-keyed oracleTier() must stay deleted');
+
+// OracleResult is a wire format: Gson reads and writes exactly these seven fields
+const oracleBlock = oracleSource.split('data class OracleResult(')[1].split('\n    )')[0];
+const persisted = [...oracleBlock.matchAll(/val (\w+):/g)].map((m) => m[1]);
+assert.deepStrictEqual(
+  persisted,
+  ['level', 'poem', 'luckyNumber', 'luckyColor', 'good', 'avoid', 'advice'],
+  'a new persisted field would turn the day\'s cached draw into nulls'
+);
+const poemCount = [...oracleSource.matchAll(/OraclePoem\(OracleTier\./g)].length;
+assert.strictEqual(poemCount, to.poems, 'the fixed poem table changed size without the contract');
+const gateBlock = oracleSource.split('private fun observerRelayGate')[1].split('\n    }')[0];
+assert(gateBlock.includes('choiceKey, "oracle-relay"'), 'the relay gate lost its salt');
+assert(!/tier/i.test(gateBlock), 'folding tier into the relay gate would move every 补话 without anyone noticing');
+[to.verify, to.shape_verify, to.persona_verify, to.determinism_verify]
+  .forEach((ref) => requireVerify(ref, `today_oracle ${ref}`));
+assert(to.unverified.length >= 2, 'the oracle slice must keep naming what only a device can prove');
+
 console.log('dialogue contract: PASS (' + contract.golden_wording.length + ' golden entries)');

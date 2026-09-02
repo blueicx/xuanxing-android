@@ -171,6 +171,25 @@
       "换装按钮标签在窄屏上是否被截断"
     ]
   },
+  "today_oracle": {
+    "file": "domain/divination/TodayOracle.kt",
+    "role_keys": { "Scholar": "scholar", "Half": "half" },
+    "label_source": "MysticGuideGenerator.personaName(modeKey)",
+    "tiers": ["High", "Mid", "Low"],
+    "banned_key_literals": ["\"玄学家\"", "\"半仙\"", "\"high\"", "\"mid\"", "\"low\""],
+    "tier_declaration": "档次逐条声明在签表上（OraclePoem(tier, level, poem, advice)），level→tier 映射由 POEMS 派生；旧的 oracleTier(level) 字符串 when 已删，键不匹配不再静默落到最低档",
+    "cache_shape": "OracleResult 仍只持久化 level/poem/luckyNumber/luckyColor/good/avoid/advice 七个字段，tier 是计算属性；缓存经 Gson 读写，多一个字段就会让当天已存的记录反序列化出 null",
+    "relay_gate": "observerRelayGate 的哈希输入仍是 7 个显示字段 + choiceKey + oracle-relay，不含 tier，因此改键不会挪动补话的触发时机",
+    "poems": 12,
+    "verify": "TodayOracleTest.rekeying_preserves_every_reaction_and_exit_line_verbatim",
+    "shape_verify": "TodayOracleTest.the_cached_oracle_shape_is_unchanged",
+    "persona_verify": "TodayOracleTest.the_two_oracle_personas_share_the_companion_labels",
+    "determinism_verify": "TodayOracleTest.relay_and_replies_are_deterministic_per_draw_and_choice",
+    "unverified": [
+      "灵签页在实机上的渲染：头像取的字、离席句与帘外补话的排布",
+      "当天已缓存的旧 JSON 在新版本读取时是否仍显示同一支签（只有源码级保证）"
+    ]
+  },
   "safety": {
     "owner": "MysticSafetyGuard",
     "hook": "return MysticSafetyGuard.enforce(",
@@ -225,7 +244,15 @@
     {"input": "继续", "expect": "an ellipsis inherits the last topic instead of resetting to composite", "verify": "MysticDialogueContinuityTest.elliptical_follow_up_inherits_last_topic"},
     {"input": "那工作怎么办", "expect": "naming a new topic overrides the one carried by the previous turn", "verify": "MysticDialogueContinuityTest.explicit_new_topic_overrides_last_topic"},
     {"input": "重开对话", "expect": "session-only reset: drops the pending reply and the session notes, and never touches the stored long-term key", "verify": "MysticSessionStateTest.clear_invalidates_pending_reply_and_forgets_session_notes"},
+    {"input": "你好呀", "expect": "a plain greeting stays Greeting — not routed into fortune or onto the board", "verify": "MysticDialogueEngineTest.classify_maps_greeting_to_greeting"},
+    {"input": "谢谢你", "expect": "thanks is classified Thanks", "verify": "MysticDialogueEngineTest.classify_maps_greeting_to_greeting"},
+    {"input": "再见，拜拜", "expect": "a farewell is classified Farewell", "verify": "MysticDialogueEngineTest.classify_maps_greeting_to_greeting"},
+    {"input": "我最近很焦虑", "expect": "an emotional statement is routed to Mood rather than Health", "verify": "MysticDialogueEngineTest.golden_matrix_handles_variants_and_bounds_input"},
     {"input": "   ", "expect": "blank input is dropped by the reducer, so no reply is generated and nothing is echoed", "verify": "MysticSessionStateTest.input_is_trimmed_and_bounded"},
+    {"input": "「x」×500（超长输入，非用户原话）", "expect": "input is cut to 200 characters before generation and the raw run never leaks into the reply", "verify": "MysticDialogueEngineTest.input_is_normalized_to_two_hundred_characters_before_generation"},
+    {"input": "「来一盘象棋」+「好」×500（棋局内超长输入）", "expect": "an oversized command inside a live game still returns a non-empty reply instead of throwing", "verify": "GameDialogueBridgeTest.empty_and_oversized_inputs_do_not_crash"},
+    {"input": "换皮肤时上一轮回复才到（事件，非用户输入）", "expect": "a context change bumps the session token and clears the turn list, and the late reply carrying the old token is dropped whole", "verify": "MysticSessionStateTest.context_change_invalidates_stale_reply"},
+    {"input": "换 persona 时请求还在飞（事件，非用户输入）", "expect": "the in-flight request returns to Idle, a system line is appended, and a success carrying the stale token changes nothing", "verify": "MysticSessionStateTest.context_change_invalidates_pending_request_and_adds_system_message"},
     {"input": "随便聊聊", "expect": "casual intents answer in their own voice without a 「你问：」 echo", "verify": "MysticDialogueEngineTest.reply_for_chat_has_no_forced_question_prefix"},
     {"input": "你是谁？", "expect": "identity answers name exactly one persona label — 玄学家 or 半仙, never the retired aliases and never the umbrella 玄师", "verify": "MysticGuideGeneratorTest.identity_answers_name_the_persona_exactly_once"},
     {"input": "我是不是抑郁症", "expect": "a verdict-seeking health question is replaced whole by a refusal; no diagnosis is discussed at all", "verify": "MysticSafetyGuardTest.verdict_asks_replace_the_whole_reply_instead_of_topping_it_up"},
