@@ -171,17 +171,41 @@
       "换装按钮标签在窄屏上是否被截断"
     ]
   },
+  "safety": {
+    "owner": "MysticSafetyGuard",
+    "hook": "return MysticSafetyGuard.enforce(",
+    "hooked_producer": "MysticGuideGenerator.customAnswer",
+    "scope": "只有随用户文本变化的自由回复过这道门；开场句、召回句、转场句是模板，不经它",
+    "domains": ["Health", "Finance"],
+    "disclaimers": {
+      "Health": "不构成医疗建议，如有不适请咨询专业人士。",
+      "Finance": "不构成投资建议，请量力而行。"
+    },
+    "disclaimer_partner": "domain/divination/IChing.kt",
+    "forbidden": ["你患有", "你已经得", "确诊", "诊断为", "处方", "剂量", "建议服用", "保证收益", "稳赚", "推荐买", "建议买入", "全仓", "必赢"],
+    "verdict_rule": "域词与结论词成对命中才整句换成拒答；只命中域词时保留原回答并在句尾补一次免责句",
+    "why_not_the_classifier": "「我该吃什么药」在 MysticIntentClassifier 里因句中的「吃」落到 Daily，永远不会走健康分支；红线不能押在路由运气上，所以守卫自带词表",
+    "refusal_lines": 8,
+    "verify": "MysticSafetyGuardTest.refusals_never_state_a_diagnosis_or_a_profit_guarantee",
+    "router_gap_verify": "MysticSafetyGuardTest.the_guard_catches_what_the_topic_router_misses",
+    "wiring_verify": "MysticDialogueEngineTest.custom_answer_routes_every_question_through_the_safety_guard",
+    "false_positive_verify": "MysticSafetyGuardTest.everyday_hesitation_is_not_mistaken_for_a_medical_ask",
+    "unverified": [
+      "免责句在气泡与窄屏上的实际换行、截断与 TalkBack 播报",
+      "语音转写出的医学/理财词是否与原话同域"
+    ]
+  },
   "golden_wording": [
     {"input": "来一盘象棋", "expect": "starts xiangqi, grounded=true", "verify": "GameAutoReplyTest.player_move_marks_engine_turn_pending"},
     {"input": "我执黑", "expect": "acknowledges color choice", "verify": "GameAutoReplyTest.color_change_before_the_first_move_switches_sides"},
     {"input": "走炮二平五", "expect": "applies real move from (7,7) to (4,7)", "verify": "GameAutoReplyTest.player_move_marks_engine_turn_pending"},
-    {"input": "马八进七", "expect": "applies real move from (1,9) to (2,7)", "verify": "XiangqiNotationTest"},
-    {"input": "马八进七这步能走吗", "expect": "answers legality from rules, no turn consumed", "verify": "GameDialogueBridgeTest"},
-    {"input": "兵九进五", "expect": "rejects as illegal, names it as unplayable", "verify": "GameDialogueBridgeTest"},
-    {"input": "悔棋", "expect": "undoes one full round", "verify": "GameSessionReducerTest"},
+    {"input": "马八进七", "expect": "applies real move from (1,9) to (2,7)", "verify": "XiangqiNotationTest.horse_move_records_destination_file_and_round_trips"},
+    {"input": "马八进七这步能走吗", "expect": "answers legality from rules, no turn consumed", "verify": "GameDialogueBridgeTest.legality_question_answers_from_real_rules"},
+    {"input": "兵九进五", "expect": "rejects as illegal, names it as unplayable", "verify": "GameDialogueBridgeTest.illegal_move_reports_real_rejection_code"},
+    {"input": "悔棋", "expect": "undoes one full round", "verify": "GameDialogueBridgeTest.undo_rewinds_full_round"},
     {"input": "重做这一手", "expect": "replays the undone round move by move", "verify": "GameAutoReplyTest.redo_replays_the_undone_round_move_by_move"},
-    {"input": "给我提示", "expect": "returns one real legal move as offline suggestion", "verify": "GameDialogueBridgeTest"},
-    {"input": "复盘刚才那步", "expect": "describes last real move with capture info", "verify": "GameDialogueBridgeTest"},
+    {"input": "给我提示", "expect": "returns one real legal move as offline suggestion", "verify": "GameDialogueBridgeTest.hint_returns_one_real_legal_move"},
+    {"input": "复盘刚才那步", "expect": "describes last real move with capture info", "verify": "GameDialogueBridgeTest.review_describes_last_real_move"},
     {"input": "有哪些威胁", "expect": "names the real attacked piece and its coordinate, and says out loud whether it can be taken back or really hangs", "verify": "GameExplanationTest.threat_report_says_which_pieces_are_really_free"},
     {"input": "这步为什么不好", "expect": "judges a halfmove that really happened from rules only: square walked into, piece left with no recapture; admits when nothing is wrong", "verify": "GameExplanationTest.why_names_the_square_walked_into_and_the_piece_left_free"},
     {"input": "换个稳一点的走法", "expect": "returns a real legal move chosen by attacked-piece counts and states it is not a strength rating", "verify": "GameExplanationTest.safer_quotes_the_move_the_scan_actually_picked"},
@@ -189,21 +213,32 @@
     {"input": "这局我观战", "expect": "hands both sides to the engine (playerColor WHITE)", "verify": "GameAutoReplyTest.spectate_hands_both_sides_to_the_engine"},
     {"input": "残局", "expect": "lists the catalog with its real size", "verify": "GameAutoReplyTest.endgame_catalog_is_listed_and_loadable"},
     {"input": "开第一关", "expect": "loads the puzzle position, title and solver as a real session", "verify": "GameArchiveTest.endgame_archive_keeps_its_puzzle_position_and_solver"},
-    {"input": "退出棋局", "expect": "resets session to empty", "verify": "GameSessionReducerTest"},
-    {"input": "我运势不错这步一定赢", "expect": "refuses cross-domain claim, keeps legality focus", "verify": "GameDialogueBridgeTest"},
+    {"input": "退出棋局", "expect": "resets session to empty", "verify": "GameSessionReducerTest.exit_resets_to_fresh_state"},
+    {"input": "我运势不错这步一定赢", "expect": "refuses cross-domain claim, keeps legality focus", "verify": "GameDialogueBridgeTest.cross_domain_fortune_claim_is_refused"},
     {"input": "保存棋局", "expect": "asks the caller to persist position+moves only, no character commentary", "verify": "GameArchiveTest.save_command_asks_the_caller_to_write_and_keeps_the_session"},
     {"input": "继续棋局", "expect": "asks the caller to read the archive; a live session refuses instead of being overwritten", "verify": "GameArchiveTest.resume_command_asks_the_caller_to_read"},
     {"input": "战绩", "expect": "reads the persisted scoreboard, counts settled results only", "verify": "GameArchiveTest.record_command_reads_the_injected_scoreboard"},
-    {"input": "来一盘围棋", "expect": "explicitly unavailable: go_provider_not_enabled", "verify": "GoAndChessSeamsTest"},
-    {"input": "来一盘国际象棋", "expect": "explicitly unavailable: chess_provider_not_enabled", "verify": "GoAndChessSeamsTest"},
+    {"input": "来一盘围棋", "expect": "explicitly unavailable: go_provider_not_enabled", "verify": "GoAndChessSeamsTest.go_without_gtp_provider_reports_unavailable"},
+    {"input": "来一盘国际象棋", "expect": "explicitly unavailable: chess_provider_not_enabled", "verify": "GoAndChessSeamsTest.chess_without_engine_reports_unavailable"},
     {"input": "上次我聊过什么", "expect": "recites only what this device stored from the user (dates, topic keys, settled results) and adds no verdict", "verify": "MysticGuideGeneratorTest.the_scholar_quotes_the_record_and_adds_no_verdict"},
-    {"input": "清除本机长期记忆", "expect": "deletes exactly this profile's talk_memory key and the panel returns to the empty state; the session-only 「重开对话」 does not", "verify": "ConversationMemoryStoreTest.clearing_removes_exactly_the_one_key_it_owns"}
+    {"input": "清除本机长期记忆", "expect": "deletes exactly this profile's talk_memory key and the panel returns to the empty state; the session-only 「重开对话」 does not", "verify": "ConversationMemoryStoreTest.clearing_removes_exactly_the_one_key_it_owns"},
+    {"input": "继续", "expect": "an ellipsis inherits the last topic instead of resetting to composite", "verify": "MysticDialogueContinuityTest.elliptical_follow_up_inherits_last_topic"},
+    {"input": "那工作怎么办", "expect": "naming a new topic overrides the one carried by the previous turn", "verify": "MysticDialogueContinuityTest.explicit_new_topic_overrides_last_topic"},
+    {"input": "重开对话", "expect": "session-only reset: drops the pending reply and the session notes, and never touches the stored long-term key", "verify": "MysticSessionStateTest.clear_invalidates_pending_reply_and_forgets_session_notes"},
+    {"input": "   ", "expect": "blank input is dropped by the reducer, so no reply is generated and nothing is echoed", "verify": "MysticSessionStateTest.input_is_trimmed_and_bounded"},
+    {"input": "随便聊聊", "expect": "casual intents answer in their own voice without a 「你问：」 echo", "verify": "MysticDialogueEngineTest.reply_for_chat_has_no_forced_question_prefix"},
+    {"input": "你是谁？", "expect": "identity answers name exactly one persona label — 玄学家 or 半仙, never the retired aliases and never the umbrella 玄师", "verify": "MysticGuideGeneratorTest.identity_answers_name_the_persona_exactly_once"},
+    {"input": "我是不是抑郁症", "expect": "a verdict-seeking health question is replaced whole by a refusal; no diagnosis is discussed at all", "verify": "MysticSafetyGuardTest.verdict_asks_replace_the_whole_reply_instead_of_topping_it_up"},
+    {"input": "我该吃什么药", "expect": "the router sends this to Daily, yet the reply is a health refusal carrying the medical disclaimer", "verify": "MysticDialogueEngineTest.custom_answer_routes_every_question_through_the_safety_guard"},
+    {"input": "告诉我买哪只股票一定赚钱", "expect": "no pick, no promise; the finance refusal carries the investment disclaimer", "verify": "MysticDialogueEngineTest.health_and_finance_never_make_diagnostic_or_profit_guarantees"},
+    {"input": "最近体检要注意什么", "expect": "an advisory health question keeps its own reply and gains the medical disclaimer exactly once", "verify": "MysticSafetyGuardTest.advisory_replies_keep_their_own_words_and_gain_the_disclaimer_once"},
+    {"input": "我是不是该辞职", "expect": "everyday hesitation is not treated as a medical or financial verdict ask", "verify": "MysticSafetyGuardTest.everyday_hesitation_is_not_mistaken_for_a_medical_ask"}
   ],
   "everyday_guards": [
-    {"input": "你好", "expectIntent": "greeting"},
-    {"input": "今天运势怎么样", "expectIntent": "fortune"},
-    {"input": "最近睡眠不好", "expectIntent": "health"},
-    {"input": "最近财运如何", "expectIntent": "wealth"},
-    {"input": "车厘子好吃吗", "expectIntent": "chat"}
+    {"input": "你好", "expectIntent": "greeting", "verify": "MysticDialogueGameIntentTest.everyday_phrases_are_not_misread_as_game"},
+    {"input": "今天运势怎么样", "expectIntent": "fortune", "verify": "MysticDialogueGameIntentTest.everyday_phrases_are_not_misread_as_game"},
+    {"input": "最近睡眠不好", "expectIntent": "health", "verify": "MysticDialogueGameIntentTest.everyday_phrases_are_not_misread_as_game"},
+    {"input": "最近财运如何", "expectIntent": "wealth", "verify": "MysticDialogueGameIntentTest.everyday_phrases_are_not_misread_as_game"},
+    {"input": "车厘子好吃吗", "expectIntent": "daily", "verify": "MysticDialogueGameIntentTest.everyday_phrases_are_not_misread_as_game"}
   ]
 }

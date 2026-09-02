@@ -3,7 +3,6 @@ package com.xuanji.app.domain.game
 import com.xuanji.app.domain.MysticIntent
 import com.xuanji.app.domain.MysticIntentClassifier
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /** The dialogue intent classifier must reach the game path and protect existing intents. */
@@ -36,9 +35,8 @@ class MysticDialogueGameIntentTest {
         assertEquals(MysticIntent.Fortune, MysticIntentClassifier.classify("今天运势怎么样"))
         assertEquals(MysticIntent.Health, MysticIntentClassifier.classify("最近睡眠不好"))
         assertEquals(MysticIntent.Wealth, MysticIntentClassifier.classify("最近财运如何"))
-        // 车厘子 contains a piece char but no verb+numeral: must NOT reach the game path
-        val cherry = MysticIntentClassifier.classify("车厘子好吃吗")
-        assertTrue(cherry != MysticIntent.Game)
+        // 车厘子 contains a piece char but no verb+numeral: it stays everyday wording, on Daily
+        assertEquals(MysticIntent.Daily, MysticIntentClassifier.classify("车厘子好吃吗"))
         // a move-like phrase stays game
         assertEquals(MysticIntent.Game, MysticIntentClassifier.classify("走炮二平五"))
     }

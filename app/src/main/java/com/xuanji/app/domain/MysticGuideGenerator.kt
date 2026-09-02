@@ -2717,7 +2717,7 @@ object MysticGuideGenerator {
         val scholar = mode != "half"
         val styleKey = styleKeyFor(mode, topicKey, fortune)
         val cleanCautions = fortune.cautions.replace("\n", " ")
-        return when (intent) {
+        val draft = when (intent) {
             "mood" -> if (scholar) {
                 "今天综合 ${fortune.overallScore} 分，最需要照看的是「${low.label}」 ${low.score} 分。" +
                     "先把睡眠、吃饭和一件最小的事安排好；情绪紧的时候，判断可以晚一点再做。"
@@ -2815,6 +2815,12 @@ object MysticGuideGenerator {
                 test?.testName.orEmpty()
             )
         }
+        return MysticSafetyGuard.enforce(
+            mode,
+            question,
+            (customPulse(question) % 2L).toInt(),
+            draft
+        )
     }
 
     /** 闲聊不报分数：先像熟人一样接话，再留一个轻入口。 */

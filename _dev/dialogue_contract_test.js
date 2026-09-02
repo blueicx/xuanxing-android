@@ -46,8 +46,9 @@ const archiveSource = readGame('GameArchive.kt');
 });
 assert(!/Mystic|fortune|bazi/i.test(archiveSource), 'archive codec must never touch fortune data');
 
-// golden wording coverage (>= 12 entries per plan)
-assert(contract.golden_wording.length >= 12, 'golden wording must have >= 12 entries');
+// golden wording coverage: the set must keep naming each behavioural family, so a
+// deleted group shows up here as a shortfall instead of a quietly smaller list
+assert(contract.golden_wording.length >= 30, `golden wording must keep >= 30 entries, found ${contract.golden_wording.length}`);
 
 // every golden line must name the Kotlin test that proves it, and that test must exist
 const testRelPaths = fs.readdirSync(TEST_DIR, { recursive: true })
@@ -59,14 +60,19 @@ const readTest = (suite) => {
   assert(rel, `no such test suite: ${suite}`);
   return fs.readFileSync(path.join(TEST_DIR, rel), 'utf8');
 };
-// a verify reference may go as deep as Suite.case, and that case must be the real method name
+// a verify reference must go all the way down to Suite.test_case, and that case must be a
+// real @Test method — a bare suite name used to pass on file existence alone, which let
+// golden lines claim a proof that never checked them.
 const requireVerify = (ref, label) => {
-  const [suite, testCase] = ref.split('.');
-  assert(suite, `${label} must name a verifying test`);
+  const dot = String(ref).indexOf('.');
+  assert(dot > 0 && dot < ref.length - 1, `${label} must name Suite.test_case, got "${ref}"`);
+  const suite = ref.slice(0, dot);
+  const testCase = ref.slice(dot + 1);
   assert(testFiles.includes(suite), `${label} points at a missing test: ${suite}`);
-  if (testCase) {
-    assert(readTest(suite).includes(testCase), `${label} names ${suite}.${testCase}, which no longer exists`);
-  }
+  assert(
+    new RegExp(`\\bfun\\s+${testCase}\\b`).test(readTest(suite)),
+    `${label} names ${suite}.${testCase}, which no longer exists`
+  );
   return suite;
 };
 const seenInputs = new Set();
@@ -77,8 +83,17 @@ contract.golden_wording.forEach((entry) => {
   requireVerify(entry.verify, `golden entry "${entry.input}"`);
 });
 
-// everyday guards: safety intents must keep priority over game misreads
-assert(contract.everyday_guards.length >= 4);
+// everyday guards: ordinary wording must keep its intent in the face of the game path
+contract.everyday_guards.forEach((guard) => {
+  assert(guard.input && guard.expectIntent, 'everyday guards need an input and an expected intent');
+  const suite = requireVerify(guard.verify, `everyday guard "${guard.input}"`);
+  const capital = guard.expectIntent[0].toUpperCase() + guard.expectIntent.slice(1);
+  const pinned = `assertEquals(MysticIntent.${capital}, MysticIntentClassifier.classify("${guard.input}"))`;
+  assert(
+    readTest(suite).includes(pinned),
+    `everyday guard "${guard.input}" claims ${guard.expectIntent}, but ${suite} no longer asserts: ${pinned}`
+  );
+});
 
 // unavailable games must expose explicit reason codes, not fake play
 assert.strictEqual(contract.unavailable_games.go, 'go_provider_not_enabled');
@@ -248,5 +263,60 @@ pp.identity_answers.forEach((line) => {
 assert(floatingSource.includes(`label = "${pp.stage_close_label}"`), 'the stage close label changed');
 assert(pp.unverified.length >= 2, 'the persona slice must keep naming what only a device can prove');
 requireVerify(pp.verify, `persona ${pp.verify}`);
+
+// ---- 安全守卫：随用户文本变化的回复只有一个出口 --------------------------------------
+const sg = contract.safety;
+const guardSource = fs.readFileSync(path.join(APP_SRC, 'domain', 'MysticSafetyGuard.kt'), 'utf8');
+const ichingSource = fs.readFileSync(path.join(APP_SRC, sg.disclaimer_partner), 'utf8');
+
+// 守卫一旦 import android，这条 JVM 门禁就退化成只有真机才能跑的声明
+assert(!/^import\s+android/m.test(guardSource), 'MysticSafetyGuard must stay free of Android imports');
+
+// 词表必须与源码同份：改词的人要同时改契约，否则「禁了什么」只剩一个印象
+const forbiddenDeclared = [...guardSource.split('val FORBIDDEN')[1].split(')')[0].matchAll(/"([^"]+)"/g)].map((m) => m[1]);
+assert.deepStrictEqual(sg.forbidden, forbiddenDeclared, 'safety.forbidden must mirror MysticSafetyGuard.FORBIDDEN');
+assert(forbiddenDeclared.length >= 10, 'the forbidden list must keep naming conclusions, not moods');
+
+// 免责句沿用盘面上已有的那两句，一字不差，免得同一个app出现两套免责口径
+Object.entries(sg.disclaimers).forEach(([domain, line]) => {
+  assert(
+    guardSource.includes(`const val ${domain.toUpperCase()}_DISCLAIMER = "${line}"`),
+    `the ${domain} disclaimer no longer matches the contract: ${line}`
+  );
+  assert(ichingSource.includes(line), `${sg.disclaimer_partner} stopped using this disclaimer: ${line}`);
+});
+
+// customAnswer 的唯一出口就是这道门；出现第二个 return 等于把守卫旁路掉
+assert(generatorSource.includes(sg.hook), `${sg.hooked_producer} no longer returns through MysticSafetyGuard.enforce`);
+assert(!/return when \(intent\)/.test(generatorSource), 'a second unguarded return in customAnswer would bypass the safety guard');
+
+// 拒答句数 = 两个域 × 两个人设 × 两种说法；少一句说明某格被并回了一句通用模板
+const refusalBody = guardSource.split('fun refusal(')[1].split('\n    }')[0];
+assert.strictEqual(
+  (refusalBody.match(/-> "/g) || []).length,
+  sg.refusal_lines,
+  `each domain × persona × variant needs its own refusal, expected ${sg.refusal_lines}`
+);
+
+// 域词与结论词必须成对命中；只凭「是不是」就拒答会把日常犹豫当成看病
+['HEALTH', 'FINANCE'].forEach((side) => {
+  assert(
+    guardSource.includes(`${side}_MARKERS.any { text.contains(it) } && ${side}_VERDICTS.any { text.contains(it) }`),
+    `a ${side.toLowerCase()} refusal must be paired with ${side.toLowerCase()} wording, not a verdict word alone`
+  );
+});
+
+// 守卫自带词表的理由必须仍然成立：分类器现在也认不出「药」，这句才会落到 Daily
+const classifierSource = fs.readFileSync(path.join(APP_SRC, 'domain', 'MysticIntentClassifier.kt'), 'utf8');
+const dailyLine = classifierSource.split('\n').find((line) => line.includes('MysticIntent.Daily'));
+const healthLine = classifierSource.split('\n').find((line) => line.includes('MysticIntent.Health'));
+assert(
+  dailyLine.includes('"吃"') && !healthLine.includes('"药"'),
+  'the guard exists because 吃什么药 routes to Daily — if the router learned 药, rewrite safety.why_not_the_classifier'
+);
+
+assert(sg.unverified.length >= 2, 'the safety slice must keep naming what only a device can prove');
+[sg.verify, sg.router_gap_verify, sg.wiring_verify, sg.false_positive_verify]
+  .forEach((ref) => requireVerify(ref, `safety ${ref}`));
 
 console.log('dialogue contract: PASS (' + contract.golden_wording.length + ' golden entries)');

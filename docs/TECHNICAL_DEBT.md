@@ -31,19 +31,26 @@
   证据：`:app:testDebugUnitTest` 266 项通过（新增 `personaName_labels_the_two_modes_and_never_the_umbrella`、`identity_answers_name_the_persona_exactly_once`；后者遍历 5 组盘面 × 7 个话题 × 2 个模式，断言六种作风全部可达且每条身份回答只自称一次）、`:app:lintDebug` 0 error、`:app:assembleDebug` 重新产出 `app-debug.apk`、`node _dev/dialogue_contract_test.js` PASS。拆成两个提交后，只有单测（`--rerun` 强制重跑）与契约脚本在最终树上重新执行过，lint 与 APK 是同内容拆分前那次门禁的产物；`styleKeyFor` 那一笔没有在隔离状态下单独跑过测试——它相对最终树只少了称谓改名，而既有断言与契约都没有钉过受影响的那几句文案，因此判断为安全，但这是推理而非观测。`assembleDebugAndroidTest` 判定 UP-TO-DATE，但 `compileDebugAndroidTestKotlin` 已针对改动后的 main 源码重新编译通过——12 项棋盘交互用例仍未在任何设备或 CI 上执行。**以上均为本机 JVM / 静态扫描 / 编译证据**：实机上浮球与舞台的称谓渲染、TalkBack 实际播报、换装标签在窄屏是否截断，以及签到 / 节奏延后应答修复后是否真的出现在界面上，都未验证。
   同类残留（未在本轮处理）：`TodayOracle` 仍以显示名作查询键——`oracleRole` 返回「玄学家 / 半仙」，`when (role)`、`if (firstRole == "玄学家")` 与 12 条对照表都依赖这两个字面量；称谓改名不会像浮球动画那样静默走错分支（`when` 不匹配会落到 `else`），但仍属「行为依赖显示字符串」，若要收口应改为稳定的 role 键。
 
+- 医疗/财务红线与契约去空转（2026-09-02）：一个切片。
+  9. `MysticSafetyGuard`（纯 Kotlin，无 Android 依赖）接在 `customAnswer` 的返回处：原先 `return when (intent) { … }` 改为先收成 `draft`，再由 `enforce(mode, question, variant, draft)` 决定整条回复。命中「领域词 + 结论词」成对出现时**整句换成拒答**（两个模式 × 两个领域 × 两个变体 = 8 句，各带本领域免责句），只命中领域词时保留原回答并在句尾补一次免责句、已有则不重复。变体由既有私有 `customPulse(question) % 2L` 选出，该 hash 始终非负，因此同一问题永远得到同一句。守卫自带词表而不复用 `MysticIntentClassifier`：分类器按主题分流，「我该吃什么药」因句中的「吃」落到 `Daily`（`MysticIntentClassifier.kt:61`），Health 的 needle 里从来没有「药」——红线不能押在路由运气上。成对命中也保证「最近睡眠不好」这类陈述不会被当成问诊。
+  契约同时被去掉三处空转：`requireVerify` 以前只要求写出测试**文件名**且用 `.includes()` 比对方法名（截断的方法名前缀也能通过），现在强制 `Suite.case` 两级并用 `\bfun\s+case\b` 校验真实方法；10 处只写了 suite 的 verify 全部补成具体用例；`golden_wording` 从 26 扩到 37，补上此前完全无契约约束的 `继续` / `那工作怎么办` / `重开对话` / 纯空白输入 / 超长输入 / `你是谁？` 与四条红线用例，`everyday_guards` 每条改为逐字钉住测试里的 `assertEquals(MysticIntent.X, classify("input"))` 断言。顺带修掉两处既有假话：契约原写「车厘子好吃吗 → chat」，实际分类器返回 `Daily`，`MysticDialogueGameIntentTest` 里那句 `assertTrue(cherry != MysticIntent.Game)` 已换成对 `Daily` 的确切断言，改坏任一侧都会失败。空输入与超长输入按用户决定**维持现状**（reducer 里 trim / 200 字符截断 / 纯空白丢弃），没有新增界面文案。
+  证据：`:app:testDebugUnitTest --rerun` 278 项通过（0 失败 0 跳过，较上一轮 +12 = `MysticSafetyGuardTest` 11 项 + `MysticDialogueEngineTest.custom_answer_routes_every_question_through_the_safety_guard` 1 项）、`:app:lintDebug` 0 errors / 81 warnings（均为既有）、`:app:assembleDebug` 重新产出 `app-debug.apk`、`:app:assembleDebugAndroidTest` 的 `compileDebugAndroidTestKotlin` 针对改动后的 main 源码重新编译通过、`node _dev/dialogue_contract_test.js` PASS（37 条 golden）。五项都在最终树上跑过。为确认新断言不是空转做过两次反证：把 `customAnswer` 临时改回直接 `return when (intent)`，结果只有那一条接线用例失败（10 项中 1 failed），恢复后全绿；把一处 verify 的方法名截成前缀（`…_round_trip` 对应实际的 `…_round_trips`），旧脚本按 `.includes()` 放行、新脚本按预期报错。本切片尚未推送，因此 CI 干净 runner 没有跑过它，`457dc7a` 那次 pass 不能代表这一轮。**以上均为本机 JVM / 静态扫描 / 编译证据**：8 句拒答与免责声明在实机气泡里的换行、窄屏截断与 TalkBack 播报，以及两种作风下拒答语气的实际观感，均未验证（已列入契约 `safety.unverified`）。
+
 ## P1：继续拆分大文件
 
-| 文件 | 当前规模（约） | 已完成 | 下一步 |
+| 文件 | 当前规模 | 已完成 | 下一步 |
 | --- | ---: | --- | --- |
-| `MysticGuideGenerator.kt` | 3.4k 行 | 对话 seam、intent classifier 已抽离 | 将模板选择与安全约束抽成纯 Kotlin 文件，保持确定性 hash 不变 |
-| `MysticGuideCard.kt` | 2.4k 行 | provider/session 接入 | 将输入栏/快捷问题和会话渲染拆成独立 composable 文件，先保持参数和状态提升方式不变 |
-| `MysticFloatingGuide.kt` | 2.6k 行 | `MysticOrb.kt` 已拆出；舞台仍在原文件 | 将舞台外壳与人物绘制分开；人物绘制 helper 需继续保持同一 skin/mood 输入 |
+| `MysticGuideGenerator.kt` | 3468 行 | 对话 seam、intent classifier、医疗/财务红线（`MysticSafetyGuard.kt`，109 行）均已抽离 | 按 intent 把模板与语气表拆成纯 Kotlin 文件，保持确定性 hash 与 `customAnswer` 唯一 `enforce` 调用点不变 |
+| `MysticGuideCard.kt` | 2719 行 | provider/session 接入；输入栏与快捷问题已抽到 `MysticConversationPanel.kt`（130 行，卡面两处调用点复用同一 `submitPanelInput`） | 继续拆会话气泡与卡面主体渲染，先保持参数和状态提升方式不变 |
+| `MysticFloatingGuide.kt` | 2683 行 | `MysticOrb.kt` 已拆出；舞台仍在原文件 | 将舞台外壳与人物绘制分开；人物绘制 helper 需继续保持同一 skin/mood 输入 |
 
 拆分规则：一次只移动一个稳定边界；不改变公共 API、资源 ID、角色 seed 或默认离线行为；每次移动后必须跑编译、单测、lint 和 debug assemble。
 
 ## P1：对话回归矩阵
 
-继续扩充 Android 与小程序的 golden wording，至少保持以下类别：问候、感谢/告别、身份、闲聊、情绪、健康、财务、连续追问、换主题/角色/皮肤、空输入与超长输入。所有回复必须经过本地 persona/safety guard，不能伪造命盘事实或给出医疗/投资结论。
+继续扩充 Android 与小程序的 golden wording，至少保持以下类别：问候、感谢/告别、身份、闲聊、情绪、健康、财务、连续追问、换主题/角色/皮肤、空输入与超长输入。
+
+红线的真实边界（本轮收口，见「当前基线」第 9 条）：`MysticGuideGenerator.customAnswer` 是唯一随用户输入变化的应答生产者，它的 `when (intent)` 结果现在统一过 `MysticSafetyGuard.enforce`（`MysticGuideGenerator.kt:2818`，全仓唯一调用点）；开场签到、本机召回句与过渡语是固定模板，不经这道关——它们本来也不回答用户的提问。因此「所有回复都过 safety guard」这句旧描述不准确，准确的表述是：**任何由用户文本决定的回复都必须过 `enforce`，模板句由各自的 golden 约束**。空输入与超长输入维持 reducer 现有行为（trim、200 字符截断、纯空白丢弃），不再假设界面上会出现新的提示文案。
 
 交流面板已新增统一的消息/请求状态控件，后续只需继续扩充 golden wording，不再为每个入口维护独立的输入状态。
 
@@ -55,6 +62,7 @@ persona 命名漂移（已收口，见「当前基线」第 7 条）：同两个
 - reduced-motion 已关闭浮球位移和持续旋转；后续检查完整舞台呼吸动画、键盘导航和旋转/返回键状态恢复。
 - 复测 safe area：浮球不遮挡分数卡、底部导航和系统手势区。
 - 本机长期记忆面板：召回句在气泡里的排布、「清除本机长期记忆」的焦点顺序与实机 48dp 命中区、清除后是否回到空态，均只有源码级证据；恢复设备验证时按 TalkBack 顺序复测，不以截图替代。
+- 医疗/财务拒答与免责句：8 句拒答（两种作风 × 两个领域 × 两个变体）在气泡里的换行、窄屏是否截断、TalkBack 是否完整念出免责句，均只有 JVM 断言；恢复设备时逐句复测，抽查一句不能代替全部 8 句。
 - 本轮手机复测暂缓，恢复时优先覆盖同日生折叠按钮的 TalkBack 标签、作品卡阅读顺序和舞台文化场景的对比度。
 
 ## P2：Provider seam
