@@ -2498,9 +2498,9 @@ object MysticGuideGenerator {
 
     fun topicLabel(key: String): String = topics[key] ?: "综合"
 
-    /** 供界面校验异步回应仍属于当前话题与作风；结果完全由既有盘面输入决定。 */
+    /** 供界面校验异步回应仍属于当前话题与作风；必须与 MysticGuide.styleKey 同源，否则守卫永远不通过。 */
     fun styleKeyFor(mode: String, topicKey: String, fortune: CompositeDailyFortune): String =
-        style(mode != "half", topicKey, fortune).second
+        style(mode != "half", topicKey, fortune).first
 
     /** 等待行也带作风，让“正在处理”像一个人手上的小动作。 */
     fun thinkingLine(mode: String, styleKey: String, kind: String): String {
