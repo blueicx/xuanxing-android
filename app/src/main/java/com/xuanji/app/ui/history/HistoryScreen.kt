@@ -1,5 +1,6 @@
 package com.xuanji.app.ui.history
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -12,15 +13,24 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.xuanji.app.data.model.HistoryEvent
 import com.xuanji.app.di.AppModule
 import com.xuanji.app.domain.SameDayBirth
+import com.xuanji.app.domain.SameDayWork
+import com.xuanji.app.domain.SameDayWorks
+import com.xuanji.app.domain.WorkKind
 import com.xuanji.app.ui.viewmodel.HistoryViewModel
 import com.xuanji.app.ui.xuanjiViewModel
 import java.time.LocalDate
@@ -103,11 +113,15 @@ fun HistoryScreen() {
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         SameDayBirth.forToday(sameDayDate).forEach { SameDayBirthCard(it) }
+        SameDayWorks.forDate(sameDayDate).forEach { SameDayWorkCard(it) }
     }
 }
 
 @Composable
 private fun SameDayBirthCard(fig: SameDayBirth.Figure) {
+    var expanded by rememberSaveable(fig.name, fig.date) { mutableStateOf(false) }
+    val summary = HistoryCopy.summary(fig.note)
+
     Card(Modifier.fillMaxWidth()) {
         Column(
             Modifier.padding(16.dp),
@@ -119,14 +133,68 @@ private fun SameDayBirthCard(fig: SameDayBirth.Figure) {
                 color = MaterialTheme.colorScheme.onSurface
             )
             Text(
-                fig.note,
+                summary,
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+            AnimatedVisibility(visible = expanded && summary != fig.note) {
+                Text(
+                    fig.note,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            if (summary != fig.note) {
+                TextButton(
+                    onClick = { expanded = !expanded },
+                    modifier = Modifier.semantics {
+                        contentDescription = if (expanded) "收起评语" else "展开评语"
+                    }
+                ) {
+                    Text(if (expanded) "收起评语" else "展开评语")
+                }
+            }
             Text(
                 "出生 · ${fig.date}",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.primary
+            )
+        }
+    }
+}
+
+@Composable
+private fun SameDayWorkCard(work: SameDayWork) {
+    Card(Modifier.fillMaxWidth()) {
+        Column(
+            Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Text(
+                "${if (work.kind == WorkKind.MUSIC) "🎵" else "📝"} ${work.title}",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Text(
+                buildString {
+                    append(work.creator)
+                    work.year?.takeIf { it > 0 }?.let { append(" · $it") }
+                    append(" · ${work.style}")
+                },
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            if (work.publicDomain && !work.excerpt.isNullOrBlank()) {
+                Text(
+                    "“${work.excerpt}”",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            }
+            Text(
+                work.note,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
     }

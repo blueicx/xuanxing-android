@@ -1,6 +1,12 @@
 package com.xuanji.app.ui.components
 
 import android.content.Intent
+import android.content.ClipData
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.platform.LocalContext
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
@@ -22,6 +28,7 @@ object ResultShare {
         val periodLabel = when (period) {
             "week" -> "本周"
             "month" -> "本月"
+            "year" -> "本年"
             else -> "今日"
         }
         val scoreText = score?.let { " ${it}分" } ?: ""
@@ -30,16 +37,28 @@ object ResultShare {
 }
 
 @Composable
-fun ShareButton(sharedText: String, modifier: Modifier = Modifier) {
+fun ShareButton(
+    sharedCard: ShareCard,
+    modifier: Modifier = Modifier
+) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
 
     IconButton(
         onClick = {
-            val intent = Intent(Intent.ACTION_SEND).apply {
-                type = "text/plain"
-                putExtra(Intent.EXTRA_TEXT, sharedText)
+            scope.launch {
+                val uri = withContext(Dispatchers.IO) {
+                    val file = ResultShareCardRenderer.shareImage(context, sharedCard)
+                    ResultShareCardRenderer.uri(context, file)
+                }
+                val intent = Intent(Intent.ACTION_SEND).apply {
+                    type = "image/png"
+                    putExtra(Intent.EXTRA_STREAM, uri)
+                    clipData = ClipData.newRawUri(sharedCard.title, uri)
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                }
+                context.startActivity(Intent.createChooser(intent, sharedCard.title))
             }
-            context.startActivity(Intent.createChooser(intent, null))
         },
         modifier = modifier
             .size(38.dp)

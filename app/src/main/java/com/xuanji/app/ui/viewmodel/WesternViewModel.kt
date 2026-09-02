@@ -2,6 +2,8 @@ package com.xuanji.app.ui.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.xuanji.app.data.model.CompositeDailyFortune
+import com.xuanji.app.data.model.BaziFull
 import com.xuanji.app.data.model.WesternDailyFortune
 import com.xuanji.app.data.repository.FortuneRepository
 import com.xuanji.app.domain.ZodiacCalculator
@@ -9,6 +11,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 
@@ -16,9 +19,11 @@ sealed interface WesternUiState {
     data object Loading : WesternUiState
     data object Empty : WesternUiState
     data class Ready(
+        val bazi: BaziFull?,
         val detail: ZodiacCalculator.WesternDetail,
         val fortune: WesternDailyFortune,
         val chart: ZodiacCalculator.NatalChart,
+        val composite: CompositeDailyFortune?,
         val period: String = "day"
     ) : WesternUiState
 }
@@ -30,15 +35,24 @@ class WesternViewModel(private val repository: FortuneRepository) : ViewModel() 
 
     init {
         viewModelScope.launch(Dispatchers.Default) {
-            repository.natalChartFlow.collect { chart ->
-                if (chart == null) {
-                    _uiState.value = WesternUiState.Empty
-                } else {
+            combine(repository.baziFullFlow, repository.natalChartFlow) { full, chart -> full to chart }
+                .collect { (full, chart) ->
+                    if (chart == null) {
+                        _uiState.value = WesternUiState.Empty
+                        return@collect
+                    }
                     val detail = ZodiacCalculator.detailFromChart(chart)
                     val fortune = repository.getWesternFortune(detail.sun, LocalDate.now(), currentPeriod)
-                    _uiState.value = WesternUiState.Ready(detail, fortune, chart, currentPeriod)
+                    val composite = full?.let {
+                        repository.getCompositeFortune(
+                            it.chart,
+                            detail.sun,
+                            LocalDate.now(),
+                            currentPeriod
+                        )
+                    }
+                    _uiState.value = WesternUiState.Ready(full, detail, fortune, chart, composite, currentPeriod)
                 }
-            }
         }
     }
 
@@ -46,12 +60,15 @@ class WesternViewModel(private val repository: FortuneRepository) : ViewModel() 
         if (period == currentPeriod) return
         currentPeriod = period
         viewModelScope.launch(Dispatchers.Default) {
+            val full = repository.baziFullFlow.value
             val chart = repository.natalChartFlow.value
-            if (chart != null) {
-                val detail = ZodiacCalculator.detailFromChart(chart)
-                val fortune = repository.getWesternFortune(detail.sun, LocalDate.now(), period)
-                _uiState.value = WesternUiState.Ready(detail, fortune, chart, period)
+            if (chart == null) return@launch
+            val detail = ZodiacCalculator.detailFromChart(chart)
+            val fortune = repository.getWesternFortune(detail.sun, LocalDate.now(), period)
+            val composite = full?.let {
+                repository.getCompositeFortune(it.chart, detail.sun, LocalDate.now(), period)
             }
+            _uiState.value = WesternUiState.Ready(full, detail, fortune, chart, composite, period)
         }
     }
 }

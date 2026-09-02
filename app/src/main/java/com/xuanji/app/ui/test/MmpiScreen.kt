@@ -104,7 +104,7 @@ private fun IntroMmpi(onStart: () -> Unit) {
         SectionTitle("关于 MMPI")
         Spacer(Modifier.height(8.dp))
         Text(
-            "MMPI（明尼苏达多相人格测验）是应用最广泛的心理测验之一，通过效度量表与临床量表评估心理健康状况。本简化版共 20 题，每题作答「是」或「否」。",
+            "本页是受 MMPI 量表概念启发的 20 题自编风格问卷，使用中性维度观察作答倾向；它不是 MMPI/MMPI-3，不能评估心理健康或替代专业测验。每题作答「是」或「否」。",
             style = MaterialTheme.typography.bodyMedium
         )
         Spacer(Modifier.height(12.dp))
@@ -127,7 +127,7 @@ private fun MmpiResultPage(answers: List<Boolean>, onRestart: () -> Unit) {
     val result = Mmpi.calculate(answers)
     androidx.compose.runtime.LaunchedEffect(Unit) {
         val top = result.scales.maxByOrNull { it.tScore }
-        TestRecordRecorder.save("MMPI 心理测试", "性格", "MMPI·${top?.code ?: "N/A"}(T=${top?.tScore ?: 0})", if (result.valid) "测验有效" else "测验存疑", "MMPI|${result.valid}")
+        TestRecordRecorder.save("MMPI 风格自我探索", "自我探索", "演示维度·${top?.name ?: "N/A"}(${top?.tScore ?: 0})", if (result.valid) "自我探索完成" else "作答需复核", "MMPI_STYLE|${result.valid}")
     }
 
     FortuneCard {
@@ -174,7 +174,7 @@ private fun MmpiResultPage(answers: List<Boolean>, onRestart: () -> Unit) {
         SectionTitle("📌 关于 MMPI")
         Spacer(Modifier.height(6.dp))
         Text(
-            "MMPI 常被用于临床心理评估，需由专业人员解释。本简化版为通识改编，各量表 T 分（≥60 偏高）仅供参考，不能替代专业心理评估或医学诊断。",
+            "正式 MMPI/MMPI-3 需要授权题本、标准常模和受训专业人员解释。本页仅为离线通识改编，演示分数（≥60 仅表示本问卷内相对偏高）不能用于心理健康判断、医学诊断或治疗决策。",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )

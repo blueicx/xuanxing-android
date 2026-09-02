@@ -1,0 +1,271 @@
+{
+  "version": 2,
+  "defaultMode": "offline",
+  "game_intents": {
+    "start_xiangqi": ["来一盘象棋", "来一盘中国象棋", "下一盘象棋", "陪我下象棋", "开一局象棋"],
+    "start_go": ["来一盘围棋"],
+    "start_chess": ["来一盘国际象棋"],
+    "move": ["走炮二平五", "马八进七", "炮二平五", "马8进7"],
+    "undo": ["悔棋"],
+    "redo": ["重做这一手"],
+    "hint": ["给我提示", "提示"],
+    "review": ["复盘刚才那步", "复盘"],
+    "threats": ["有哪些威胁", "我有哪些子被威胁"],
+    "difficulty": ["难度困难", "轻松一点"],
+    "spectate": ["这局我观战", "替我下"],
+    "endgame_list": ["残局"],
+    "endgame_start": ["开第一关", "来局残局"],
+    "exit": ["退出棋局"],
+    "save": ["保存棋局", "存档"],
+    "resume": ["继续棋局", "接着上次那局"],
+    "record": ["战绩", "比分"],
+    "legality_question": ["马八进七这步能走吗", "这步能走吗"]
+  },
+  "game_events": ["Start", "ApplyMove", "EngineReply", "Undo", "Redo", "SetDifficulty", "SetColor", "Cancel", "Exit"],
+  "board_encoding": {
+    "square": "file 0..8 (left to right), rank 0..9 (rank 0 = black back rank, rank 9 = red back rank)",
+    "fenLike": "rows top(black rank 0) to bottom(red rank 9), uppercase = red, lowercase = black, side suffix ' r'/' b'",
+    "initial": "rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C5C1/9/RNBAKABNR r",
+    "uci": "file letter a..i (file 0 = a), row digit '9'-'rank' (rank 9 -> '0')"
+  },
+  "token_drop_rule": "any GameEvent whose token != state.sessionToken returns the state unchanged; Start/Exit reset the session",
+  "grounded_reply_required": true,
+  "rejection_codes": ["from_empty", "wrong_turn", "illegal_move", "self_check", "game_over"],
+  "unavailable_games": {
+    "go": "go_provider_not_enabled",
+    "chess": "chess_provider_not_enabled"
+  },
+  "engine": {
+    "levels": ["easy", "normal", "hard"],
+    "default": "normal",
+    "auto_reply": "when a result sets awaitEngine, callers must keep driving engineReply until shouldAskEngine is false; every engine move is re-verified by XiangqiRules before it reaches the board",
+    "spectate": "playerColor WHITE means the engine plays both sides",
+    "reply_voice": "engine replies are first person (我走「…」) so they never read as the human's move",
+    "verify": "GameAutoReplyTest.engine_reply_lands_a_rules_verified_move_and_returns_the_turn"
+  },
+  "draw_rules": {
+    "repetition": "same position encoding three times in the session positionLog",
+    "no_capture_limit": "60 consecutive halfmoves without a capture",
+    "wording": "和棋（双方不变作和） / 和棋（无吃子限着判和）",
+    "note": "draws are a session-level verdict: XiangqiRules.outcome alone can never report 和棋",
+    "verify": "GameAutoReplyTest.draw_reply_text_comes_from_the_draw_reason"
+  },
+  "archive_codec": {
+    "dto": "GameSave = { version, start (FEN-like), moves (UCI list), playerColor, difficulty, title, savedAt }",
+    "why_uci": "same-file twin rooks are ambiguous in Chinese notation, so archives store coordinates",
+    "restore": "every halfmove replays through reduceGame + XiangqiRules; replay stops at the first rejection and the reply states how many halfmoves were dropped",
+    "scope": "board data only — character commentary is never written to or read from an archive",
+    "storage": "bridge returns an archive request (SAVE/RESUME); the Compose caller performs the DataStore work"
+  },
+  "scoreboard": {
+    "keys": "game_save_<sha256(profileKey)> and game_record_<sha256(profileKey)>",
+    "settled_only": "only checkmate / stalemate / draw results move a number; spectated games are not scored",
+    "once_per_session": "a session token tallies at most one result"
+  },
+  "board_ui": {
+    "square_tag": "square-$file-$rank",
+    "difficulty_tag": "difficulty-$level",
+    "status_text": ["红方行棋", "黑方行棋", "引擎推演中···"],
+    "review_template": "回放第 $ply/$totalPly 手",
+    "legal_target_description": "可落子格",
+    "piece_description_prefixes": ["红方", "黑方"],
+    "instrumented_test": "app/src/androidTest/.../game/GameBoardCardTest.kt",
+    "note": "the instrumented cases are compiled by assembleDebugAndroidTest but have not been run on a device; their premises are pinned on the JVM by BoardUiFixtureTest"
+  },
+  "explanation": {
+    "commands": {
+      "why": ["这步为什么不好", "刚才那步走错了吗", "这手怎么样"],
+      "safer": ["换个稳一点的走法", "更安全的一手", "走法稳些"]
+    },
+    "triggers": {
+      "why": ["这步", "刚才", "为什么", "走错", "不好"],
+      "safer": ["更稳", "稳一点", "安全"]
+    },
+    "facts_source": "BoardExplanation reads only XiangqiRules.legalMoves: which enemy moves land on a square, and whether a legal recapture still exists after the attacker is moved onto it",
+    "recapture_rule": "被攻击不等于白送——只有攻击方落子之后己方无合法回吃才算白送；被牵死的保护子不计入保护，这一点交给 legalMoves 判定，不另写规则",
+    "king_rule": "规则不会生成吃掉将/帅的着法，因此被照住的将/帅永远不会被报成白送",
+    "difficulty_scaling": "easy 不加评注；normal 只说落点被谁盯住与新送出的子；hard 再多报几个「被盯住但有子护着」",
+    "safer_scan": "候选按棋盘扫描序取前 N（easy 6 / normal 14 / hard 40），只比较「走完后己方被盯住的子数」，平手取先出现的，因此不依赖随机值也能复现",
+    "forbidden_pattern": "胜率|等级分|Elo|评分|棋力|[0-9]+\\.[0-9]+%?",
+    "private_eval": "private fun evaluate",
+    "private_eval_file": "SmartBoardEngine.kt",
+    "determinism": "同一局面+同一难度重复回答、以及两个独立 bridge 实例，字符串必须全等",
+    "verify": "GameExplanationTest.no_in_game_reply_states_a_rating_or_a_probability",
+    "determinism_verify": "GameExplanationTest.two_bridges_explain_the_same_board_identically",
+    "premise_verify": "BoardExplanationTest.aPinnedProtectorDoesNotMakeAPieceSafe"
+  },
+  "conversation_memory": {
+    "kinds": ["user_input", "user_choice", "settled_game_result"],
+    "red_line": "角色的生成文案在 RecollectionKind 里没有对应种类，所以「不把生成内容伪装成长期记忆」在类型上成立，而不是靠调用方自觉",
+    "key": "talk_memory_<sha256(profileKey)>",
+    "key_prefix": "talk_memory_",
+    "digest_charset": "UTF_8",
+    "max_entries": 20,
+    "overflow": "超出上限挤掉最旧的一条并计入 dropped（随记忆一起写盘）；同 kind+date+text 的去重不算损失",
+    "read_states": "没存过→空记忆；整块读不出→null。开场文案必须区分「本机从没记过」和「本机记录读不出来」，后者不得假装什么都没丢",
+    "opening_line": "开场召回句只反映进面板时本机已存的内容，在本次访问里不再变；「现场手记」里的记忆列表则实时更新",
+    "gated_styles": {
+      "scholar": ["archive", "harbor", "compass"],
+      "half": ["herald", "alley", "intern"]
+    },
+    "golden_wording": [
+      "8月30日、9月1日你聊过「事业、财富」。这几句是你自己留在本机的，我不加判词。",
+      "——都是你自己压在本机上的话，我可没现编。",
+      "棋本上记着象棋·胜、象棋·负",
+      "更早的 7 条已清理，本机只留最近 20 条。",
+      "本机那几页记录读不出来，这次不引旧话。",
+      "摊子上那本旧账我翻不开，这次不装记得。",
+      "这里只存你自己打的字、点过的选项和终局结果；角色说的话不留档。",
+      "清除本机长期记忆"
+    ],
+    "rating_pattern": "胜率|等级分|Elo|评分|棋力|[0-9]+\\.[0-9]+",
+    "fragments": [
+      "你聊过",
+      "棋本上记着",
+      "这几句是你自己留在本机的，我不加判词。",
+      "——都是你自己压在本机上的话，我可没现编。",
+      "本机只留最近",
+      "本机那几页记录读不出来，这次不引旧话。",
+      "摊子上那本旧账我翻不开，这次不装记得。"
+    ],
+    "neighbours": {
+      "game_save_": "data/local/GameArchiveStore.kt",
+      "game_record_": "data/local/GameArchiveStore.kt",
+      "mystic_visit_": "ui/components/MysticGuideCard.kt",
+      "card_layout_": "ui/components/CardLayout.kt",
+      "user_profile": "data/repository/FortuneRepository.kt"
+    },
+    "settled_note": "终局一行的文字来自 GameRecord.settledNote，与战绩板同一个令牌表；没结算就返回空串，调用方无从伪造",
+    "clear_button": {"min_height_dp": 48, "content_description": "清除本机长期记忆"},
+    "verify": "ConversationMemoryStoreTest.clearing_removes_exactly_the_one_key_it_owns",
+    "codec_verify": "MysticRecollectionTest.generated_copy_has_no_kind_it_could_be_stored_under",
+    "unverified": [
+      "DataStore 真机往返与跨进程存活",
+      "清除是否真的释放磁盘上的那条记录",
+      "召回文案在气泡里的实际排布",
+      "清除按钮的 TalkBack 播报与 ≥48dp 触摸目标",
+      "safest 在困难档低端机上的耗时"
+    ]
+  },
+  "persona": {
+    "umbrella": "玄师",
+    "names": { "scholar": "玄学家", "half": "半仙" },
+    "retired": ["慈翁", "魔师"],
+    "name_fn": "fun personaName(mode: String): String = if (mode == \"half\") \"半仙\" else \"玄学家\"",
+    "orb_motion": "tween(if (half) 3500 else 5200, easing = LinearEasing)",
+    "orb_amplitude": "if (half) 3f else 2f",
+    "orb_role_binding": "roleName = MysticGuideGenerator.personaName(stageMode)",
+    "orb_mode_binding": "half = stageMode == \"half\"",
+    "stage_close_label": "关闭玄师台",
+    "identity_answers": [
+      "$name，一个守旧档的人。我不替你判命，只帮你看清手边能做的事。",
+      "我叫$name。夜里守灯，白天听人说话；算盘有几把，但从不吓人。",
+      "$name。罗盘在我手里，方向盘仍在你手里。",
+      "街口$name。收费随缘，实话管饱。",
+      "$name！台前能镇场，幕后会记账；命理这行，也得讲证据。",
+      "云端实习$name。天机会看，大话不说。"
+    ],
+    "verify": "MysticGuideGeneratorTest.identity_answers_name_the_persona_exactly_once",
+    "unverified": [
+      "浮球与舞台在实机上的称谓渲染、TalkBack 实际播报",
+      "换装按钮标签在窄屏上是否被截断"
+    ]
+  },
+  "today_oracle": {
+    "file": "domain/divination/TodayOracle.kt",
+    "role_keys": { "Scholar": "scholar", "Half": "half" },
+    "label_source": "MysticGuideGenerator.personaName(modeKey)",
+    "tiers": ["High", "Mid", "Low"],
+    "banned_key_literals": ["\"玄学家\"", "\"半仙\"", "\"high\"", "\"mid\"", "\"low\""],
+    "tier_declaration": "档次逐条声明在签表上（OraclePoem(tier, level, poem, advice)），level→tier 映射由 POEMS 派生；旧的 oracleTier(level) 字符串 when 已删，键不匹配不再静默落到最低档",
+    "cache_shape": "OracleResult 仍只持久化 level/poem/luckyNumber/luckyColor/good/avoid/advice 七个字段，tier 是计算属性；缓存经 Gson 读写，多一个字段就会让当天已存的记录反序列化出 null",
+    "relay_gate": "observerRelayGate 的哈希输入仍是 7 个显示字段 + choiceKey + oracle-relay，不含 tier，因此改键不会挪动补话的触发时机",
+    "poems": 12,
+    "verify": "TodayOracleTest.rekeying_preserves_every_reaction_and_exit_line_verbatim",
+    "shape_verify": "TodayOracleTest.the_cached_oracle_shape_is_unchanged",
+    "persona_verify": "TodayOracleTest.the_two_oracle_personas_share_the_companion_labels",
+    "determinism_verify": "TodayOracleTest.relay_and_replies_are_deterministic_per_draw_and_choice",
+    "unverified": [
+      "灵签页在实机上的渲染：头像取的字、离席句与帘外补话的排布",
+      "当天已缓存的旧 JSON 在新版本读取时是否仍显示同一支签（只有源码级保证）"
+    ]
+  },
+  "safety": {
+    "owner": "MysticSafetyGuard",
+    "hook": "return MysticSafetyGuard.enforce(",
+    "hooked_producer": "MysticGuideGenerator.customAnswer",
+    "scope": "只有随用户文本变化的自由回复过这道门；开场句、召回句、转场句是模板，不经它",
+    "domains": ["Health", "Finance"],
+    "disclaimers": {
+      "Health": "不构成医疗建议，如有不适请咨询专业人士。",
+      "Finance": "不构成投资建议，请量力而行。"
+    },
+    "disclaimer_partner": "domain/divination/IChing.kt",
+    "forbidden": ["你患有", "你已经得", "确诊", "诊断为", "处方", "剂量", "建议服用", "保证收益", "稳赚", "推荐买", "建议买入", "全仓", "必赢"],
+    "verdict_rule": "域词与结论词成对命中才整句换成拒答；只命中域词时保留原回答并在句尾补一次免责句",
+    "why_not_the_classifier": "「我该吃什么药」在 MysticIntentClassifier 里因句中的「吃」落到 Daily，永远不会走健康分支；红线不能押在路由运气上，所以守卫自带词表",
+    "refusal_lines": 8,
+    "verify": "MysticSafetyGuardTest.refusals_never_state_a_diagnosis_or_a_profit_guarantee",
+    "router_gap_verify": "MysticSafetyGuardTest.the_guard_catches_what_the_topic_router_misses",
+    "wiring_verify": "MysticDialogueEngineTest.custom_answer_routes_every_question_through_the_safety_guard",
+    "false_positive_verify": "MysticSafetyGuardTest.everyday_hesitation_is_not_mistaken_for_a_medical_ask",
+    "unverified": [
+      "免责句在气泡与窄屏上的实际换行、截断与 TalkBack 播报",
+      "语音转写出的医学/理财词是否与原话同域"
+    ]
+  },
+  "golden_wording": [
+    {"input": "来一盘象棋", "expect": "starts xiangqi, grounded=true", "verify": "GameAutoReplyTest.player_move_marks_engine_turn_pending"},
+    {"input": "我执黑", "expect": "acknowledges color choice", "verify": "GameAutoReplyTest.color_change_before_the_first_move_switches_sides"},
+    {"input": "走炮二平五", "expect": "applies real move from (7,7) to (4,7)", "verify": "GameAutoReplyTest.player_move_marks_engine_turn_pending"},
+    {"input": "马八进七", "expect": "applies real move from (1,9) to (2,7)", "verify": "XiangqiNotationTest.horse_move_records_destination_file_and_round_trips"},
+    {"input": "马八进七这步能走吗", "expect": "answers legality from rules, no turn consumed", "verify": "GameDialogueBridgeTest.legality_question_answers_from_real_rules"},
+    {"input": "兵九进五", "expect": "rejects as illegal, names it as unplayable", "verify": "GameDialogueBridgeTest.illegal_move_reports_real_rejection_code"},
+    {"input": "悔棋", "expect": "undoes one full round", "verify": "GameDialogueBridgeTest.undo_rewinds_full_round"},
+    {"input": "重做这一手", "expect": "replays the undone round move by move", "verify": "GameAutoReplyTest.redo_replays_the_undone_round_move_by_move"},
+    {"input": "给我提示", "expect": "returns one real legal move as offline suggestion", "verify": "GameDialogueBridgeTest.hint_returns_one_real_legal_move"},
+    {"input": "复盘刚才那步", "expect": "describes last real move with capture info", "verify": "GameDialogueBridgeTest.review_describes_last_real_move"},
+    {"input": "有哪些威胁", "expect": "names the real attacked piece and its coordinate, and says out loud whether it can be taken back or really hangs", "verify": "GameExplanationTest.threat_report_says_which_pieces_are_really_free"},
+    {"input": "这步为什么不好", "expect": "judges a halfmove that really happened from rules only: square walked into, piece left with no recapture; admits when nothing is wrong", "verify": "GameExplanationTest.why_names_the_square_walked_into_and_the_piece_left_free"},
+    {"input": "换个稳一点的走法", "expect": "returns a real legal move chosen by attacked-piece counts and states it is not a strength rating", "verify": "GameExplanationTest.safer_quotes_the_move_the_scan_actually_picked"},
+    {"input": "难度困难", "expect": "switches the session difficulty and states the real search depth", "verify": "GameAutoReplyTest.difficulty_command_updates_the_session"},
+    {"input": "这局我观战", "expect": "hands both sides to the engine (playerColor WHITE)", "verify": "GameAutoReplyTest.spectate_hands_both_sides_to_the_engine"},
+    {"input": "残局", "expect": "lists the catalog with its real size", "verify": "GameAutoReplyTest.endgame_catalog_is_listed_and_loadable"},
+    {"input": "开第一关", "expect": "loads the puzzle position, title and solver as a real session", "verify": "GameArchiveTest.endgame_archive_keeps_its_puzzle_position_and_solver"},
+    {"input": "退出棋局", "expect": "resets session to empty", "verify": "GameSessionReducerTest.exit_resets_to_fresh_state"},
+    {"input": "我运势不错这步一定赢", "expect": "refuses cross-domain claim, keeps legality focus", "verify": "GameDialogueBridgeTest.cross_domain_fortune_claim_is_refused"},
+    {"input": "保存棋局", "expect": "asks the caller to persist position+moves only, no character commentary", "verify": "GameArchiveTest.save_command_asks_the_caller_to_write_and_keeps_the_session"},
+    {"input": "继续棋局", "expect": "asks the caller to read the archive; a live session refuses instead of being overwritten", "verify": "GameArchiveTest.resume_command_asks_the_caller_to_read"},
+    {"input": "战绩", "expect": "reads the persisted scoreboard, counts settled results only", "verify": "GameArchiveTest.record_command_reads_the_injected_scoreboard"},
+    {"input": "来一盘围棋", "expect": "explicitly unavailable: go_provider_not_enabled", "verify": "GoAndChessSeamsTest.go_without_gtp_provider_reports_unavailable"},
+    {"input": "来一盘国际象棋", "expect": "explicitly unavailable: chess_provider_not_enabled", "verify": "GoAndChessSeamsTest.chess_without_engine_reports_unavailable"},
+    {"input": "上次我聊过什么", "expect": "recites only what this device stored from the user (dates, topic keys, settled results) and adds no verdict", "verify": "MysticGuideGeneratorTest.the_scholar_quotes_the_record_and_adds_no_verdict"},
+    {"input": "清除本机长期记忆", "expect": "deletes exactly this profile's talk_memory key and the panel returns to the empty state; the session-only 「重开对话」 does not", "verify": "ConversationMemoryStoreTest.clearing_removes_exactly_the_one_key_it_owns"},
+    {"input": "继续", "expect": "an ellipsis inherits the last topic instead of resetting to composite", "verify": "MysticDialogueContinuityTest.elliptical_follow_up_inherits_last_topic"},
+    {"input": "那工作怎么办", "expect": "naming a new topic overrides the one carried by the previous turn", "verify": "MysticDialogueContinuityTest.explicit_new_topic_overrides_last_topic"},
+    {"input": "重开对话", "expect": "session-only reset: drops the pending reply and the session notes, and never touches the stored long-term key", "verify": "MysticSessionStateTest.clear_invalidates_pending_reply_and_forgets_session_notes"},
+    {"input": "你好呀", "expect": "a plain greeting stays Greeting — not routed into fortune or onto the board", "verify": "MysticDialogueEngineTest.classify_maps_greeting_to_greeting"},
+    {"input": "谢谢你", "expect": "thanks is classified Thanks", "verify": "MysticDialogueEngineTest.classify_maps_greeting_to_greeting"},
+    {"input": "再见，拜拜", "expect": "a farewell is classified Farewell", "verify": "MysticDialogueEngineTest.classify_maps_greeting_to_greeting"},
+    {"input": "我最近很焦虑", "expect": "an emotional statement is routed to Mood rather than Health", "verify": "MysticDialogueEngineTest.golden_matrix_handles_variants_and_bounds_input"},
+    {"input": "   ", "expect": "blank input is dropped by the reducer, so no reply is generated and nothing is echoed", "verify": "MysticSessionStateTest.input_is_trimmed_and_bounded"},
+    {"input": "「x」×500（超长输入，非用户原话）", "expect": "input is cut to 200 characters before generation and the raw run never leaks into the reply", "verify": "MysticDialogueEngineTest.input_is_normalized_to_two_hundred_characters_before_generation"},
+    {"input": "「来一盘象棋」+「好」×500（棋局内超长输入）", "expect": "an oversized command inside a live game still returns a non-empty reply instead of throwing", "verify": "GameDialogueBridgeTest.empty_and_oversized_inputs_do_not_crash"},
+    {"input": "换皮肤时上一轮回复才到（事件，非用户输入）", "expect": "a context change bumps the session token and clears the turn list, and the late reply carrying the old token is dropped whole", "verify": "MysticSessionStateTest.context_change_invalidates_stale_reply"},
+    {"input": "换 persona 时请求还在飞（事件，非用户输入）", "expect": "the in-flight request returns to Idle, a system line is appended, and a success carrying the stale token changes nothing", "verify": "MysticSessionStateTest.context_change_invalidates_pending_request_and_adds_system_message"},
+    {"input": "随便聊聊", "expect": "casual intents answer in their own voice without a 「你问：」 echo", "verify": "MysticDialogueEngineTest.reply_for_chat_has_no_forced_question_prefix"},
+    {"input": "你是谁？", "expect": "identity answers name exactly one persona label — 玄学家 or 半仙, never the retired aliases and never the umbrella 玄师", "verify": "MysticGuideGeneratorTest.identity_answers_name_the_persona_exactly_once"},
+    {"input": "我是不是抑郁症", "expect": "a verdict-seeking health question is replaced whole by a refusal; no diagnosis is discussed at all", "verify": "MysticSafetyGuardTest.verdict_asks_replace_the_whole_reply_instead_of_topping_it_up"},
+    {"input": "我该吃什么药", "expect": "the router sends this to Daily, yet the reply is a health refusal carrying the medical disclaimer", "verify": "MysticDialogueEngineTest.custom_answer_routes_every_question_through_the_safety_guard"},
+    {"input": "告诉我买哪只股票一定赚钱", "expect": "no pick, no promise; the finance refusal carries the investment disclaimer", "verify": "MysticDialogueEngineTest.health_and_finance_never_make_diagnostic_or_profit_guarantees"},
+    {"input": "最近体检要注意什么", "expect": "an advisory health question keeps its own reply and gains the medical disclaimer exactly once", "verify": "MysticSafetyGuardTest.advisory_replies_keep_their_own_words_and_gain_the_disclaimer_once"},
+    {"input": "我是不是该辞职", "expect": "everyday hesitation is not treated as a medical or financial verdict ask", "verify": "MysticSafetyGuardTest.everyday_hesitation_is_not_mistaken_for_a_medical_ask"}
+  ],
+  "everyday_guards": [
+    {"input": "你好", "expectIntent": "greeting", "verify": "MysticDialogueGameIntentTest.everyday_phrases_are_not_misread_as_game"},
+    {"input": "今天运势怎么样", "expectIntent": "fortune", "verify": "MysticDialogueGameIntentTest.everyday_phrases_are_not_misread_as_game"},
+    {"input": "最近睡眠不好", "expectIntent": "health", "verify": "MysticDialogueGameIntentTest.everyday_phrases_are_not_misread_as_game"},
+    {"input": "最近财运如何", "expectIntent": "wealth", "verify": "MysticDialogueGameIntentTest.everyday_phrases_are_not_misread_as_game"},
+    {"input": "车厘子好吃吗", "expectIntent": "daily", "verify": "MysticDialogueGameIntentTest.everyday_phrases_are_not_misread_as_game"}
+  ]
+}

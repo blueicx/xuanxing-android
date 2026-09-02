@@ -1,0 +1,11 @@
+const fs = require('fs');
+const assert = require('assert');
+const contract = JSON.parse(fs.readFileSync(__dirname + '/authentic_systems_contract.json', 'utf8'));
+assert.strictEqual(contract.defaultMode, 'offline');
+assert.deepStrictEqual(contract.lunisolar.supportedYears, [1900, 2100]);
+assert.strictEqual(contract.ifa.combinationCount, 256);
+assert.strictEqual(contract.ifa.indexOrder, 'outer*16+inner');
+assert.strictEqual(contract.nadi.offlineFallback, 'simulation');
+assert(contract.psychometrics.open.includes('ipip-big5-50'));
+for (const id of ['mmpi', 'mmpi-3', 'raven', '16pf', 'mbti']) assert(contract.psychometrics.licensedOnly.includes(id));
+console.log('authentic systems contract: PASS');

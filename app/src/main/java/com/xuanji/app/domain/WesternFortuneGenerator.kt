@@ -1,170 +1,163 @@
 package com.xuanji.app.domain
 
+import com.xuanji.app.data.model.Element
+import com.xuanji.app.data.model.FortuneDimension
 import com.xuanji.app.data.model.WesternDailyFortune
-import com.xuanji.app.domain.ZodiacCalculator.ZodiacInfo
+import com.xuanji.app.domain.ZodiacCalculator.NatalChart
+import com.xuanji.app.domain.ZodiacCalculator.SkySnapshot
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
-import kotlin.random.Random
 
 /**
- * 西方（星座）每日运势生成器。基于日期与星座生成稳定的每日运势。
+ * 西方（占星）周期运势生成器。
+ *
+ * 日 / 周 / 月 / 年 全部走真实星历：
+ *  - 日：当天北京正午的星空与本命盘比相位；
+ *  - 周：本周（锚周一）七天逐日采样；
+ *  - 月：当月整月逐日采样；
+ *  - 年：当年每四天一次、全年约 90 个采样点。
+ * 评分由相位力度累加（慢行星累加为背景、个人行星取均值），解说由同一批相位展开。
+ * 无随机：同一本命盘、同一日期、同一周期，输出完全相同。
  */
 object WesternFortuneGenerator {
 
-    private val COLOR_POOL = listOf(
-        "星空蓝", "暮光紫", "晨曦金", "月光银", "松石绿", "珊瑚红", "雾灰", "琥珀橙"
-    )
-    private val DIR_POOL = listOf(
-        "正东", "东南", "正南", "西南", "正西", "西北", "正北", "东北"
-    )
-    private val SIGN_NAMES = listOf(
-        "白羊座", "金牛座", "双子座", "巨蟹座", "狮子座", "处女座",
-        "天秤座", "天蝎座", "射手座", "摩羯座", "水瓶座", "双鱼座"
-    )
-    private val SUMMARY_HIGH = listOf(
-        "今天是你闪耀的一天，宇宙为你亮起绿灯。",
-        "能量满格，适合推进拖延已久的计划。"
-    )
-    private val SUMMARY_MID = listOf(
-        "平稳的一天，细节里藏着机会。",
-        "保持自己的节奏，好运在转角处。"
-    )
-    private val SUMMARY_LOW = listOf(
-        "今天宜放慢脚步，给自己一点喘息。",
-        "低能量日，避免重大决定，静待时机。"
+    private val DIM_LABELS = linkedMapOf(
+        "career" to "事业运",
+        "wealth" to "财运",
+        "love" to "感情运",
+        "study" to "学业运",
+        "health" to "健康运"
     )
 
-    fun generate(info: ZodiacInfo, date: LocalDate): WesternDailyFortune {
-        val seed = run {
-            var s = date.toEpochDay() xor info.sign.hashCode().toLong()
-            if (s == 0L) s = date.toEpochDay()
-            s
+    /** 占星传统色系（按星座），比五行色系更贴合西方语境 */
+    private val SIGN_COLORS = listOf(
+        "铁锈红", "苔绿", "鹅黄", "月白", "金橙", "雾蓝灰",
+        "藕粉", "墨黑", "茄紫", "岩棕", "电光蓝", "海蓝"
+    )
+
+    fun generate(info: ZodiacCalculator.ZodiacInfo, date: LocalDate): WesternDailyFortune =
+        generate(info, date, "day", null)
+
+    fun generate(
+        info: ZodiacCalculator.ZodiacInfo,
+        date: LocalDate,
+        period: String,
+        natal: NatalChart?
+    ): WesternDailyFortune {
+        val dates = WesternTransitReader.sampleDates(date, period)
+        val label = periodLabel(period)
+        val reading = WesternTransitReader.read(natal, info.sign, dates, label)
+        val span = (dates.last().toEpochDay() - dates.first().toEpochDay()).toInt() + 1
+        return assemble(info, date, period, reading, span, label)
+    }
+
+    fun generateWeekly(
+        info: ZodiacCalculator.ZodiacInfo,
+        date: LocalDate,
+        natal: NatalChart? = null
+    ): WesternDailyFortune = generate(info, date, "week", natal)
+
+    fun generateMonthly(
+        info: ZodiacCalculator.ZodiacInfo,
+        date: LocalDate,
+        natal: NatalChart? = null
+    ): WesternDailyFortune = generate(info, date, "month", natal)
+
+    fun generateYearly(
+        info: ZodiacCalculator.ZodiacInfo,
+        date: LocalDate,
+        natal: NatalChart? = null
+    ): WesternDailyFortune = generate(info, date, "year", natal)
+
+    private fun periodLabel(period: String): String = when (period) {
+        "week" -> "本周"
+        "month" -> "本月"
+        "year" -> "本年"
+        else -> "今日"
+    }
+
+    private fun assemble(
+        info: ZodiacCalculator.ZodiacInfo,
+        date: LocalDate,
+        period: String,
+        reading: WesternReading,
+        windowDays: Int,
+        periodText: String
+    ): WesternDailyFortune {
+        val overall = (50 + reading.overallDelta).coerceIn(12, 97)
+        fun score(delta: Int): Int = (overall + delta).coerceIn(6, 99)
+
+        val luckySignIdx = WesternTransitReader.signIndexOf(reading.luckySign)
+        val luckyColor = SIGN_COLORS[luckySignIdx]
+        val luckyDirection = elementDirection(reading.luckyElement)
+        // 幸运数取自真实天象：当值太阳度数与主导相位力度的组合（1-9）
+        val sky: SkySnapshot = ZodiacCalculator.skyAt(date)
+        val sunDegree = (sky.lon("太阳") % 30.0).toInt()
+        val leadWeight = reading.insights.firstOrNull()?.weight ?: 0
+        val luckyNumber = (((sunDegree + leadWeight + luckySignIdx * 3).let { ((it % 9) + 9) % 9 }) + 1)
+
+        val dims = DIM_LABELS.entries.map { (key, label) ->
+            val delta = when (key) {
+                "career" -> reading.careerDelta
+                "wealth" -> reading.wealthDelta
+                "love" -> reading.loveDelta
+                "study" -> reading.studyDelta
+                else -> reading.healthDelta
+            }
+            val s = score(delta)
+            FortuneDimension(
+                key = key,
+                label = label,
+                score = s,
+                interpretation = interpret(label, s, reading.notes[key], windowDays, periodText)
+            )
         }
-        val rnd = Random(seed)
-        val overall = 42 + rnd.nextInt(53) // 42..94
-
-        fun cat(): Int = (overall + rnd.nextInt(25) - 12).coerceIn(12, 98)
-        val career = cat()
-        val wealth = cat()
-        val love = cat()
-        val health = cat()
-
-        val summary = when {
-            overall >= 75 -> SUMMARY_HIGH[rnd.nextInt(SUMMARY_HIGH.size)]
-            overall >= 50 -> SUMMARY_MID[rnd.nextInt(SUMMARY_MID.size)]
-            else -> SUMMARY_LOW[rnd.nextInt(SUMMARY_LOW.size)]
-        }
-
-        val luckyNumber = 1 + rnd.nextInt(9)
-        val luckyColor = COLOR_POOL[rnd.nextInt(COLOR_POOL.size)]
-        val luckyDirection = DIR_POOL[rnd.nextInt(DIR_POOL.size)]
 
         return WesternDailyFortune(
             dateKey = date.format(DateTimeFormatter.ISO_LOCAL_DATE),
             sign = info.sign,
             overallScore = overall,
-            careerScore = career,
-            wealthScore = wealth,
-            loveScore = love,
-            healthScore = health,
-            summary = summary,
-            luckyNumber = luckyNumber,
-            luckyColor = luckyColor,
-            luckyDirection = luckyDirection
-        )
-    }
-
-    /** 太阳当前星座 index（近似节气法，与小程序对齐） */
-    fun sunSignIndex(date: LocalDate): Int {
-        val m = date.monthValue
-        val d = date.dayOfMonth
-        val boundaries = intArrayOf(20, 19, 21, 20, 21, 22, 23, 23, 23, 24, 23, 22)
-        return if (d >= boundaries[m - 1]) ((m - 3) % 12 + 12) % 12
-        else (((m - 4) % 12) + 12) % 12
-    }
-
-    /** 月亮近似位置：2000-01-06 月亮在白羊，27.3天一周 */
-    fun moonSignIndex(date: LocalDate): Int {
-        val epochMoon = LocalDate.of(2000, 1, 6).toEpochDay()
-        val daysSince = date.toEpochDay() - epochMoon
-        return ((Math.floor(daysSince / 2.238).toInt() % 12) + 12) % 12
-    }
-
-    /** 相位分（占星学标准） */
-    fun aspectScore(signA: Int, signB: Int): Pair<Int, String> {
-        var dist = Math.abs(signA - signB) % 12
-        if (dist > 6) dist = 12 - dist
-        return when (dist) {
-            0 -> 5 to "合相(强化)"
-            1 -> 0 to "半六分(中性)"
-            2 -> 10 to "六合(机会)"
-            3 -> -12 to "刑相(挑战)"
-            4 -> 15 to "三合(和谐)"
-            5 -> -3 to "梅花(调适)"
-            6 -> -8 to "对冲(极化)"
-            else -> 0 to "平"
-        }
-    }
-
-    /** 西方每周运势 — 用月亮位置做相位分析（与小程序完全对齐） */
-    fun generateWeekly(info: ZodiacInfo, date: LocalDate): WesternDailyFortune {
-        val userIdx = SIGN_NAMES.indexOf(info.sign).let { if (it < 0) 0 else it }
-        val moonIdx = moonSignIndex(date)
-        return buildByAspect(userIdx, moonIdx, "本周月亮", date, "week")
-    }
-
-    /** 西方每月运势 — 用太阳当前位置做相位分析 */
-    fun generateMonthly(info: ZodiacInfo, date: LocalDate): WesternDailyFortune {
-        val userIdx = SIGN_NAMES.indexOf(info.sign).let { if (it < 0) 0 else it }
-        val sunIdx = sunSignIndex(date)
-        return buildByAspect(userIdx, sunIdx, "本月太阳", date, "month")
-    }
-
-    private fun buildByAspect(
-        userIdx: Int,
-        transitIdx: Int,
-        transitLabel: String,
-        date: LocalDate,
-        periodTag: String
-    ): WesternDailyFortune {
-        val asp = aspectScore(userIdx, transitIdx)
-        val overall = (55 + asp.first).coerceIn(20, 95)
-
-        fun cat(base: Int, bonus: Int) = (base + bonus).coerceIn(12, 98)
-        val (careerBonus, wealthBonus, loveBonus, healthBonus) = when (asp.second) {
-            "三合(和谐)" -> listOf(4, 3, 4, 3)
-            "六合(机会)" -> listOf(3, 4, 2, 2)
-            "合相(强化)" -> listOf(2, 1, 3, 1)
-            "刑相(挑战)" -> listOf(-4, -3, -2, -4)
-            "对冲(极化)" -> listOf(-2, -1, -4, -2)
-            "梅花(调适)" -> listOf(-1, 0, -1, -1)
-            else -> listOf(0, 0, 0, 0)
-        }
-        val career = cat(overall, careerBonus)
-        val wealth = cat(overall, wealthBonus)
-        val love = cat(overall, loveBonus)
-        val health = cat(overall, healthBonus)
-
-        val userSign = SIGN_NAMES[userIdx]
-        val summary = "$userSign 与 $transitLabel(${SIGN_NAMES[transitIdx]})形成${asp.second}(${asp.first})。"
-
-        val luckyNumber = 1 + ((userIdx + transitIdx * 7) % 9)
-        val luckyColor = COLOR_POOL[(userIdx + transitIdx) % COLOR_POOL.size]
-        val luckyDirection = DIR_POOL[(userIdx * 2 + transitIdx * 3) % DIR_POOL.size]
-
-        return WesternDailyFortune(
-            dateKey = date.format(DateTimeFormatter.ISO_LOCAL_DATE),
-            sign = userSign,
-            overallScore = overall,
-            careerScore = career,
-            wealthScore = wealth,
-            loveScore = love,
-            healthScore = health,
-            summary = summary,
+            careerScore = score(reading.careerDelta),
+            wealthScore = score(reading.wealthDelta),
+            loveScore = score(reading.loveDelta),
+            healthScore = score(reading.healthDelta),
+            summary = reading.summary,
             luckyNumber = luckyNumber,
             luckyColor = luckyColor,
             luckyDirection = luckyDirection,
-            period = periodTag
+            period = period,
+            insights = reading.insights,
+            dimensionNotes = dims,
+            dimensionBasis = reading.notes
         )
+    }
+
+    private fun interpret(
+        label: String,
+        score: Int,
+        rawNotes: List<String>?,
+        windowDays: Int,
+        periodText: String
+    ): String {
+        val basis = (rawNotes ?: emptyList()).distinct().take(2)
+        val trend = when {
+            score >= 82 -> "${label}得到天象明显的助力"
+            score >= 68 -> "${label}偏顺，推一下就动"
+            score >= 52 -> "${label}中性，取决于你怎么安排"
+            score >= 38 -> "${label}受阻，宜收不宜放"
+            else -> "${label}处于低谷，先止损再谈发展"
+        }
+        val body = if (basis.isEmpty()) {
+            "$trend。${periodText}这 ${windowDays} 天内没有行运行星精准触及这一领域对应的本命点位，${label}处于自然状态。"
+        } else {
+            "$trend。依据是：${basis.joinToString("；")}。"
+        }
+        return body + when (label) {
+            "事业运" -> if (score >= 68) "该出面的场合出面，成果会被记住。" else "${periodText}少承诺、多交付，把口径留在纸上。"
+            "财运" -> if (score >= 68) "可以主动谈价与收款，扩张也划算。" else "不宜加杠杆、不宜替人垫钱，先看清条款。"
+            "感情运" -> if (score >= 68) "关系里的气氛是打开的，想说的话适合现在说。" else "别把一时的感受当结论，先把日常过稳。"
+            "学业运" -> if (score >= 68) "吸收快、表达准，把难的科目排前面。" else "读不进去就换动手的事，硬坐只会耗掉心情。"
+            else -> if (score >= 68) "体力与情绪承载得住，可加大工作量。" else "睡眠与饮食先管住，身体在替你记账。"
+        }
     }
 }

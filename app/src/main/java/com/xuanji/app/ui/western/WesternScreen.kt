@@ -1,6 +1,7 @@
 package com.xuanji.app.ui.western
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -10,12 +11,14 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.background
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -27,14 +30,28 @@ import com.xuanji.app.data.model.WesternDailyFortune
 import com.xuanji.app.di.AppModule
 import com.xuanji.app.domain.ZodiacCalculator
 import com.xuanji.app.ui.components.FortuneCard
+import com.xuanji.app.ui.components.FortuneDimensionDetail
+import com.xuanji.app.ui.components.FortuneInsightList
+import com.xuanji.app.ui.components.FortunePageWidth
+import com.xuanji.app.ui.components.FortuneProse
+import com.xuanji.app.ui.components.FortuneStickyHeader
 import com.xuanji.app.ui.components.InfoRow
+import com.xuanji.app.ui.components.CardLayouts
+import com.xuanji.app.ui.components.CardMeta
+import com.xuanji.app.ui.components.LocalCardLayout
+import com.xuanji.app.ui.components.MysticFloatingGuide
 import com.xuanji.app.ui.components.NatalWheelChart
 import com.xuanji.app.ui.components.PeriodToggleRow
 import com.xuanji.app.ui.components.ResultShare
+import com.xuanji.app.ui.components.ResultShareCards
+import com.xuanji.app.ui.components.RestoreCardsBar
 import com.xuanji.app.ui.components.ScoreRow
+import com.xuanji.app.ui.components.ScoreRing
 import com.xuanji.app.ui.components.SectionTitle
 import com.xuanji.app.ui.components.SystemExplanation
 import com.xuanji.app.ui.components.ShareButton
+import com.xuanji.app.ui.components.rememberCardLayoutController
+import com.xuanji.app.ui.components.ShareCard
 import com.xuanji.app.ui.viewmodel.WesternUiState
 import com.xuanji.app.ui.viewmodel.WesternViewModel
 import com.xuanji.app.ui.xuanjiViewModel
@@ -43,34 +60,36 @@ import com.xuanji.app.ui.xuanjiViewModel
 fun WesternScreen() {
     val viewModel = xuanjiViewModel { WesternViewModel(AppModule.repository) }
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val readyState = uiState as? WesternUiState.Ready
+    val controller = rememberCardLayoutController(
+        "western",
+        readyState?.bazi?.chart?.display ?: "guest"
+    )
 
-    Column(
-        Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        Text(
-            "星座运势",
-            style = MaterialTheme.typography.headlineSmall,
-            color = MaterialTheme.colorScheme.primary
-        )
+    Box(Modifier.fillMaxSize()) {
         when (val s = uiState) {
-            is WesternUiState.Loading -> Text("正在推算星盘…")
-            is WesternUiState.Empty -> Text("尚未设置出生信息，请先到「我的」填写。")
+            is WesternUiState.Loading -> Message("正在推算星盘…")
+            is WesternUiState.Empty -> Message("尚未设置出生信息，请先到「我的」填写。")
             is WesternUiState.Ready -> WesternContent(
+                bazi = s.bazi,
                 detail = s.detail,
                 fortune = s.fortune,
                 chart = s.chart,
+                composite = s.composite,
                 period = s.period,
-                onPeriodChange = viewModel::setPeriod
+                onPeriodChange = viewModel::setPeriod,
+                controller = controller
             )
         }
-        SystemExplanation("western")
     }
 }
 
+@Composable
+private fun Message(text: String) {
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Text(text)
+    }
+}
 @Composable
 private fun SignBlock(title: String, info: ZodiacCalculator.ZodiacInfo) {
     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -104,17 +123,83 @@ private fun SignBlock(title: String, info: ZodiacCalculator.ZodiacInfo) {
 
 @Composable
 private fun WesternContent(
+    bazi: com.xuanji.app.data.model.BaziFull?,
     detail: ZodiacCalculator.WesternDetail,
     fortune: WesternDailyFortune,
     chart: ZodiacCalculator.NatalChart,
+    composite: com.xuanji.app.data.model.CompositeDailyFortune?,
     period: String,
-    onPeriodChange: (String) -> Unit
+    onPeriodChange: (String) -> Unit,
+    controller: com.xuanji.app.ui.components.CardLayoutController
 ) {
     val interp = ZodiacCalculator.interpretChart(chart)
-    PeriodToggleRow(period, onPeriodChange)
-    FortuneCard {
-        SectionTitle("圆盘星盘")
-        Spacer(Modifier.height(8.dp))
+    val cards = westernCards(detail, fortune, chart, interp, period)
+
+    CompositionLocalProvider(LocalCardLayout provides controller) {
+        MysticFloatingGuide(bazi, composite) { scrollState ->
+            Column(Modifier.fillMaxSize()) {
+                FortuneStickyHeader(
+                    period = period,
+                    onPeriodChange = onPeriodChange,
+                    headline = "${periodTitle(period)}星盘 ${fortune.overallScore} 分",
+                    subtitle = "${fortune.dateKey} · ${fortune.sign}当值行运"
+                )
+                Column(
+                    Modifier
+                        .weight(1f)
+                        .verticalScroll(scrollState)
+                        .padding(bottom = 28.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    FortunePageWidth {
+                        Column(
+                            Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+                            verticalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
+                            WesternFortuneSection(
+                                fortune,
+                                period,
+                                ResultShareCards.western("fortune", period, fortune, detail, chart, interp)
+                            )
+                            CardLayouts.ordered(cards, controller.state).forEach { card -> card.content() }
+                            if (controller.state.hiddenCount > 0) {
+                                RestoreCardsBar(controller)
+                            }
+                            SystemExplanation("western")
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+private fun westernCards(
+    detail: ZodiacCalculator.WesternDetail,
+    fortune: WesternDailyFortune,
+    chart: ZodiacCalculator.NatalChart,
+    interp: ZodiacCalculator.ChartInterpretation,
+    period: String
+): List<CardMeta> {
+    fun share(cardId: String) = ResultShareCards.western(cardId, period, fortune, detail, chart, interp)
+
+    return listOf(
+        CardMeta("wheel", "圆盘星盘", share("wheel")) { WheelSection(chart, share("wheel")) },
+        CardMeta("natal", "本命星盘", share("natal")) { NatalSection(detail, share("natal")) },
+        CardMeta("axes", "四轴解析", share("axes")) { AxesSection(interp, share("axes")) },
+        CardMeta("planets", "十大行星", share("planets")) { PlanetsSection(chart, share("planets")) },
+        CardMeta("planet-meaning", "行星含义", share("planet-meaning")) { PlanetMeaningSection(interp, share("planet-meaning")) },
+        CardMeta("aspects", "主要相位", share("aspects")) { AspectsSection(chart, share("aspects")) },
+        CardMeta("aspect-meaning", "相位解读", share("aspect-meaning")) { AspectMeaningSection(interp, share("aspect-meaning")) },
+        CardMeta("conclusion", "综合解读", share("conclusion")) {
+            WesternConclusionSection(ZodiacCalculator.computeConclusion(detail, chart), share("conclusion"))
+        },
+    )
+}
+
+@Composable
+private fun WheelSection(chart: ZodiacCalculator.NatalChart, shareCard: ShareCard) {
+    FortuneCard(cardId = "wheel", title = "圆盘星盘", shareCard = shareCard) {
         Text(
             "外圈为十二星座，中圈为十二宫位（自上升点 ASC 起逆时针），盘内圆点为十大行星落点；ASC/MC 为上升与天顶。",
             style = MaterialTheme.typography.bodySmall,
@@ -125,24 +210,24 @@ private fun WesternContent(
         Spacer(Modifier.height(10.dp))
         PlanetLegend()
     }
-    FortuneCard {
-        SectionTitle("本命星盘")
-        Spacer(Modifier.height(12.dp))
+}
+
+@Composable
+private fun NatalSection(detail: ZodiacCalculator.WesternDetail, shareCard: ShareCard) {
+    FortuneCard(cardId = "natal", title = "本命星盘", shareCard = shareCard) {
         SignBlock("太阳星座", detail.sun)
         Spacer(Modifier.height(12.dp))
         SignBlock("上升星座", detail.rising)
         Spacer(Modifier.height(12.dp))
         SignBlock("月亮星座", detail.moon)
         Spacer(Modifier.height(8.dp))
-        Text(
-            detail.note,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
+        Text(detail.note, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
-    FortuneCard {
-        SectionTitle("四轴解析 · ASC / DSC / MC / IC")
-        Spacer(Modifier.height(4.dp))
+}
+
+@Composable
+private fun AxesSection(interp: ZodiacCalculator.ChartInterpretation, shareCard: ShareCard) {
+    FortuneCard(cardId = "axes", title = "四轴解析", shareCard = shareCard) {
         Text(
             "四轴是星盘的坐标骨架：上升(ASC)与下降(DSC)构成地平线，天顶(MC)与天底(IC)构成子午线，勾勒出你与世界互动的基本框架。",
             style = MaterialTheme.typography.bodySmall,
@@ -150,172 +235,125 @@ private fun WesternContent(
         )
         Spacer(Modifier.height(8.dp))
         interp.axes.forEach { ax ->
-            Row(
-                verticalAlignment = Alignment.Top,
-                modifier = Modifier.padding(vertical = 4.dp)
-            ) {
-                Text(
-                    ax.key,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.secondary,
-                    modifier = Modifier.width(40.dp)
-                )
+            Row(verticalAlignment = Alignment.Top, modifier = Modifier.padding(vertical = 4.dp)) {
+                Text(ax.key, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.secondary, modifier = Modifier.width(40.dp))
                 Column {
-                    Text(
-                        "${ax.name} · ${ax.sign} ${ax.degree}°",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
+                    Text("${ax.name} · ${ax.sign} ${ax.degree}°", style = MaterialTheme.typography.bodyMedium)
                     Spacer(Modifier.height(2.dp))
-                    Text(
-                        ax.text,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    Text(ax.text, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
             Spacer(Modifier.height(6.dp))
         }
     }
-    FortuneCard {
-        SectionTitle("本命星盘 · 十大行星")
-        Spacer(Modifier.height(4.dp))
-        Text(
-            "ASC ${chart.ascendant.toInt()}° · MC ${chart.midheaven.toInt()}°",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
+}
+
+@Composable
+private fun PlanetsSection(chart: ZodiacCalculator.NatalChart, shareCard: ShareCard) {
+    FortuneCard(cardId = "planets", title = "十大行星", shareCard = shareCard) {
+        Text("ASC ${chart.ascendant.toInt()}° · MC ${chart.midheaven.toInt()}°", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(Modifier.height(8.dp))
         chart.planets.forEach { p ->
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.padding(vertical = 3.dp)
-            ) {
-                Text(
-                    p.symbol,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.secondary,
-                    modifier = Modifier.width(28.dp)
-                )
-                Text(
-                    "${p.name}　${p.sign} ${p.degreeInSign}°　第 ${p.house} 宫",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 3.dp)) {
+                Text(p.symbol, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.secondary, modifier = Modifier.width(28.dp))
+                Text("${p.name}　${p.sign} ${p.degreeInSign}°　第 ${p.house} 宫", style = MaterialTheme.typography.bodyMedium)
             }
         }
     }
-    FortuneCard {
-        SectionTitle("行星落座落宫含义")
-        Spacer(Modifier.height(8.dp))
+}
+
+@Composable
+private fun PlanetMeaningSection(interp: ZodiacCalculator.ChartInterpretation, shareCard: ShareCard) {
+    FortuneCard(cardId = "planet-meaning", title = "行星含义", shareCard = shareCard) {
         interp.planets.forEach { pm ->
-            Row(
-                verticalAlignment = Alignment.Top,
-                modifier = Modifier.padding(vertical = 4.dp)
-            ) {
-                Text(
-                    pm.symbol,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.secondary,
-                    modifier = Modifier.width(28.dp)
-                )
+            Row(verticalAlignment = Alignment.Top, modifier = Modifier.padding(vertical = 4.dp)) {
+                Text(pm.symbol, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.secondary, modifier = Modifier.width(28.dp))
                 Column {
-                    Text(
-                        "${pm.name} · ${pm.sign} 第 ${pm.house} 宫",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
+                    Text("${pm.name} · ${pm.sign} 第 ${pm.house} 宫", style = MaterialTheme.typography.bodyMedium)
                     Spacer(Modifier.height(2.dp))
-                    Text(
-                        pm.text,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    Text(pm.text, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
             Spacer(Modifier.height(6.dp))
         }
     }
-    FortuneCard {
-        SectionTitle("主要相位")
-        Spacer(Modifier.height(8.dp))
+}
+
+@Composable
+private fun AspectsSection(chart: ZodiacCalculator.NatalChart, shareCard: ShareCard) {
+    FortuneCard(cardId = "aspects", title = "主要相位", shareCard = shareCard) {
         if (chart.aspects.isEmpty()) {
-            Text("未检测到主要相位。", style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("未检测到主要相位。", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         } else {
             chart.aspects.forEach { a ->
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(vertical = 3.dp)
-                ) {
-                    Text(
-                        "${a.p1} ${a.type} ${a.p2}",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 3.dp)) {
+                    Text("${a.p1} ${a.type} ${a.p2}", style = MaterialTheme.typography.bodyMedium)
                     Spacer(Modifier.width(8.dp))
-                    Text(
-                        "（${"%.1f".format(a.orb)}°）",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    Text("（${"%.1f".format(a.orb)}°）", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }
     }
-    FortuneCard {
-        SectionTitle("相位文字解读")
-        Spacer(Modifier.height(8.dp))
+}
+
+@Composable
+private fun AspectMeaningSection(interp: ZodiacCalculator.ChartInterpretation, shareCard: ShareCard) {
+    FortuneCard(cardId = "aspect-meaning", title = "相位解读", shareCard = shareCard) {
         if (interp.aspects.isEmpty()) {
-            Text(
-                "未检测到主要相位。",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            Text("未检测到主要相位。", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         } else {
             interp.aspects.forEach { am ->
                 Column(Modifier.padding(vertical = 4.dp)) {
-                    Text(
-                        "${am.p1} ${am.type} ${am.p2}",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
+                    Text("${am.p1} ${am.type} ${am.p2}", style = MaterialTheme.typography.bodyMedium)
                     Spacer(Modifier.height(2.dp))
-                    Text(
-                        am.text,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    Text(am.text, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 Spacer(Modifier.height(6.dp))
             }
         }
     }
-    WesternConclusionSection(ZodiacCalculator.computeConclusion(detail, chart))
-    FortuneCard {
-        val periodTitle = when (period) {
-            "week" -> "本周"
-            "month" -> "本月"
-            else -> "今日"
+}
+
+@Composable
+private fun WesternFortuneSection(
+    fortune: WesternDailyFortune,
+    period: String,
+    shareCard: ShareCard
+) {
+    val label = periodTitle(period)
+    FortuneCard(cardId = "fortune", title = "${label}行运解说", shareCard = shareCard) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            ScoreRing(fortune.overallScore, caption = "${label}总分")
+            Spacer(Modifier.width(14.dp))
+            Column(Modifier.weight(1f)) {
+                InfoRow("太阳星座", fortune.sign)
+                InfoRow("幸运数字", "${fortune.luckyNumber}")
+                InfoRow("幸运色", fortune.luckyColor)
+                InfoRow("吉利方位", fortune.luckyDirection)
+            }
         }
-        SectionTitle("${periodTitle}运势 · ${fortune.dateKey}") {
-            ShareButton(
-                sharedText = ResultShare.fortuneTitle("星座运势", period, fortune.overallScore)
-            )
+        Spacer(Modifier.height(14.dp))
+        FortuneProse(fortune.summary)
+        if (fortune.dimensionNotes.isNotEmpty()) {
+            Spacer(Modifier.height(16.dp))
+            SectionTitle("${label}分项详批")
+            Spacer(Modifier.height(8.dp))
+            FortuneDimensionDetail(fortune.dimensionNotes)
         }
-        Spacer(Modifier.height(8.dp))
-        Text(fortune.summary, style = MaterialTheme.typography.bodyLarge)
-        Spacer(Modifier.height(12.dp))
-        ScoreRow("综合", fortune.overallScore)
-        ScoreRow("事业", fortune.careerScore)
-        ScoreRow("财运", fortune.wealthScore)
-        ScoreRow("感情", fortune.loveScore)
-        ScoreRow("健康", fortune.healthScore)
-        Spacer(Modifier.height(8.dp))
-        InfoRow("幸运数字", "${fortune.luckyNumber}")
-        InfoRow("幸运色", fortune.luckyColor)
-        InfoRow("吉利方位", fortune.luckyDirection)
+        if (fortune.insights.isNotEmpty()) {
+            Spacer(Modifier.height(16.dp))
+            SectionTitle("${label}加减分的依据")
+            Spacer(Modifier.height(8.dp))
+            FortuneInsightList(fortune.insights)
+        }
     }
+}
+
+private fun periodTitle(period: String): String = when (period) {
+    "week" -> "本周"
+    "month" -> "本月"
+    "year" -> "本年"
+    else -> "今日"
 }
 
 private val PLANET_LEGEND = listOf(
@@ -345,9 +383,11 @@ private fun PlanetLegend() {
 }
 
 @Composable
-private fun WesternConclusionSection(c: ZodiacCalculator.WesternConclusion) {
-    FortuneCard {
-        SectionTitle("综合解读")
+private fun WesternConclusionSection(
+    c: ZodiacCalculator.WesternConclusion,
+    shareCard: ShareCard
+) {
+    FortuneCard(cardId = "conclusion", title = "综合解读", shareCard = shareCard) {
         Spacer(Modifier.height(8.dp))
         Text(
             c.summary,
