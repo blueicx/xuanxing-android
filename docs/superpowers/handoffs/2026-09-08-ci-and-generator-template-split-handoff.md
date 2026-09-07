@@ -6,7 +6,8 @@
 - 项目：`F:\huny\xuanji-android`
 - 分支：`codex/system-consistency`
 - 起始基线：`3ed9806 docs: replace the "not pushed" claims with what run #17 actually showed`
-- 本轮代码尚未推送；远端 CI 尚未针对本轮改动重跑。
+- 本轮提交：`7724f27 refactor: extract dialogue templates and gate contract`、`079fde3 docs: hand off dialogue contract and template split`。
+- 本轮提交尚未推送；远端 CI 尚未针对本轮改动重跑。
 - 工作树中的既有截图、UI dump、脚本、宣传图和 `.superpowers/` 文件均为用户成果，未清理、未回退。
 
 ## 本轮已完成
