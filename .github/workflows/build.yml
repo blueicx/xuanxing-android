@@ -21,6 +21,11 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
+      - name: Set up Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
@@ -34,6 +39,9 @@ jobs:
 
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
+
+      - name: Verify dialogue contract
+        run: node _dev/dialogue_contract_test.js
 
       - name: Build debug APK
         run: ./gradlew testDebugUnitTest lintDebug assembleDebug --no-daemon

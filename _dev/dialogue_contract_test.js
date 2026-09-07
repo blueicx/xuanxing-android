@@ -166,6 +166,7 @@ const APP_SRC = path.join(__dirname, '..', 'app', 'src', 'main', 'java', 'com', 
 const recollectionSource = fs.readFileSync(path.join(APP_SRC, 'domain', 'MysticRecollection.kt'), 'utf8');
 const memoryStoreSource = fs.readFileSync(path.join(APP_SRC, 'data', 'local', 'ConversationMemoryStore.kt'), 'utf8');
 const generatorSource = fs.readFileSync(path.join(APP_SRC, 'domain', 'MysticGuideGenerator.kt'), 'utf8');
+const dialogueTemplatesSource = fs.readFileSync(path.join(APP_SRC, 'domain', 'MysticDialogueTemplates.kt'), 'utf8');
 const mysticCardSource = fs.readFileSync(path.join(APP_SRC, 'ui', 'components', 'MysticGuideCard.kt'), 'utf8');
 const cm = contract.conversation_memory;
 
@@ -253,7 +254,10 @@ assert(
 );
 pp.identity_answers.forEach((line) => {
   assert.strictEqual(line.split('$name').length - 1, 1, `an identity answer must name the persona once: ${line}`);
-  assert(generatorSource.includes(line), `identity wording changed: ${line}`);
+  assert(
+    generatorSource.includes(line) || dialogueTemplatesSource.includes(line),
+    `identity wording changed: ${line}`
+  );
 });
 
 // 「玄师」是这套陪伴功能的统称，不落到任何一个模式上
