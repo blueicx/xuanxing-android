@@ -5,7 +5,7 @@
 ## 当前基线
 
 - Android 门禁：`testDebugUnitTest`、`lintDebug`、`assembleDebug` 已建立并在最近一轮通过；lint 当前无 error，剩余主要是既有 unused 参数/变量和 SDK XML 版本提示。
-- CI（`.github/workflows/build.yml`，2026-09-02 才可用）：此前 `Build Debug APK` 在 `eb4c3bb`/`887e1ee`/`7dc3b52` 连续失败且 Gradle 从未启动，因此**没有任何历史 CI 证据可引用**。两个根因已分别修复：`1dbe42f` 去掉 `sdkmanager` 中不存在的包 `build-tools;34.0`（真实包为 `34.0.0`，未知包会使该步骤退出码 1）；`457dc7a` 为 `.gitignore` 的笼统 `*.jar` 添加 `!gradle/wrapper/gradle-wrapper.jar` 例外并入库 wrapper jar——在此之前仓库从未 tracked 任何 jar，任何 fresh clone 运行 `./gradlew` 都会 `ClassNotFoundException: org.gradle.wrapper.GradleWrapperMain`，这不止是 CI 问题。`457dc7a` 的运行结果为 pass（7m20s，`BUILD SUCCESSFUL in 6m 41s`，产出 `xuanxing-debug-apk`）。2026-09-02 本分支推到 `f89f2f1` 后再跑一次（run #17）：同样 pass，`BUILD SUCCESSFUL in 6m 30s`，`52 actionable tasks: 52 executed`（无一项来自缓存），`testDebugUnitTest` / `assembleDebug` / `lintDebug` 三个任务都在干净 runner 上真实执行并成功，APK 已上传。注意两点边界：Gradle 成功日志不打印逐条测试数，因此各轮记的「N 项通过 / 0 跳过」仍是本机计数；workflow 里没有 `node` 步骤，`_dev/dialogue_contract_test.js` 至今没在 CI 跑过一次。CI 覆盖范围仅 `testDebugUnitTest` + `lintDebug` + `assembleDebug`；instrumented `app/src/androidTest`、真机与 DataStore 运行时行为不在其中，仍按下列条目视为未验证。
+- CI（`.github/workflows/build.yml`）：此前 `Build Debug APK` 在 `eb4c3bb`/`887e1ee`/`7dc3b52` 连续失败且 Gradle 从未启动；`1dbe42f`、`457dc7a` 已修复 SDK 包名与 wrapper jar，run #17（`f89f2f1`）已在干净 runner 通过 `testDebugUnitTest` / `assembleDebug` / `lintDebug`。本轮新增 Node 20 步骤并在 Gradle 前执行 `node _dev/dialogue_contract_test.js`，使 45 条 golden wording 成为 CI 阻断门禁；本机最终树验证为 `dialogue contract: PASS (45 golden entries)`，但本轮改动尚未推送，因此远端尚未产生新的 CI run。Gradle 成功日志不打印逐条测试数，instrumented `app/src/androidTest`、真机与 DataStore 运行时行为仍不在 CI 覆盖范围内。
 - Android 测试：纯 Kotlin domain/generator 测试已存在，覆盖对话分类、确定性、离线 provider、会话 token、生成器空输入与棋局规则 / 引擎 / 存档 / 解释事实，以及本机长期记忆的编解码与存储（`PreferenceBridge` 用内存假桥，不需 Robolectric 即可验证读写与清除）；`app/src/androidTest` 源码集已建立（棋盘 12 项 Compose 交互用例），能被 `assembleDebugAndroidTest` 编译，但**未在设备或 CI 上执行**。
 - 小程序：结构 lint 与 7 项引擎/题库测试已分开执行并通过；双端契约位于 `_dev/dialogue_contract.json`。
 - 设备证据：曾完成 `com.xuanji.app` AVD 安装、启动、综合/东方/西方浮球、召回舞台和关闭回浮球截图，证据保存在 `.superpowers/round46-*`。没有把当前无在线设备误报为实体机验证。
@@ -19,6 +19,8 @@
   4. 交互测试：新增 `app/src/androidTest` 源码集与 Compose UI-Test 依赖，`GameBoardCardTest` 用坐标 `testTag` 驱动选子 / 落子 / 取消 / 难度 / 回放 / 思考锁 / 吃子记录 12 项用例；其前提由 `BoardUiFixtureTest` 在 JVM 上钉住，`_dev/dialogue_contract.json` 新增 `board_ui` 段交叉校验定位符与状态文案。
   证据：`:app:testDebugUnitTest` 201 项通过（其中棋局相关 153 项）、`:app:lintDebug` 0 error、`:app:assembleDebug` 与 `:app:assembleDebugAndroidTest` 均产出 APK、`node _dev/dialogue_contract_test.js` PASS（22 条 golden wording，含 UI 定位符交叉校验，改坏一处状态文案即失败）。**以上均为本机 JVM/编译证据，12 项棋盘交互用例未在设备执行。**
   Pikafish UCI 协议 parser 与显式降级 seam 已交付。
+
+- 对话模板与 CI 契约（2026-09-08）：本轮完成一个可回滚切片。`.github/workflows/build.yml` 增加 Node 20 与 `_dev/dialogue_contract_test.js` 步骤；契约脚本现在同时扫描 `MysticGuideGenerator.kt` 与 `MysticDialogueTemplates.kt`，避免模板抽离后身份文案约束失效。新增纯 Kotlin `MysticDialogueTemplates.kt`，把 greeting/farewell/thanks/identity/smalltalk/daily/chat 模板和确定性 pulse hash 从生成器移出，`MysticGuideGenerator.kt` 从 3468 行降到 3191 行，`MysticDialogueTemplatesTest` 钉住 persona 标签和告别模板。用户输入决定的回复仍由生成器统一经过 `MysticSafetyGuard.enforce`，离线默认与 seed/hash 不变。证据：`node _dev/dialogue_contract_test.js` PASS（45 条）；`:app:testDebugUnitTest`、`:app:lintDebug`、`:app:assembleDebug` 同一轮本机执行均成功，lint 无 error（仅既有 warning）。尚未推送，远端 CI 尚未重跑；设备/UI/TalkBack 仍按要求暂缓。
 
 - 棋局解释与陪伴记忆（2026-09-02）：两个切片已交付并通过门禁。
   5. 讲棋：`BoardExplanation` 用 `XiangqiRules.legalMoves` 做回吃判定（先把攻击方挪到目标格再问能否合法吃回），`GameDialogueBridge` 新增 `WHY`「这步为什么不好」与 `SAFER`「换个稳一点的走法」，威胁报告与走子后评注改为区分「有子能回吃」与「没人能吃回，属于白送」，难度只决定话量；契约新增 `explanation` 段，扫描措辞禁词并断言 `SmartBoardEngine.evaluate` 仍为 `private`。
@@ -45,7 +47,7 @@
 
 | 文件 | 当前规模 | 已完成 | 下一步 |
 | --- | ---: | --- | --- |
-| `MysticGuideGenerator.kt` | 3468 行 | 对话 seam、intent classifier、医疗/财务红线（`MysticSafetyGuard.kt`，109 行）均已抽离 | 按 intent 把模板与语气表拆成纯 Kotlin 文件，保持确定性 hash 与 `customAnswer` 唯一 `enforce` 调用点不变 |
+| `MysticGuideGenerator.kt` | 3191 行 | 对话 seam、intent classifier、医疗/财务红线（`MysticSafetyGuard.kt`，109 行）与基础 wording 模板均已抽离 | 继续按稳定边界拆 topic/fortune 答案与语气表，保持确定性 hash 与 `customAnswer` 唯一 `enforce` 调用点不变 |
 | `MysticGuideCard.kt` | 2719 行 | provider/session 接入；输入栏与快捷问题已抽到 `MysticConversationPanel.kt`（130 行，卡面两处调用点复用同一 `submitPanelInput`） | 继续拆会话气泡与卡面主体渲染，先保持参数和状态提升方式不变 |
 | `MysticFloatingGuide.kt` | 2683 行 | `MysticOrb.kt` 已拆出；舞台仍在原文件 | 将舞台外壳与人物绘制分开；人物绘制 helper 需继续保持同一 skin/mood 输入 |
 
