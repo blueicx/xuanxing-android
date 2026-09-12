@@ -248,123 +248,38 @@ private fun MysticImmersiveStage(
     topStartContent: @Composable () -> Unit,
     content: @Composable () -> Unit
 ) {
-    val breath = rememberInfiniteTransition(label = "stageBreath")
-    val breathValue by breath.animateFloat(
-        initialValue = 0f,
-        targetValue = (2 * Math.PI).toFloat(),
-        animationSpec = infiniteRepeatable(tween(4600, easing = LinearEasing)),
-        label = "breathValue"
-    )
-    val ink = Color(0xFF0D0817)
-    val gold = Color(0xFFD9C58B)
-
     val view = LocalView.current
     DisposableEffect(view) {
         try {
             val win = view.context.findActivity()?.window
             if (win != null) {
                 WindowCompat.setDecorFitsSystemWindows(win, false)
-
                 val controller = WindowCompat.getInsetsController(win, win.decorView)
-                controller.systemBarsBehavior =
-                    WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-                controller.hide(
-                    WindowInsetsCompat.Type.statusBars() or
-                        WindowInsetsCompat.Type.navigationBars()
-                )
+                controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                controller.hide(WindowInsetsCompat.Type.statusBars() or WindowInsetsCompat.Type.navigationBars())
             }
-        } catch (_: Exception) {
-            // Older devices may not support all window APIs
-        }
-
+        } catch (_: Exception) { }
         onDispose {
             try {
                 val win = view.context.findActivity()?.window
                 if (win != null) {
                     val controller = WindowCompat.getInsetsController(win, win.decorView)
-                    controller.show(
-                        WindowInsetsCompat.Type.statusBars() or
-                            WindowInsetsCompat.Type.navigationBars()
-                    )
-                    // 关掉舞台后恢复成「沉浸式但仍让 Scaffold 分发 insets」的全局状态，
-                    // 设回 true 会让整个 app 突然多出系统栏内边距，页面跳一下。
+                    controller.show(WindowInsetsCompat.Type.statusBars() or WindowInsetsCompat.Type.navigationBars())
                     WindowCompat.setDecorFitsSystemWindows(win, false)
                 }
             } catch (_: Exception) { }
         }
     }
-
-    Surface(Modifier.fillMaxSize(), color = ink, contentColor = Color(0xFFF4EEE5)) {
-        Box(Modifier.fillMaxSize()) {
-            Canvas(Modifier.fillMaxSize()) { StageBackdrop(gold, moodLevel, skinId) }
-
-            StageFigure(
-                half = half,
-                skinId = skinId,
-                garment = garment,
-                trimColor = trimColor,
-                breathValue = breathValue,
-                moodLevel = moodLevel,
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .padding(top = 44.dp)
-                    .fillMaxWidth(0.70f)
-                    .aspectRatio(0.68f)
-            )
-
-            Column(
-                Modifier
-                    .align(Alignment.BottomCenter)
-                    .fillMaxWidth()
-                    .fillMaxHeight(0.50f)
-                    .background(
-                        Brush.verticalGradient(
-                            0f to Color.Transparent,
-                            0.22f to ink.copy(alpha = 0.72f),
-                            0.48f to ink.copy(alpha = 0.96f),
-                            1f to ink
-                        )
-                    )
-                    .navigationBarsPadding()
-                    .imePadding()
-                    .padding(start = 18.dp, end = 18.dp, top = 44.dp, bottom = 10.dp)
-            ) {
-                MaterialTheme(
-                    colorScheme = darkColorScheme(
-                        primary = gold,
-                        tertiary = Color(0xFFE3A579)
-                    )
-                ) {
-                    content()
-                }
-            }
-
-            Box(
-                Modifier
-                    .align(Alignment.TopStart)
-                    .statusBarsPadding()
-                    .padding(start = 12.dp, top = 12.dp)
-            ) {
-                topStartContent()
-            }
-
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .statusBarsPadding()
-                    .padding(start = 20.dp, end = 16.dp, top = 14.dp),
-                horizontalArrangement = Arrangement.End
-            ) {
-                StageControl(label = "关闭玄师台", onClick = onClose) {
-                    Icon(
-                        Icons.Filled.Close,
-                        contentDescription = "关闭玄师台",
-                        modifier = Modifier.size(19.dp)
-                    )
-                }
-            }
-        }
-    }
+    MysticStageLayout(
+        mode = if (half) "half" else "scholar",
+        skinId = skinId,
+        garment = garment,
+        trimColor = trimColor,
+        moodLevel = moodLevel,
+        onClose = onClose,
+        topStartContent = topStartContent,
+        content = content
+    )
 }
 
 @Composable
