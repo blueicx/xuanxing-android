@@ -6,13 +6,17 @@
 
 浮球和舞台都遵循系统导航栏/输入法安全区；系统开启“移除动画”时，浮球取消位移、旋转和面部微动。
 
-浮球实现已独立在 `MysticOrb.kt`，舞台与人物绘制仍保留在 `MysticFloatingGuide.kt`，后续可继续按同一边界渐进拆分。
+浮球实现独立在 `MysticOrb.kt`；舞台外壳、文化背景和人物画布分别由 `MysticStageLayout.kt`、`MysticCultureBackdrop.kt`、`MysticFigureCanvas.kt` 承担，`MysticFloatingGuide.kt` 只保留挂载与状态桥接。
 
 ## 对话与会话
 
 `MysticDialogueEngine` 负责输入分类和确定性本地回复，`MysticSessionState`/`reduce` 负责会话 token、上下文切换及旧异步结果丢弃。跨会话的「本机长期记忆」由 `RecollectionKind` 限定种类，只有用户原话、用户主动选择与已结算棋局结果三种，生成文案在类型上无处可放，因此「不把生成内容伪装成长期记忆」不再依赖调用方自觉（见「本机长期记忆」一节）。
 
 意图规范化已抽到 `MysticIntentClassifier`，供 generator 与 engine 共用，避免两套关键词表继续漂移。
+
+对话输入先经过 `MysticDialogueAnalyzer`：统一 NFKC、标点和大小写，给出主主题、次主题实体、置信度与上一轮承接。`MysticTopicAnswerTemplates` 只接收已经计算出的盘面事实，`MysticCultureVoice` 维护文化皮肤的动作/语汇；因此换作风不会重新计算分数，也不会把文化装饰冒充事实。
+
+交流面板由 `MysticMessageList`、`MysticConversationInput`、`MysticClarifierRow` 和 `MysticSoftMemoryPanel` 组成。低置信度或多主题时最多给两个澄清入口，用户点选后仍走同一个 session token。软标签存于独立的 `soft_memory_<sha256(profileKey)>` 命名空间，显示“由对话推断”，可逐条撤回或全部清除，不进入 `RecollectionKind` 的长期访问记录。
 
 同日生页的音乐/诗歌目录由 `SameDayWorks` 提供确定性结果：公版作品才允许显示短摘录，非公版只显示标题、作者、年份与风格元数据。长评语默认折叠为首句，用户主动展开后才显示全文。作品与人物内容均属于人文陪伴，不是占断证据。
 
@@ -49,7 +53,7 @@ B+C 视觉方案采用统一人物骨架加文化道具和场景层：每个 `sk
 
 ## Provider seam
 
-`DialogueProvider` 与 `OfflineDialogueProvider` 只提供扩展接口；当前默认实现完全离线，不请求网络、不写入密钥，也不改变现有盘面、健康和财务边界。未来接入在线 provider 时，结果仍需经过 `MysticSafetyGuard.enforce`（见上节），且只允许替换 `draft`，不允许绕开这道门直接返回文本。
+`DialogueProvider` 与 `OfflineDialogueProvider` 只提供扩展接口；当前默认实现完全离线，不请求网络、不写入密钥，也不改变现有盘面、健康和财务边界。未来接入在线 provider 时，结果先由 `DialogueReplyValidator` 校验分数是否来自当前 `CompositeDailyFortune`、是否越过记忆/安全红线，再标记 `OnlineValidated`；失败、超时或校验拒绝统一回到 `OnlineFallback` 的本地生成器，不允许直接返回未校验文本。
 
 两端各有一份同名但不同职责的契约：小程序 `_dev/dialogue_contract.json` 是双端共享的对话契约（意图枚举、规范化、seed 组成、session token、安全边界）；Android `_dev/dialogue_contract.json` 早已不止棋局（事件、判和、存档、棋盘 UI、讲棋、本机记忆、称谓与医疗/财务红线），只随本仓库的 Kotlin 源码演进，两者不互为副本。
 

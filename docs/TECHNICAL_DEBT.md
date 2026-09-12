@@ -13,6 +13,7 @@
 - B+C 视觉：`MysticCultureSpec` 已为 8 个皮肤提供结构化道具和舞台场景；后续仍需设备上检查人物比例、遮挡和不同屏幕密度的视觉细节。
 - 对话承接：`MysticDialogueContinuity` 已让省略式追问继承最近主题；后续应继续扩充中英文标点、连续 5 轮、换 persona/皮肤和跨端 golden wording。
 - 深陪伴计划（2026-09-12）：实现入口见 [`docs/superpowers/plans/2026-09-12-deep-companion.md`](superpowers/plans/2026-09-12-deep-companion.md)，本阶段只治理现有陪伴体验，不新增占卜体系。默认离线；在线 Provider 仅保留显式扩展接缝，外部文本仍需本地事实/安全校验。设备、TalkBack、Logcat 和真实视觉复测等待用户通知，不能用 JVM/编译结果替代。
+- 深陪伴实现（本分支）：已完成分析器、澄清入口、旧 token 丢弃、软标签撤回/清除、Provider 本地事实校验与离线回退；舞台拆为 `MysticStageLayout` / `MysticCultureBackdrop` / `MysticFigureCanvas`，交流面板拆为消息列表与输入状态，主题回答和文化语气表已从生成器抽出。最终门禁仍以本轮最后一次命令输出为准，设备、TalkBack、Logcat 和真实视觉复测等待用户通知。
 - 棋局功能（2026-09-01）：四个切片已交付并通过门禁。
   1. 引擎与对话：`SmartBoardEngine`（alpha-beta，难度 2/3/4 层 + 开局库）成为默认应手，走子后自动串接引擎回包，新增难度切换、换色 / 观战、威胁扫描、残局目录、重做与和棋措辞。
   2. 棋盘 UI：难度选择、回放控件、落子滑动动画（系统动画时长为 0 时跳过）、吃子记录与 TalkBack 描述。
@@ -48,9 +49,9 @@
 
 | 文件 | 当前规模 | 已完成 | 下一步 |
 | --- | ---: | --- | --- |
-| `MysticGuideGenerator.kt` | 3191 行 | 对话 seam、intent classifier、医疗/财务红线（`MysticSafetyGuard.kt`，109 行）与基础 wording 模板均已抽离 | 继续按稳定边界拆 topic/fortune 答案与语气表，保持确定性 hash 与 `customAnswer` 唯一 `enforce` 调用点不变 |
-| `MysticGuideCard.kt` | 2719 行 | provider/session 接入；输入栏与快捷问题已抽到 `MysticConversationPanel.kt`（130 行，卡面两处调用点复用同一 `submitPanelInput`） | 继续拆会话气泡与卡面主体渲染，先保持参数和状态提升方式不变 |
-| `MysticFloatingGuide.kt` | 2683 行 | `MysticOrb.kt` 已拆出；舞台仍在原文件 | 将舞台外壳与人物绘制分开；人物绘制 helper 需继续保持同一 skin/mood 输入 |
+| `MysticGuideGenerator.kt` | 3166 行 | 对话 seam、intent classifier、医疗/财务红线、主题回答模板和文化语气 seam 已抽离 | 继续按稳定边界拆 fortune 组合答案，保持确定性 hash 与 `customAnswer` 唯一 `enforce` 调用点不变 |
+| `MysticGuideCard.kt` | 2781 行 | provider/session 接入；消息列表、输入状态、澄清和软记忆控件已由独立组件承载 | 继续拆卡面主体渲染，先保持参数和状态提升方式不变 |
+| `MysticFloatingGuide.kt` | 2598 行 | `MysticOrb.kt`、`MysticStageLayout.kt`、`MysticCultureBackdrop.kt`、`MysticFigureCanvas.kt` 已拆出；旧绘制 helper 暂留作回滚缓冲 | 后续可删除确认无引用的旧 helper，并在设备上检查人物比例、遮挡和密度适配 |
 
 拆分规则：一次只移动一个稳定边界；不改变公共 API、资源 ID、角色 seed 或默认离线行为；每次移动后必须跑编译、单测、lint 和 debug assemble。
 
