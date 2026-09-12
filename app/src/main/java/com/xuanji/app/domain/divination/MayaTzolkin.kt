@@ -7,13 +7,13 @@ import java.time.LocalDate
  * 玛雅卓尔金历（Tzolk'in，260 天神圣历）：
  * - 卓尔金数 1-13 与 20 个日名循环组合
  * - 同时给出 Haab（365 天太阳历）近似
- * 以 2000-01-01 = 13 Ahau / 18 Cumku 为锚点的确定性换算，仅供文化娱乐参考。
+ * 以 GMT 584283 相关常数换算长纪历、卓尔金历与 Haab 历；解读文案仅供文化娱乐参考。
  */
 object MayaTzolkin {
 
     private val DAY_NAMES = listOf(
         "Imix", "Ik", "Akbal", "Kan", "Chicchan", "Cimi", "Manik", "Lamat", "Muluc", "Oc",
-        "Chuen", "Eb", "Ben", "Ix", "Men", "Cib", "Caban", "Etznab", "Cauac", "Ahau"
+        "Chuen", "Eb", "Ben", "Ix", "Men", "Cib", "Caban", "Etznab", "Cauac", "Ajaw"
     )
     private val DAY_NAMES_CN = listOf(
         "伊米什(鳄)", "伊克(风)", "阿克巴尔(夜)", "坎(玉米)", "奇钱(蛇)", "奇米(死)",
@@ -253,13 +253,12 @@ object MayaTzolkin {
         return LongCount(baktun, katun, tun, uinal, kin, days)
     }
 
-    private val ANCHOR = LocalDate.of(2000, 1, 1) // 13 Ahau (nameIdx=19), Haab 18 Cumku
-
     fun forDate(date: LocalDate): MayaResult {
-        val days = date.toEpochDay() - ANCHOR.toEpochDay()
-        val number = (((days + 12) % 13 + 13) % 13 + 1).toInt()
+        val days = date.toEpochDay() + JDN_1970 - GMT_CORRELATION
+        // 长纪历 0.0.0.0.0 = 4 Ajaw 8 Kumk'u。
+        val number = (((days + 3) % 13 + 13) % 13 + 1).toInt()
         val nameIdx = (((days + 19) % 20 + 20) % 20).toInt()
-        val haabDay = (((357 + days) % 365 + 365) % 365).toInt()
+        val haabDay = (((348 + days) % 365 + 365) % 365).toInt()
         val haab = if (haabDay >= 360) {
             HaabDate("Wayeb", (haabDay - 360))
         } else {

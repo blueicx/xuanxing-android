@@ -202,7 +202,7 @@ val DIVINATION_REGIONS: List<DivRegion> = listOf(
     )),
     DivRegion("common", "常用占卜", listOf(
         DivSubregion("common", "常用占卜", "日常随手可玩的小占卜。", listOf(
-            sys("today", "今日算命", "每日一签，按日期确定", Screen.TodayOracle.route, TodayOracleIcon),
+            sys("today", "今日算命", "当日首抽固化 · 跨天再换", Screen.TodayOracle.route, TodayOracleIcon),
             sys("tarot", "塔罗牌", "78 张牌库，单张 / 三张牌阵", Screen.Tarot.route, TarotIcon),
             sys("crystalball", "水晶球占卜", "凝视象征解读", Screen.CrystalBall.route, CrystalBallIcon),
             sys("kau_cim", "中国灵签", "观音灵签 · 求签解签", "divination/lot/chinese_kau_cim", LotteryStickIcon),

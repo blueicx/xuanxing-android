@@ -107,7 +107,8 @@ object HumanDesign {
     fun cast(profile: UserProfile): HumanDesignResult {
         val chart = ZodiacCalculator.calculateNatalChart(
             profile.birthYear, profile.birthMonth, profile.birthDay,
-            profile.birthHour, profile.birthMinute, profile.locationName
+            profile.birthHour, profile.birthMinute, profile.locationName,
+            profile.locationLat, profile.locationLng
         )
         val map = chart.planets.associateBy { it.name }
         val planets = listOf("太阳", "月亮", "水星", "金星", "火星", "木星", "土星", "北交")

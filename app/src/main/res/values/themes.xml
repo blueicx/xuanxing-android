@@ -7,7 +7,6 @@
         <item name="android:statusBarColor">@color/splash_bg</item>
         <item name="android:navigationBarColor">@color/splash_bg</item>
         <item name="android:windowLightStatusBar">false</item>
-        <item name="android:windowLightNavigationBar">false</item>
     </style>
 
     <!-- Android 12+ 开屏（core-splashscreen 兼容库，向下兼容到 minSdk 26） -->

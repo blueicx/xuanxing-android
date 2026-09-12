@@ -2,7 +2,7 @@ package com.xuanji.app.domain.test
 
 /**
  * 趣味人格测试合集
- * 4 个子测试：SBTI（傻乎乎大）、九型人格、DISC、性格色彩（FPA）。
+ * 4 个子测试：SBTI（原创趣味）、九型人格风格、DISC 风格、性格色彩（均为自我探索）。
  * 每套 10 题，每题 A/B/C/D 四选项，选项字母经 weights 映射到类型代码，计分后取最高分类型。
  * 并列时按该子测试的固定顺序取先出现的类型（确定性，不使用 random）。
  * 全离线、确定性计分，结果仅供娱乐参考。
@@ -44,7 +44,7 @@ object FunTests {
         weights = mapOf("A" to aCode, "B" to bCode, "C" to cCode, "D" to dCode)
     )
 
-    // ============ SBTI 傻乎乎大（S躺平 / B卷王 / T嘴炮 / I纠结） ============
+    // ============ SBTI 原创趣味（S躺平 / B卷王 / T嘴炮 / I纠结） ============
     val SBTI_QUESTIONS: List<FunQuestion> = listOf(
         funQuestion(
             "周末早上你通常……",
@@ -342,9 +342,9 @@ object FunTests {
 
     // ============ 子测试元信息与类型定义 ============
     val SUBTESTS: List<FunSubtestInfo> = listOf(
-        FunSubtestInfo("SBTI", "SBTI 处事风格", "10 题 · 4 种类型", "以躺平、进取、表达、纠结四类处事风格，反映你的生活与工作姿态。"),
-        FunSubtestInfo("Enneagram", "九型人格", "10 题 · 9 种类型", "经典九型人格测评，识别驱动你行为的核心动机与性格模式。"),
-        FunSubtestInfo("DISC", "DISC 行为风格", "10 题 · 4 种风格", "DISC 行为风格测评，分析你在职场与社交中的行为倾向。"),
+        FunSubtestInfo("SBTI", "SBTI 处事风格（原创）", "10 题 · 4 种类型", "以躺平、进取、表达、纠结做趣味类比，反映生活与工作倾向。"),
+        FunSubtestInfo("Enneagram", "九型人格风格探索", "10 题 · 9 种类型", "以九型人格概念做自我探索，不是标准化人格测评。"),
+        FunSubtestInfo("DISC", "DISC 风格探索", "10 题 · 4 种风格", "以 DISC 概念做行为风格自我探索，不是标准化测评。"),
         FunSubtestInfo("Color", "性格色彩", "10 题 · 4 种颜色", "FPA 性格色彩测评，从力量、热情、平和、理性四个维度刻画性格。")
     )
 

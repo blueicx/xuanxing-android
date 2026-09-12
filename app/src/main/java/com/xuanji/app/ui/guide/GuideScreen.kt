@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
@@ -46,7 +47,7 @@ fun GuideScreen(onFinish: () -> Unit) {
         GuidePage(
             Icons.Filled.AutoStories,
             "东方玄学 · 五行八字",
-            "输入生辰，即可推算完整八字命盘、五行强弱与喜用神。"
+            "输入生辰，即可推算八字四柱、五行强弱与喜用神；节气边界采用离线经验表，结果仅作文化参考。"
         ),
         GuidePage(
             Icons.Filled.Star,
@@ -63,7 +64,7 @@ fun GuideScreen(onFinish: () -> Unit) {
     val scope = rememberCoroutineScope()
 
     Column(
-        Modifier.fillMaxSize().padding(24.dp),
+        Modifier.fillMaxSize().safeDrawingPadding().padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Spacer(Modifier.height(40.dp))

@@ -3,12 +3,12 @@ package com.xuanji.app.domain.test
 import kotlin.math.roundToInt
 
 /**
- * MMPI（明尼苏达多相人格测验，通识简化版）
+ * MMPI 风格心理自我探索（20 题自编简版；不是 MMPI/MMPI-3，也不具备临床解释效力）。
  * 14 个量表：效度 Q/L/F/K + 临床 Hs/D/Hy/Pd/Mf/Pa/Pt/Sc/Ma/Si，共 20 题。
  * 每题作答「是/否」：key=false 表示「是」计分，key=true 表示「否」计分。
  * 原始分做 K 校正（Hs+0.5K、Pd+0.4K、Pt+1K、Sc+1K、Ma+0.2K），
- * 再按 T=50+10*(raw-mean)/sd 换算 T 分（常模 mean/sd 见 NORM），T≥60 判偏高。
- * 全离线、确定性计分，结果仅供自我探索参考，不构成医学诊断。
+ * 这里的分数是产品内的演示指标，不是正式量表 T 分或常模结果。
+ * 全离线、确定性计分，仅供非临床自我探索，不构成心理或医学诊断。
  */
 
 data class MmpiQuestion(val text: String, val scale: String?, val key: Boolean)
@@ -71,10 +71,10 @@ object Mmpi {
     )
 
     val SCALE_NAMES: Map<String, String> = mapOf(
-        "Q" to "疑问", "L" to "说谎", "F" to "诈病（罕见回答）", "K" to "校正",
-        "Hs" to "疑病", "D" to "抑郁", "Hy" to "癔病", "Pd" to "精神病态",
-        "Mf" to "男性化/女性化", "Pa" to "偏执", "Pt" to "精神衰弱",
-        "Sc" to "精神分裂", "Ma" to "轻躁狂", "Si" to "社会内向"
+        "Q" to "漏答提示", "L" to "自我呈现", "F" to "回答一致性", "K" to "防御倾向",
+        "Hs" to "身体关注", "D" to "情绪低落", "Hy" to "压力反应", "Pd" to "规则与冲动",
+        "Mf" to "兴趣表达", "Pa" to "人际戒备", "Pt" to "担忧与反复思虑",
+        "Sc" to "思维与体验", "Ma" to "精力与活跃度", "Si" to "社交偏好"
     )
 
     /** 常模：mean/sd（本简化版按题量推算的参考值） */
@@ -190,11 +190,11 @@ object Mmpi {
             .sortedByDescending { it.tScore }
             .take(2)
         if (elevated.isNotEmpty()) {
-            sb.append("临床量表中，${elevated[0].name}（T=${elevated[0].tScore}）偏高")
-            if (elevated.size > 1) sb.append("，${elevated[1].name}（T=${elevated[1].tScore}）也偏高")
-            sb.append("。建议结合日常生活状态综合看待，若持续困扰请寻求专业心理帮助。")
+            sb.append("自我探索维度中，${elevated[0].name}的演示分数相对较高")
+            if (elevated.size > 1) sb.append("，${elevated[1].name}也相对较高")
+            sb.append("。这不是临床结论；若现实生活中持续困扰，请咨询合格专业人士。")
         } else {
-            sb.append("各临床量表均在正常范围（T<60），说明你的心理健康状况总体平稳。")
+            sb.append("各自我探索维度没有明显偏高；这不能用于判断心理健康状态。")
         }
         return sb.toString()
     }

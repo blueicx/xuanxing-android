@@ -1,7 +1,10 @@
 package com.xuanji.app.domain.divination
 
+import com.xuanji.app.domain.ZodiacCalculator
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
+import kotlin.math.asin
+import kotlin.math.cos
 import kotlin.math.floor
 import kotlin.math.sin
 
@@ -9,7 +12,7 @@ import kotlin.math.sin
  * 希腊占星（Hellenistic Astrology）确定性计算。
  *
  * 基于用户的 Python 基础实现移植并完善：
- *  - 简化儒略日 → 太阳黄经、月亮黄经、上升点（简化）、五大行星位置；
+ *  - 简化儒略日 → 太阳黄经、月亮黄经、按地点与恒星时计算的上升点；
  *  - 区段（Sect）判定（日生/夜生）；
  *  - 幸运点 / 精神点（Lots，昼夜公式）；
  *  - 年主星推运（Annual Profections）：每年上升点推进一宫；
@@ -213,15 +216,33 @@ object HellenisticAstrology {
         return ((218.3 + 13.176396 * days) % 360 + 360) % 360
     }
 
-    /** 完整本命盘 */
-    fun chart(date: LocalDate, hour: Double = 12.0): HellenisticChart {
-        val j = jd(date.year, date.monthValue, date.dayOfMonth, hour)
+    /**
+     * 完整本命盘。
+     *
+     * 保留北京（UTC+8）默认值以兼容既有资料；海外出生资料必须传入出生地经纬度和
+     * 当日 UTC 偏移（夏令时亦需由调用方提供）。
+     */
+    fun chart(
+        date: LocalDate,
+        hour: Double = 12.0,
+        latitude: Double = 39.90,
+        longitude: Double = 116.41,
+        timeZoneOffsetHours: Double = 8.0
+    ): HellenisticChart {
+        val utcHour = hour - timeZoneOffsetHours
+        val j = jd(date.year, date.monthValue, date.dayOfMonth, utcHour)
         val sun = sunLongitude(j)
         val moon = moonLongitude(j)
-        val asc = (sun + 90) % 360
-        val isDiurnal = hour >= 6 && hour < 18
-        val lotF = if (isDiurnal) (asc + moon - sun) % 360 else (asc + sun - moon) % 360
-        val lotS = if (isDiurnal) (asc + sun - moon) % 360 else (asc + moon - sun) % 360
+        val hourInt = floor(hour).toInt()
+        val minute = ((hour - hourInt) * 60.0).toInt()
+        val natal = ZodiacCalculator.calculateNatalChart(
+            date.year, date.monthValue, date.dayOfMonth, hourInt, minute,
+            "自定义地点", latitude, longitude, timeZoneOffsetHours
+        )
+        val asc = natal.ascendant
+        val isDiurnal = solarAltitude(sun, j, latitude, longitude) > 0.0
+        val lotF = mod360(if (isDiurnal) asc + moon - sun else asc + sun - moon)
+        val lotS = mod360(if (isDiurnal) asc + sun - moon else asc + moon - sun)
         fun signName(lon: Double): Pair<String, Double> {
             val norm = (lon % 360 + 360) % 360
             return SIGNS[(norm / 30.0).toInt() % 12] to (norm % 30)
@@ -234,6 +255,22 @@ object HellenisticAstrology {
         val base = HellenisticChart(date, hour, isDiurnal, sSign, sDeg, mSign, mDeg, aSign, aDeg, fSign, fDeg, lSign, lDeg, "")
         return base.copy(verdict = buildVerdict(base))
     }
+
+    /** 太阳高度角大于地平线时为日生盘；避免以民用钟点 6–18 点替代天文昼夜。 */
+    private fun solarAltitude(sunLongitude: Double, jd: Double, latitude: Double, longitude: Double): Double {
+        val eps = Math.toRadians(23.4392911)
+        val lambda = Math.toRadians(sunLongitude)
+        val declination = asin(sin(eps) * sin(lambda))
+        val rightAscension = Math.toDegrees(kotlin.math.atan2(cos(eps) * sin(lambda), cos(lambda)))
+        val days = jd - 2451545.0
+        val localSidereal = mod360(280.46061837 + 360.98564736629 * days + longitude)
+        var hourAngle = mod360(localSidereal - rightAscension)
+        if (hourAngle > 180.0) hourAngle -= 360.0
+        val lat = Math.toRadians(latitude)
+        return Math.toDegrees(asin(sin(lat) * sin(declination) + cos(lat) * cos(declination) * cos(Math.toRadians(hourAngle))))
+    }
+
+    private fun mod360(value: Double): Double = ((value % 360.0) + 360.0) % 360.0
 
     /** 按黄道十二宫与区段、幸运点等要素生成六维综合解读 */
     private fun buildVerdict(c: HellenisticChart): String {

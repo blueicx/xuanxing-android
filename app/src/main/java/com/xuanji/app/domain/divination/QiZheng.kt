@@ -40,7 +40,8 @@ object QiZheng {
     fun cast(profile: UserProfile): QiZhengResult {
         val chart = ZodiacCalculator.calculateNatalChart(
             profile.birthYear, profile.birthMonth, profile.birthDay,
-            profile.birthHour, profile.birthMinute, profile.locationName
+            profile.birthHour, profile.birthMinute, profile.locationName,
+            profile.locationLat, profile.locationLng
         )
         val dt = LocalDateTime.of(profile.birthYear, profile.birthMonth, profile.birthDay, profile.birthHour, profile.birthMinute)
         val j2000 = LocalDateTime.of(2000, 1, 1, 12, 0)

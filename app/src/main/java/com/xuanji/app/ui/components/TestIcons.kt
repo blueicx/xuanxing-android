@@ -77,7 +77,7 @@ val HollandTestIcon: ImageVector by lazy {
     }
 }
 
-/** 4. 瑞文标准推理：3×3 图形矩阵，右下格为缺项答案（菱形） */
+/** 4. 原创文字推理挑战：以抽象矩阵意象表现数列/类比练习。 */
 val RavenTestIcon: ImageVector by lazy {
     testIcon("RavenTestIcon") {
         path(fill = SolidColor(Color.Black)) {

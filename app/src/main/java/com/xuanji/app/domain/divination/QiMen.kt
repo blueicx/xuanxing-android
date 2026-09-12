@@ -1,5 +1,6 @@
 package com.xuanji.app.domain.divination
 
+import com.xuanji.app.domain.BaziCalculator
 import java.time.LocalDateTime
 
 /**
@@ -89,12 +90,7 @@ object QiMen {
 
     /** 日干支序数（0-59）：干=ord%10，支=ord%12 */
     private fun dayGanZhi(y: Int, m: Int, d: Int): Int {
-        var yy = y
-        var mm = m
-        if (mm <= 2) { mm += 12; yy -= 1 }
-        val dayOfYear: Int = java.time.LocalDate.of(y, m, d).dayOfYear
-        val base = (y - 1) * 365 + (y - 1) / 4 - (y - 1) / 100 + (y - 1) / 400 + dayOfYear
-        return ((base % 60) + 60) % 60
+        return BaziCalculator.dayPillarIndexForDate(java.time.LocalDate.of(y, m, d))
     }
 
     private fun hourBranch(hour: Int): Int { val h = (hour + 1) % 24; return h / 2 + 1 }
