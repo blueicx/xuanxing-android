@@ -240,6 +240,7 @@ fs.readdirSync(APP_SRC, { recursive: true })
 const orbSource = fs.readFileSync(path.join(UI_SRC, 'components', 'MysticOrb.kt'), 'utf8');
 const floatingSource = fs.readFileSync(path.join(UI_SRC, 'components', 'MysticFloatingGuide.kt'), 'utf8');
 const panelSource = fs.readFileSync(path.join(UI_SRC, 'components', 'MysticConversationPanel.kt'), 'utf8');
+const stageSource = fs.readFileSync(path.join(UI_SRC, 'components', 'MysticStageLayout.kt'), 'utf8');
 assert(
   orbSource.includes(pp.orb_motion) && orbSource.includes(pp.orb_amplitude),
   'the orb motion must be driven by the mode itself'
@@ -264,12 +265,57 @@ pp.identity_answers.forEach((line) => {
 });
 
 // 「玄师」是这套陪伴功能的统称，不落到任何一个模式上
-[panelSource, floatingSource].forEach((source) => {
-  assert(source.includes(pp.umbrella), `the umbrella name ${pp.umbrella} disappeared from the companion UI`);
-});
-assert(floatingSource.includes(`label = "${pp.stage_close_label}"`), 'the stage close label changed');
+assert(
+  [panelSource, floatingSource, stageSource].some((source) => source.includes(pp.umbrella)),
+  `the umbrella name ${pp.umbrella} disappeared from the companion UI`
+);
+assert(
+  [floatingSource, stageSource].some((source) =>
+    source.includes(`label = "${pp.stage_close_label}"`) ||
+    source.includes(`contentDescription = "${pp.stage_close_label}"`)
+  ),
+  'the stage close label changed'
+);
 assert(pp.unverified.length >= 2, 'the persona slice must keep naming what only a device can prove');
 requireVerify(pp.verify, `persona ${pp.verify}`);
+
+// ---- 深陪伴扩展：分析、软标签、provider seam 与舞台标题 -------------------------------
+const analysis = contract.dialogue_analysis;
+const analyzerSource = fs.readFileSync(path.join(APP_SRC, 'domain', 'MysticDialogueAnalyzer.kt'), 'utf8');
+assert(analysis.primary_topic_required === true, 'dialogue analysis must keep a primary topic');
+assert(analysis.multi_topic_policy === 'first_stable_topic_plus_secondary_topic_entity', 'multi-topic policy drifted');
+assert(analysis.clarifier_limit === 2, 'clarifier limit must stay bounded at two');
+assert(analysis.low_confidence_threshold === 60, 'low-confidence threshold changed without a contract update');
+['normalize', 'secondary_topic', 'confidence', 'previousTopic'].forEach((symbol) => {
+  assert(analyzerSource.includes(symbol), `dialogue analyzer lost ${symbol}`);
+});
+assert(analyzerSource.includes('Normalizer.Form.NFKC'), 'input normalization must use Unicode NFKC');
+
+const soft = contract.soft_memory;
+const softTagSource = fs.readFileSync(path.join(APP_SRC, 'domain', 'SoftMemoryTag.kt'), 'utf8');
+const softStoreSource = fs.readFileSync(path.join(APP_SRC, 'data', 'local', 'SoftMemoryTagStore.kt'), 'utf8');
+assert(soft.auto_save === true && soft.user_revoke === true, 'soft memory must remain visible and revocable');
+assert(softStoreSource.includes('KEY_PREFIX = "soft_memory_"'), 'soft memory must have its own key namespace');
+assert(softStoreSource.includes('revoke(') && softStoreSource.includes('clear('), 'soft memory must expose revoke and clear');
+assert(softTagSource.includes('Inferred'), 'inferred soft tags must carry their source');
+assert(softTagSource.includes('profileKeyDigest'), 'soft tags must be profile-scoped');
+assert(soft.source_label === '由对话推断', 'soft memory source label changed');
+assert(soft.scope === 'local_only' && soft.retention === 'until_manual_delete', 'soft memory boundary changed');
+
+const providerSource = fs.readFileSync(path.join(APP_SRC, 'domain', 'DialogueReplyValidator.kt'), 'utf8');
+const coordinatorSource = fs.readFileSync(path.join(APP_SRC, 'domain', 'MysticDialogueCoordinator.kt'), 'utf8');
+assert(coordinatorSource.includes('OnlineValidated') && providerSource.includes('allowedScores'), 'provider replies must be fact-checked before acceptance');
+assert(coordinatorSource.includes('OnlineFallback') && coordinatorSource.includes('validate'), 'provider failures must fall back to offline replies');
+
+assert.strictEqual(contract.stage_title, 'persona-only', 'stage title policy changed');
+assert(stageSource.includes('MysticGuideGenerator.personaName'), 'stage title must use the canonical persona name');
+assert(!/sceneLabel|scene\.sceneLabel/.test(stageSource), 'stage title must not expose the cultural scene as a role title');
+assert(stageSource.includes('navigationBarsPadding') && stageSource.includes('imePadding'), 'stage must respect system safe areas');
+
+const messageListSource = fs.readFileSync(path.join(UI_SRC, 'components', 'MysticMessageList.kt'), 'utf8');
+const inputSource = fs.readFileSync(path.join(UI_SRC, 'components', 'MysticConversationInput.kt'), 'utf8');
+assert(messageListSource.includes('MAX_VISIBLE_MESSAGES = 12'), 'message list window changed without a contract update');
+assert(inputSource.includes('take(maxLength)') && inputSource.includes('maxLength: Int = 200'), 'input bound must stay 200 characters');
 
 // ---- 安全守卫：随用户文本变化的回复只有一个出口 --------------------------------------
 const sg = contract.safety;
