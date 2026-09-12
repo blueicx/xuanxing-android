@@ -64,6 +64,7 @@ import com.xuanji.app.data.model.CompositeDailyFortune
 import com.xuanji.app.data.local.ConversationMemoryStore
 import com.xuanji.app.data.local.DataStorePreferenceBridge
 import com.xuanji.app.data.local.dataStore
+import com.xuanji.app.data.local.softMemoryTagStore
 import com.xuanji.app.di.AppModule
 import com.xuanji.app.domain.MysticClarifierOption
 import com.xuanji.app.domain.MysticInteraction
@@ -90,6 +91,9 @@ import com.xuanji.app.domain.ConversationMemory
 import com.xuanji.app.domain.RecallFacts
 import com.xuanji.app.domain.RecollectionCodec
 import com.xuanji.app.domain.RecollectionKind
+import com.xuanji.app.domain.SoftMemorySource
+import com.xuanji.app.domain.SoftMemoryTag
+import com.xuanji.app.domain.DefaultMysticDialogueAnalyzer
 import com.xuanji.app.domain.MysticMemoryNote as DomainMysticMemoryNote
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
@@ -220,6 +224,7 @@ fun MysticGuideCard(
     val context = LocalContext.current
     val visitStore = remember(context) { MysticVisitStore(context) }
     val memoryStore = remember(context) { ConversationMemoryStore(DataStorePreferenceBridge(context)) }
+    val softMemoryStore = remember(context) { context.softMemoryTagStore() }
     val coroutineScope = rememberCoroutineScope()
     val visitProfile = remember(bazi) { "bazi|${bazi.chart.display}" }
     val companionKey = "${bazi.hashCode()}|${fortune.hashCode()}"
@@ -246,6 +251,7 @@ fun MysticGuideCard(
     var recollectionLine by remember(visitProfile) { mutableStateOf("") }
     var storedMemory by remember(visitProfile) { mutableStateOf(ConversationMemory()) }
     var recollectionBroken by remember(visitProfile) { mutableStateOf(false) }
+    var softMemoryTags by remember(visitProfile) { mutableStateOf(emptyList<SoftMemoryTag>()) }
     var memoryClearFailed by remember(visitProfile) { mutableStateOf(false) }
     var visitReady by remember(visitProfile) { mutableStateOf(false) }
     var persistedVisitAction by remember(visitProfile) { mutableStateOf("") }
@@ -291,6 +297,7 @@ fun MysticGuideCard(
             guide.styleKey,
             if (loaded == null) RecallFacts(unreadable = true) else RecollectionCodec.facts(loaded)
         )
+        softMemoryTags = runCatching { softMemoryStore.read(visitProfile).tags }.getOrDefault(emptyList())
     }
     LaunchedEffect(guide) {
         sessionState = reduce(
@@ -451,6 +458,38 @@ fun MysticGuideCard(
         pendingFollowUp = key
     }
 
+    fun rememberSoftTopic(text: String) {
+        val analysis = DefaultMysticDialogueAnalyzer().analyze(
+            text,
+            DialogueContext(
+                mode = mode,
+                styleKey = guide.styleKey,
+                topicKey = topic,
+                fortune = fortune,
+                latestTest = latestTest,
+                recentTurns = sessionState.recentTurns,
+                memoryNotes = sessionState.memoryNotes,
+                skinId = companion.skinId,
+                question = text
+            )
+        )
+        val topicKey = analysis.topicKey ?: return
+        if (analysis.intent == com.xuanji.app.domain.MysticIntent.Game) return
+        val tag = SoftMemoryTag(
+            id = "topic-$topicKey",
+            key = "topic",
+            label = "最近常聊",
+            value = analysis.entities["topic_label"] ?: topicKey,
+            source = SoftMemorySource.Inferred,
+            createdAt = fortune.dateKey,
+            lastSeenAt = fortune.dateKey
+        )
+        coroutineScope.launch {
+            val updated = runCatching { softMemoryStore.upsertInferred(visitProfile, tag) }.getOrNull()
+            if (updated != null) softMemoryTags = updated.tags
+        }
+    }
+
     fun submitCustom() {
         if (
             pendingFollowUp != null ||
@@ -468,6 +507,7 @@ fun MysticGuideCard(
         val cleanQuestion = customQuestion.trim().take(200)
         if (cleanQuestion.isEmpty()) return
         rememberLongTerm(RecollectionKind.USER_INPUT, cleanQuestion)
+        rememberSoftTopic(cleanQuestion)
         sessionState = reduce(sessionState, MysticEvent.SendInput(cleanQuestion))
         pendingCustom = cleanQuestion
         customQuestion = ""
@@ -562,6 +602,20 @@ fun MysticGuideCard(
         }
         customQuestion = text
         submitCustom()
+    }
+
+    fun revokeSoftTag(id: String) {
+        coroutineScope.launch {
+            val updated = runCatching { softMemoryStore.revoke(visitProfile, id) }.getOrNull()
+            if (updated != null) softMemoryTags = updated.tags
+        }
+    }
+
+    fun clearSoftMemory() {
+        coroutineScope.launch {
+            runCatching { softMemoryStore.clear(visitProfile) }
+            softMemoryTags = emptyList()
+        }
     }
 
     fun cancelPanelReply() {
@@ -1484,6 +1538,10 @@ fun MysticGuideCard(
                         onQuickPrompt = ::submitPanelInput,
                         onCancel = ::cancelPanelReply,
                         onRetry = ::retryPanelReply,
+                        onClarifierSelected = ::submitPanelInput,
+                        softMemoryTags = softMemoryTags,
+                        onRevokeSoftTag = ::revokeSoftTag,
+                        onClearSoftMemory = ::clearSoftMemory,
                         accent = accent,
                         showMessages = false
                     )
@@ -2208,6 +2266,10 @@ fun MysticGuideCard(
                             onQuickPrompt = ::submitPanelInput,
                             onCancel = ::cancelPanelReply,
                             onRetry = ::retryPanelReply,
+                            onClarifierSelected = ::submitPanelInput,
+                            softMemoryTags = softMemoryTags,
+                            onRevokeSoftTag = ::revokeSoftTag,
+                            onClearSoftMemory = ::clearSoftMemory,
                             accent = accent,
                             showMessages = false
                         )

@@ -29,6 +29,7 @@ import com.xuanji.app.domain.MysticMessage
 import com.xuanji.app.domain.MysticMessageRole
 import com.xuanji.app.domain.MysticRequestState
 import com.xuanji.app.domain.MysticSessionState
+import com.xuanji.app.domain.SoftMemoryTag
 
 private val QUICK_PROMPTS = listOf(
     "今日运势", "继续说", "换个话题", "解释刚才", "我只是想聊聊"
@@ -42,6 +43,10 @@ fun MysticConversationPanel(
     onQuickPrompt: (String) -> Unit,
     onCancel: () -> Unit,
     onRetry: () -> Unit,
+    onClarifierSelected: (String) -> Unit = {},
+    softMemoryTags: List<SoftMemoryTag> = emptyList(),
+    onRevokeSoftTag: (String) -> Unit = {},
+    onClearSoftMemory: () -> Unit = {},
     modifier: Modifier = Modifier,
     accent: androidx.compose.ui.graphics.Color = MaterialTheme.colorScheme.primary,
     placeholder: String = "说点什么，我接得住",
@@ -80,8 +85,21 @@ fun MysticConversationPanel(
                         color = MaterialTheme.colorScheme.onSurface
                     )
                 }
+                if (message.role == MysticMessageRole.Mystic && message.clarifiers.isNotEmpty()) {
+                    MysticClarifierRow(
+                        options = message.clarifiers,
+                        onSelected = onClarifierSelected,
+                        enabled = !busy
+                    )
+                }
             }
         }
+
+        MysticSoftMemoryPanel(
+            tags = softMemoryTags,
+            onRevoke = onRevokeSoftTag,
+            onClear = onClearSoftMemory
+        )
 
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             QUICK_PROMPTS.forEach { prompt ->
