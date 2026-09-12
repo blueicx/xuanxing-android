@@ -12,6 +12,7 @@
 - 同日生增强：`SameDayWorks` 已加入确定性音乐/诗歌卡，`HistoryCopy` 与 `AnimatedVisibility` 支持长评语折叠；后续可继续扩充经过版权核验的作品元数据。
 - B+C 视觉：`MysticCultureSpec` 已为 8 个皮肤提供结构化道具和舞台场景；后续仍需设备上检查人物比例、遮挡和不同屏幕密度的视觉细节。
 - 对话承接：`MysticDialogueContinuity` 已让省略式追问继承最近主题；后续应继续扩充中英文标点、连续 5 轮、换 persona/皮肤和跨端 golden wording。
+- 深陪伴计划（2026-09-12）：实现入口见 [`docs/superpowers/plans/2026-09-12-deep-companion.md`](superpowers/plans/2026-09-12-deep-companion.md)，本阶段只治理现有陪伴体验，不新增占卜体系。默认离线；在线 Provider 仅保留显式扩展接缝，外部文本仍需本地事实/安全校验。设备、TalkBack、Logcat 和真实视觉复测等待用户通知，不能用 JVM/编译结果替代。
 - 棋局功能（2026-09-01）：四个切片已交付并通过门禁。
   1. 引擎与对话：`SmartBoardEngine`（alpha-beta，难度 2/3/4 层 + 开局库）成为默认应手，走子后自动串接引擎回包，新增难度切换、换色 / 观战、威胁扫描、残局目录、重做与和棋措辞。
   2. 棋盘 UI：难度选择、回放控件、落子滑动动画（系统动画时长为 0 时跳过）、吃子记录与 TalkBack 描述。

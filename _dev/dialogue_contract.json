@@ -214,6 +214,23 @@
       "语音转写出的医学/理财词是否与原话同域"
     ]
   },
+  "dialogue_analysis": {
+    "primary_topic_required": true,
+    "multi_topic_policy": "first_stable_topic_plus_secondary_topic_entity",
+    "clarifier_limit": 2,
+    "low_confidence_threshold": 60,
+    "normalization": "unicode_nfkc_trim_punctuation_casefold",
+    "offline_default": true
+  },
+  "soft_memory": {
+    "auto_save": true,
+    "user_revoke": true,
+    "storage": "soft_memory_<sha256(profileKey)>",
+    "source_label": "由对话推断",
+    "scope": "local_only",
+    "retention": "until_manual_delete"
+  },
+  "stage_title": "persona-only",
   "golden_wording": [
     {"input": "来一盘象棋", "expect": "starts xiangqi, grounded=true", "verify": "GameAutoReplyTest.player_move_marks_engine_turn_pending"},
     {"input": "我执黑", "expect": "acknowledges color choice", "verify": "GameAutoReplyTest.color_change_before_the_first_move_switches_sides"},

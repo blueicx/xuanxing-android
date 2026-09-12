@@ -3,6 +3,9 @@ const path = require('path');
 const assert = require('assert');
 const contract = JSON.parse(fs.readFileSync(__dirname + '/dialogue_contract.json', 'utf8'));
 
+const overview = fs.readFileSync(path.join(__dirname, '..', 'docs', 'SYSTEMS_OVERVIEW.md'), 'utf8');
+assert(overview.includes('45 条 golden wording'), 'SYSTEMS_OVERVIEW must report the current golden count');
+
 const GAME_DIR = path.join(__dirname, '..', 'app', 'src', 'main', 'java', 'com', 'xuanji', 'app', 'domain', 'game');
 const TEST_DIR = path.join(__dirname, '..', 'app', 'src', 'test', 'kotlin');
 const readGame = (name) => fs.readFileSync(path.join(GAME_DIR, name), 'utf8');
