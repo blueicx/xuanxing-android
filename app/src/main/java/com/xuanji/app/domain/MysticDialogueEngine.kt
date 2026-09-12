@@ -69,7 +69,9 @@ fun MysticDialogueEngine.reply(context: DialogueContext): DialogueReply =
     reply(context, context.question)
 
 class DefaultMysticDialogueEngine : MysticDialogueEngine {
-    override fun classify(question: String): MysticIntent = MysticIntentClassifier.classify(question)
+    private val analyzer: MysticDialogueAnalyzer = DefaultMysticDialogueAnalyzer()
+
+    override fun classify(question: String): MysticIntent = analyzer.classify(question)
 
     override fun reply(context: DialogueContext, input: String): DialogueReply {
         val normalizedInput = input.trim().take(200)
