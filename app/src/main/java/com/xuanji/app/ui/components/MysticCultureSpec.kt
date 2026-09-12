@@ -1,5 +1,7 @@
 package com.xuanji.app.ui.components
 
+import com.xuanji.app.domain.MysticCultureVoice
+
 /** 文化皮肤的结构化视觉契约：道具与场景必须随文化变化，而非只换配色。 */
 enum class CulturalScene {
     JIANGNAN_GARDEN,
@@ -23,15 +25,26 @@ data class MysticCultureSpec(
 ) {
     companion object {
         private val SPECS = mapOf(
-            "jiangnan-robe" to MysticCultureSpec(CulturalScene.JIANGNAN_GARDEN, "江南水榭", "折扇与水纹", "扇", "拈扇侧身", "慢、清、留白"),
-            "academy-gown" to MysticCultureSpec(CulturalScene.ACADEMY_ARCHIVE, "学院档案室", "书卷与羽笔", "卷", "翻页点记", "据、证、脉络"),
-            "silkroad-robe" to MysticCultureSpec(CulturalScene.SILKROAD_CARAVANSERAI, "丝路驿站", "香料囊与旅铃", "铃", "抬铃示路", "远、路、回声"),
-            "northland-mantle" to MysticCultureSpec(CulturalScene.NORTHLAND_FIRE, "北境火塘", "鹿角护符", "角", "护符按心", "暖、守、火光"),
-            "cloud-daoist" to MysticCultureSpec(CulturalScene.DAOIST_CLOUD_TERRACE, "云台观", "拂尘与玉符", "尘", "拂尘收势", "静、观、顺势"),
-            "street-jacket" to MysticCultureSpec(CulturalScene.CITY_NIGHT, "城市夜行", "耳机与霓虹贴纸", "音", "摘耳机倾听", "快、短、在场"),
-            "desert-traveler" to MysticCultureSpec(CulturalScene.DESERT_DUSK, "沙海暮色", "水囊与星盘", "星", "抬腕辨星", "风、沙、方向"),
-            "festival-costume" to MysticCultureSpec(CulturalScene.FESTIVAL_COURTYARD, "节庆院落", "鼓与彩绸", "鼓", "击鼓定拍", "喜、拍、相逢")
+            "jiangnan-robe" to spec(CulturalScene.JIANGNAN_GARDEN, "江南水榭", "折扇与水纹", "扇", "jiangnan-robe"),
+            "academy-gown" to spec(CulturalScene.ACADEMY_ARCHIVE, "学院档案室", "书卷与羽笔", "卷", "academy-gown"),
+            "silkroad-robe" to spec(CulturalScene.SILKROAD_CARAVANSERAI, "丝路驿站", "香料囊与旅铃", "铃", "silkroad-robe"),
+            "northland-mantle" to spec(CulturalScene.NORTHLAND_FIRE, "北境火塘", "鹿角护符", "角", "northland-mantle"),
+            "cloud-daoist" to spec(CulturalScene.DAOIST_CLOUD_TERRACE, "云台观", "拂尘与玉符", "尘", "cloud-daoist"),
+            "street-jacket" to spec(CulturalScene.CITY_NIGHT, "城市夜行", "耳机与霓虹贴纸", "音", "street-jacket"),
+            "desert-traveler" to spec(CulturalScene.DESERT_DUSK, "沙海暮色", "水囊与星盘", "星", "desert-traveler"),
+            "festival-costume" to spec(CulturalScene.FESTIVAL_COURTYARD, "节庆院落", "鼓与彩绸", "鼓", "festival-costume")
         )
+
+        private fun spec(
+            scene: CulturalScene,
+            label: String,
+            prop: String,
+            glyph: String,
+            skinId: String
+        ): MysticCultureSpec {
+            val voice = MysticCultureVoice.forSkin(skinId)
+            return MysticCultureSpec(scene, label, prop, glyph, voice.gesture, voice.lexicon)
+        }
 
         private val NEUTRAL = MysticCultureSpec(
             CulturalScene.NEUTRAL_STAGE,
