@@ -25,6 +25,8 @@ enum class RecollectionKind(val wire: String) {
     }
 }
 
+// SoftMemoryTag deliberately lives outside this archive: it is visible and revocable, not a user quote.
+
 /** 一条长期记录：[intent] 只存话题键（如 career），不存生成出来的句子。 */
 data class RecollectionEntry(
     val dateKey: String = "",
