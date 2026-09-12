@@ -6,7 +6,8 @@ package com.xuanji.app.domain
  */
 class MysticDialogueCoordinator(
     private val provider: DialogueProvider,
-    private val engine: MysticDialogueEngine = DefaultMysticDialogueEngine()
+    private val engine: MysticDialogueEngine = DefaultMysticDialogueEngine(),
+    private val analyzer: MysticDialogueAnalyzer = DefaultMysticDialogueAnalyzer()
 ) {
     suspend fun complete(state: MysticSessionState, context: DialogueContext, input: String): List<MysticEvent> {
         val started = reduce(state, MysticEvent.SendInput(input))
@@ -25,14 +26,22 @@ class MysticDialogueCoordinator(
             provider.complete(DialogueRequest(requestContext, pending.input, pending.sessionToken))
         }.getOrElse { ProviderResult.Failure("provider_exception", retryable = true) }
         return when (result) {
-            is ProviderResult.Success -> listOf(
-                MysticEvent.SendInput(pending.input),
-                MysticEvent.ReplySucceeded(
-                    pending.sessionToken,
-                    pending.turnId,
-                    DialogueReply(engine.classify(pending.input), "", result.text)
+            is ProviderResult.Success -> {
+                val analysis = analyzer.analyze(pending.input, requestContext)
+                listOf(
+                    MysticEvent.SendInput(pending.input),
+                    MysticEvent.ReplySucceeded(
+                        pending.sessionToken,
+                        pending.turnId,
+                        DialogueReply(
+                            intent = analysis.intent,
+                            prefix = "",
+                            text = result.text,
+                            clarifiers = clarifiersFor(analysis)
+                        )
+                    )
                 )
-            )
+            }
             is ProviderResult.Failure -> listOf(
                 MysticEvent.SendInput(pending.input),
                 MysticEvent.ReplyFailed(pending.sessionToken, pending.turnId, result.reason)

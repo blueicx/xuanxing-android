@@ -105,6 +105,16 @@ class MysticDialogueEngineTest {
     }
 
     @Test
+    fun ambiguous_reply_answers_primary_topic_and_exposes_at_most_two_clarifiers() {
+        val reply = DefaultMysticDialogueEngine().reply(contextFor("工作和感情都想问"), "工作和感情都想问")
+
+        assertEquals(MysticIntent.Career, reply.intent)
+        assertEquals(true, reply.text.isNotBlank())
+        assertEquals(true, reply.clarifiers.size <= 2)
+        assertEquals(true, reply.clarifiers.any { it.contains("感情") })
+    }
+
+    @Test
     fun sensitive_topics_stay_as_guidance_not_conclusions() {
         val engine = DefaultMysticDialogueEngine()
         val health = engine.reply(contextFor("我最近睡眠不好，健康怎么样"))
