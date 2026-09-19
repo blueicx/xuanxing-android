@@ -3,6 +3,8 @@ package com.xuanji.app
 import android.app.Application
 import android.util.Log
 import com.xuanji.app.data.repository.FortuneRepository
+import com.xuanji.app.data.local.foodPreferenceStore
+import com.xuanji.app.data.repository.ActionRepository
 import com.xuanji.app.data.repository.HistoryRepository
 import com.xuanji.app.data.repository.LiuYaoRepository
 import com.xuanji.app.data.repository.ReferenceRepository
@@ -24,13 +26,15 @@ class XuanjiApplication : Application() {
         super.onCreate()
         installCrashLogger()
         val repository = FortuneRepository(this)
+        val testRecordRepository = TestRecordRepository(this)
         AppModule.init(
             repository,
             HistoryRepository(this),
             TarotRepository(this),
             LiuYaoRepository(this),
             ReferenceRepository(this),
-            TestRecordRepository(this)
+            testRecordRepository,
+            ActionRepository(repository, testRecordRepository, foodPreferenceStore())
         )
 
         // 出生信息默认空白（不预填任何生日），由用户自行填写。

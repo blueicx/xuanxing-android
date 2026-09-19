@@ -35,6 +35,7 @@ import com.xuanji.app.data.model.CompositeDailyFortune
 import com.xuanji.app.di.AppModule
 import com.xuanji.app.ui.components.CardLayouts
 import com.xuanji.app.ui.components.CardMeta
+import com.xuanji.app.ui.components.DailyActionSection
 import com.xuanji.app.ui.components.FortuneCard
 import com.xuanji.app.ui.components.FortuneDimensionDetail
 import com.xuanji.app.ui.components.FortuneInsightList
@@ -52,6 +53,7 @@ import com.xuanji.app.ui.components.rememberCardLayoutController
 import com.xuanji.app.ui.components.scoreColor
 import com.xuanji.app.ui.viewmodel.CompositeFortuneViewModel
 import com.xuanji.app.ui.viewmodel.CompositeUiState
+import com.xuanji.app.ui.viewmodel.ActionViewModel
 import com.xuanji.app.ui.xuanjiViewModel
 
 /**
@@ -70,6 +72,8 @@ fun CompositeFortuneScreen(
     }
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val actionViewModel = xuanjiViewModel { ActionViewModel(AppModule.actionRepository) }
+    val actionState by actionViewModel.state.collectAsStateWithLifecycle()
     when (val s = state) {
         is CompositeUiState.Loading -> CenterMessage("正在综合推算…")
         is CompositeUiState.Empty -> CenterMessage("尚未设置出生信息，请先在「我的」中填写生日。")
@@ -77,7 +81,8 @@ fun CompositeFortuneScreen(
             bazi = s.bazi,
             fortune = s.fortune,
             period = s.period,
-            onPeriodChange = viewModel::setPeriod
+            onPeriodChange = viewModel::setPeriod,
+            dailyAction = actionState.todayPlan
         )
     }
 }
@@ -94,7 +99,8 @@ private fun CompositeContent(
     bazi: BaziFull,
     fortune: CompositeDailyFortune,
     period: String,
-    onPeriodChange: (String) -> Unit
+    onPeriodChange: (String) -> Unit,
+    dailyAction: com.xuanji.app.domain.action.DailyActionPlan?
 ) {
     val controller = rememberCardLayoutController("composite", bazi.chart.display)
     val cards = fortuneCards(fortune, period)
@@ -122,6 +128,7 @@ private fun CompositeContent(
                             verticalArrangement = Arrangement.spacedBy(16.dp)
                         ) {
                             SummaryBlock(fortune)
+                            DailyActionSection(dailyAction)
                             SystemSplitCard(fortune, period)
                             CardLayouts.ordered(cards, controller.state).forEach { card ->
                                 when (card.id) {

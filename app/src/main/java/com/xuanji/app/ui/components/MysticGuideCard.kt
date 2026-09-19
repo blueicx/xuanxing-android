@@ -54,13 +54,17 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.google.gson.Gson
 import com.xuanji.app.data.model.BaziFull
 import com.xuanji.app.data.model.CompositeDailyFortune
+import com.xuanji.app.data.local.ConversationMemoryStore
+import com.xuanji.app.data.local.DataStorePreferenceBridge
 import com.xuanji.app.data.local.dataStore
+import com.xuanji.app.data.local.softMemoryTagStore
 import com.xuanji.app.di.AppModule
 import com.xuanji.app.domain.MysticClarifierOption
 import com.xuanji.app.domain.MysticInteraction
@@ -83,8 +87,16 @@ import com.xuanji.app.domain.MysticGuestExit
 import com.xuanji.app.domain.MysticRhythmCheckin
 import com.xuanji.app.domain.MysticSkin
 import com.xuanji.app.domain.MysticVisitMemory
+import com.xuanji.app.domain.ConversationMemory
+import com.xuanji.app.domain.RecallFacts
+import com.xuanji.app.domain.RecollectionCodec
+import com.xuanji.app.domain.RecollectionKind
+import com.xuanji.app.domain.SoftMemorySource
+import com.xuanji.app.domain.SoftMemoryTag
+import com.xuanji.app.domain.DefaultMysticDialogueAnalyzer
 import com.xuanji.app.domain.MysticMemoryNote as DomainMysticMemoryNote
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import java.security.MessageDigest
 
@@ -106,6 +118,13 @@ private data class MysticMemoryNote(
     val id: String,
     val text: String
 )
+
+/** 记忆列表里那条是哪个动作；穷举写，新增种类时编译期就得补。 */
+private fun recollectionKindLabel(kind: RecollectionKind): String = when (kind) {
+    RecollectionKind.USER_INPUT -> "原话"
+    RecollectionKind.USER_CHOICE -> "选择"
+    RecollectionKind.SETTLED_GAME_RESULT -> "终局"
+}
 
 private data class StoredMysticVisit(
     val dateKey: String = "",
@@ -204,6 +223,8 @@ fun MysticGuideCard(
     val records by AppModule.testRecordRepository.records.collectAsStateWithLifecycle(initialValue = emptyList())
     val context = LocalContext.current
     val visitStore = remember(context) { MysticVisitStore(context) }
+    val memoryStore = remember(context) { ConversationMemoryStore(DataStorePreferenceBridge(context)) }
+    val softMemoryStore = remember(context) { context.softMemoryTagStore() }
     val coroutineScope = rememberCoroutineScope()
     val visitProfile = remember(bazi) { "bazi|${bazi.chart.display}" }
     val companionKey = "${bazi.hashCode()}|${fortune.hashCode()}"
@@ -227,6 +248,11 @@ fun MysticGuideCard(
     var memorySequence by remember(companion) { companion::memorySequence }
     var memoryExpanded by remember(companion) { companion::memoryExpanded }
     var revisitLine by remember(visitProfile) { mutableStateOf("") }
+    var recollectionLine by remember(visitProfile) { mutableStateOf("") }
+    var storedMemory by remember(visitProfile) { mutableStateOf(ConversationMemory()) }
+    var recollectionBroken by remember(visitProfile) { mutableStateOf(false) }
+    var softMemoryTags by remember(visitProfile) { mutableStateOf(emptyList<SoftMemoryTag>()) }
+    var memoryClearFailed by remember(visitProfile) { mutableStateOf(false) }
     var visitReady by remember(visitProfile) { mutableStateOf(false) }
     var persistedVisitAction by remember(visitProfile) { mutableStateOf("") }
     LaunchedEffect(companionKey) {
@@ -242,7 +268,37 @@ fun MysticGuideCard(
     val dialogueEngine = remember { DefaultMysticDialogueEngine() }
     val dialogueProvider: DialogueProvider = remember { OfflineDialogueProvider(dialogueEngine) }
     var sessionState by remember { mutableStateOf(MysticSessionState()) }
+    var gameSession by remember { mutableStateOf(com.xuanji.app.domain.game.GameSessionState()) }
+    var gameReply by remember { mutableStateOf("") }
+    var gameInputEcho by remember { mutableStateOf<String?>(null) }
+    var gameThinking by remember { mutableStateOf(false) }
+    var gameViewPly by remember { mutableStateOf<Int?>(null) }
+    val gameArchiveStore = remember(context) { com.xuanji.app.data.local.GameArchiveStore(context) }
+    var gameRecord by remember { mutableStateOf(com.xuanji.app.domain.game.GameRecord()) }
+    var gameArchive by remember { mutableStateOf<com.xuanji.app.domain.game.GameSave?>(null) }
+    var gameRecordedToken by remember { mutableStateOf<Long?>(null) }
+    val gameBridge = remember {
+        com.xuanji.app.domain.game.GameDialogueBridge(recordOf = { gameRecord })
+    }
     var pendingCustom by remember(guide) { mutableStateOf<String?>(null) }
+    LaunchedEffect(visitProfile) {
+        gameRecord = runCatching { gameArchiveStore.loadRecord(visitProfile) }
+            .getOrElse { com.xuanji.app.domain.game.GameRecord() }
+        gameArchive = runCatching { gameArchiveStore.load(visitProfile) }.getOrNull()
+    }
+    LaunchedEffect(visitProfile) {
+        // null = 存过但读不出来（或读盘失败）；空记忆 = 本机从没记过。两句话不一样。
+        val loaded = runCatching { memoryStore.load(visitProfile) }.getOrNull()
+        recollectionBroken = loaded == null
+        storedMemory = loaded ?: ConversationMemory()
+        // 开场句只反映进来时本机已存的内容；这次访问新记的东西不改写它。
+        recollectionLine = MysticGuideGenerator.recallLine(
+            mode,
+            guide.styleKey,
+            if (loaded == null) RecallFacts(unreadable = true) else RecollectionCodec.facts(loaded)
+        )
+        softMemoryTags = runCatching { softMemoryStore.read(visitProfile).tags }.getOrDefault(emptyList())
+    }
     LaunchedEffect(guide) {
         sessionState = reduce(
             sessionState,
@@ -347,6 +403,20 @@ fun MysticGuideCard(
         arrivalVisible = true
     }
 
+    /**
+     * Long-term memory only ever holds what the user typed or tapped on this device.
+     * A blank/nothing-said input produces no entry at all, and a failed write leaves the
+     * visible snapshot untouched rather than pretending the note landed.
+     */
+    fun rememberLongTerm(kind: RecollectionKind, text: String, intent: String = topic) {
+        val entry = RecollectionCodec.entryOf(fortune.dateKey, kind, text, intent) ?: return
+        coroutineScope.launch {
+            val updated = runCatching { memoryStore.remember(visitProfile, entry) }.getOrNull()
+                ?: return@launch
+            storedMemory = updated
+        }
+    }
+
     fun rememberMemory(kind: String, detail: String) {
         val text = MysticGuideGenerator.memoryNote(mode, guide.styleKey, kind, detail)
         if (text.isBlank()) return
@@ -388,6 +458,38 @@ fun MysticGuideCard(
         pendingFollowUp = key
     }
 
+    fun rememberSoftTopic(text: String) {
+        val analysis = DefaultMysticDialogueAnalyzer().analyze(
+            text,
+            DialogueContext(
+                mode = mode,
+                styleKey = guide.styleKey,
+                topicKey = topic,
+                fortune = fortune,
+                latestTest = latestTest,
+                recentTurns = sessionState.recentTurns,
+                memoryNotes = sessionState.memoryNotes,
+                skinId = companion.skinId,
+                question = text
+            )
+        )
+        val topicKey = analysis.topicKey ?: return
+        if (analysis.intent == com.xuanji.app.domain.MysticIntent.Game) return
+        val tag = SoftMemoryTag(
+            id = "topic-$topicKey",
+            key = "topic",
+            label = "最近常聊",
+            value = analysis.entities["topic_label"] ?: topicKey,
+            source = SoftMemorySource.Inferred,
+            createdAt = fortune.dateKey,
+            lastSeenAt = fortune.dateKey
+        )
+        coroutineScope.launch {
+            val updated = runCatching { softMemoryStore.upsertInferred(visitProfile, tag) }.getOrNull()
+            if (updated != null) softMemoryTags = updated.tags
+        }
+    }
+
     fun submitCustom() {
         if (
             pendingFollowUp != null ||
@@ -404,14 +506,116 @@ fun MysticGuideCard(
         ) return
         val cleanQuestion = customQuestion.trim().take(200)
         if (cleanQuestion.isEmpty()) return
+        rememberLongTerm(RecollectionKind.USER_INPUT, cleanQuestion)
+        rememberSoftTopic(cleanQuestion)
         sessionState = reduce(sessionState, MysticEvent.SendInput(cleanQuestion))
         pendingCustom = cleanQuestion
         customQuestion = ""
     }
 
+    /**
+     * Run one board action off the main thread, then keep playing until the human is to
+     * move again. The local search blocks while it evaluates, and spectating hands both
+     * sides to the engine, so a single command can produce several replies. Board state
+     * only changes through a bridge result — every move shown already passed the rules
+     * re-check inside the reducer.
+     */
+    fun driveGame(
+        echo: String? = null,
+        action: (com.xuanji.app.domain.game.GameSessionState) -> com.xuanji.app.domain.game.GameDialogueBridge.Result
+    ) {
+        if (gameThinking) return
+        gameThinking = true
+        gameViewPly = null
+        coroutineScope.launch(kotlinx.coroutines.Dispatchers.Default) {
+            suspend fun fulfil(
+                result: com.xuanji.app.domain.game.GameDialogueBridge.Result
+            ): com.xuanji.app.domain.game.GameDialogueBridge.Result = when (result.archive) {
+                com.xuanji.app.domain.game.GameDialogueBridge.ArchiveRequest.SAVE -> {
+                    val save = com.xuanji.app.domain.game.GameArchive.saveOf(
+                        result.state,
+                        savedAt = System.currentTimeMillis()
+                    )
+                    if (runCatching { gameArchiveStore.save(visitProfile, save) }.isSuccess) {
+                        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) { gameArchive = save }
+                        result
+                    } else {
+                        result.copy(reply = "本机存储不可用，这一局没能保存。")
+                    }
+                }
+                com.xuanji.app.domain.game.GameDialogueBridge.ArchiveRequest.RESUME -> {
+                    val save = runCatching { gameArchiveStore.load(visitProfile) }.getOrNull()
+                    gameBridge.resumeWith(result.state, save)
+                }
+                null -> result
+            }
+            suspend fun publish(result: com.xuanji.app.domain.game.GameDialogueBridge.Result) {
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    if (result.event is com.xuanji.app.domain.game.GameEvent.Start) {
+                        gameRecordedToken = null
+                    }
+                    gameSession = result.state
+                    if (result.reply.isNotBlank()) gameReply = result.reply
+                    if (echo != null && (result.event != null || result.grounded)) gameInputEcho = echo
+                }
+            }
+            var result = fulfil(action(gameSession))
+            publish(result)
+            while (result.awaitEngine && isActive) {
+                result = gameBridge.engineReply(result.state)
+                publish(result)
+            }
+            val settled = gameBridge.settledResult(result.state)
+            val token = result.state.sessionToken
+            if (settled != null && gameRecordedToken != token) {
+                gameRecordedToken = token
+                rememberLongTerm(
+                    RecollectionKind.SETTLED_GAME_RESULT,
+                    com.xuanji.app.domain.game.GameRecord.settledNote(settled),
+                    intent = ""
+                )
+                val updated = runCatching { gameArchiveStore.record(visitProfile, settled) }.getOrNull()
+                if (updated != null) {
+                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) { gameRecord = updated }
+                }
+            }
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) { gameThinking = false }
+        }
+    }
+
+    fun runGameText(text: String, echo: String = text) {
+        driveGame(echo) { gameBridge.handle(it, text) }
+    }
+
     fun submitPanelInput(text: String) {
+        // Game path first: board-game intents bypass the generic pendingCustom reply so
+        // character game commentary never mixes with fortune template wording.
+        val cleanText = text.trim().take(200)
+        val gameIntent = com.xuanji.app.domain.MysticIntentClassifier.classify(cleanText) ==
+            com.xuanji.app.domain.MysticIntent.Game ||
+            gameBridge.activeGame(gameSession)
+        if (gameIntent) {
+            // intent 留空：棋桌上的话不该被召回句算成「聊过某个命理主题」。
+            rememberLongTerm(RecollectionKind.USER_INPUT, cleanText, intent = "")
+            runGameText(cleanText)
+            return
+        }
         customQuestion = text
         submitCustom()
+    }
+
+    fun revokeSoftTag(id: String) {
+        coroutineScope.launch {
+            val updated = runCatching { softMemoryStore.revoke(visitProfile, id) }.getOrNull()
+            if (updated != null) softMemoryTags = updated.tags
+        }
+    }
+
+    fun clearSoftMemory() {
+        coroutineScope.launch {
+            runCatching { softMemoryStore.clear(visitProfile) }
+            softMemoryTags = emptyList()
+        }
     }
 
     fun cancelPanelReply() {
@@ -702,6 +906,7 @@ fun MysticGuideCard(
         pendingGuestChoiceEcho = null
         pendingOpening = null
         rememberMemory("handoff", MysticGuideGenerator.topicLabel(fromTopic))
+        rememberLongTerm(RecollectionKind.USER_CHOICE, MysticGuideGenerator.topicLabel(topic))
     }
 
     fun selectOpening(option: MysticOpeningOption) {
@@ -754,6 +959,7 @@ fun MysticGuideCard(
         openingAnswered = true
         pendingOpening = null
         rememberMemory("opening", expectedOption.label)
+        rememberLongTerm(RecollectionKind.USER_CHOICE, expectedOption.label)
         persistedVisitAction = expectedOption.label
         runCatching {
             visitStore.save(
@@ -822,6 +1028,7 @@ fun MysticGuideCard(
         )
         pendingRhythm = null
         rememberMemory("rhythm", expectedOption.label)
+        rememberLongTerm(RecollectionKind.USER_CHOICE, expectedOption.label)
     }
 
     fun requestGuestReply(key: String) {
@@ -905,6 +1112,7 @@ fun MysticGuideCard(
         pendingGuest = false
         guestChoiceCarryoverKey = choice.key
         rememberMemory("guest", choice.label)
+        rememberLongTerm(RecollectionKind.USER_CHOICE, choice.label)
     }
 
     LaunchedEffect(pendingCustom, guide) {
@@ -1079,6 +1287,7 @@ fun MysticGuideCard(
         guestChoiceCarryoverKey = null
         pendingInteraction = null
         rememberMemory("game", option.label)
+        rememberLongTerm(RecollectionKind.USER_CHOICE, option.label, intent = "")
     }
 
     LaunchedEffect(pendingFollowUp) {
@@ -1132,6 +1341,7 @@ fun MysticGuideCard(
         guestChoiceCarryoverKey = null
         pendingFollowUp = null
         rememberMemory("ask", item.question)
+        rememberLongTerm(RecollectionKind.USER_CHOICE, item.question)
     }
     val accent by animateColorAsState(
         targetValue = if (mode == "half") MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.primary,
@@ -1188,6 +1398,9 @@ fun MysticGuideCard(
                     .padding(bottom = 86.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
+                if (recollectionLine.isNotBlank()) {
+                    MysticStageSpeech(recollectionLine, accent)
+                }
                 if (revisitLine.isNotBlank()) {
                     MysticStageSpeech(revisitLine, accent)
                 }
@@ -1238,15 +1451,101 @@ fun MysticGuideCard(
                     .padding(start = 8.dp, end = 8.dp, top = 8.dp, bottom = 18.dp),
                 color = Color.Transparent
             ) {
-                MysticConversationPanel(
-                    state = sessionState,
-                    onSend = ::submitPanelInput,
-                    onQuickPrompt = ::submitPanelInput,
-                    onCancel = ::cancelPanelReply,
-                    onRetry = ::retryPanelReply,
-                    accent = accent,
-                    showMessages = false
-                )
+                Column {
+                    if (gameBridge.activeGame(gameSession)) {
+                        com.xuanji.app.ui.components.game.GameBoardCard(
+                            position = gameSession.positionAt(gameViewPly ?: gameSession.history.size),
+                            history = gameSession.history,
+                            viewPly = gameViewPly,
+                            outcome = gameSession.outcome,
+                            lineColor = Color(skin.garment),
+                            boardColor = Color(skin.back),
+                            difficulty = gameSession.difficulty,
+                            thinking = gameThinking,
+                            canRedo = gameSession.redo.isNotEmpty(),
+                            onSquareTap = { tap ->
+                                driveGame {
+                                    gameBridge.applySquareMove(it, from = tap.first, to = tap.second)
+                                }
+                            },
+                            onUndo = { runGameText("悔棋") },
+                            onRedo = { runGameText("重做这一手") },
+                            onHint = { runGameText("给我提示") },
+                            onExit = { runGameText("退出棋局") },
+                            onRestart = { runGameText("来一盘象棋") },
+                            onDifficultyChange = { level ->
+                                runGameText(com.xuanji.app.domain.game.SmartBoardEngine.labelOf(level))
+                            },
+                            onStep = { ply ->
+                                gameViewPly = ply.takeIf { it < gameSession.history.size }
+                            },
+                            footer = if (gameReply.isNotBlank()) {
+                                {
+                                    Text(
+                                        text = gameReply,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = Color(0xFFEFE6D7),
+                                        modifier = Modifier.semantics {
+                                            contentDescription = "基于当前局面的棋局解说"
+                                        }
+                                    )
+                                }
+                            } else {
+                                null
+                            }
+                        )
+                    }
+                    val archiveLive = gameBridge.activeGame(gameSession)
+                    if (archiveLive || gameArchive != null || gameRecord.games > 0) {
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 6.dp, vertical = 2.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Text(
+                                text = gameRecord.summaryText(),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .semantics { contentDescription = "棋局战绩" },
+                                style = MaterialTheme.typography.labelSmall,
+                                color = accent.copy(alpha = 0.72f)
+                            )
+                            if (gameSession.history.isNotEmpty()) {
+                                OutlinedButton(
+                                    onClick = { runGameText("保存棋局") },
+                                    enabled = !gameThinking,
+                                    modifier = Modifier.testTag("game-save")
+                                ) {
+                                    Text("保存棋局", style = MaterialTheme.typography.labelSmall)
+                                }
+                            }
+                            if (!archiveLive && gameArchive != null) {
+                                OutlinedButton(
+                                    onClick = { runGameText("继续棋局") },
+                                    enabled = !gameThinking,
+                                    modifier = Modifier.testTag("game-resume")
+                                ) {
+                                    Text("继续棋局", style = MaterialTheme.typography.labelSmall)
+                                }
+                            }
+                        }
+                    }
+                    MysticConversationPanel(
+                        state = sessionState,
+                        onSend = ::submitPanelInput,
+                        onQuickPrompt = ::submitPanelInput,
+                        onCancel = ::cancelPanelReply,
+                        onRetry = ::retryPanelReply,
+                        onClarifierSelected = ::submitPanelInput,
+                        softMemoryTags = softMemoryTags,
+                        onRevokeSoftTag = ::revokeSoftTag,
+                        onClearSoftMemory = ::clearSoftMemory,
+                        accent = accent,
+                        showMessages = false
+                    )
+                }
             }
         }
         return
@@ -1297,7 +1596,7 @@ fun MysticGuideCard(
                 }
                 Column(Modifier.weight(1f)) {
                     Text(
-                        if (mode == "half") "半仙" else "玄学家",
+                        MysticGuideGenerator.personaName(mode),
                         style = MaterialTheme.typography.titleSmall,
                         color = MaterialTheme.colorScheme.onSurface
                     )
@@ -1380,7 +1679,7 @@ fun MysticGuideCard(
                 }
             }
 
-            AnimatedVisibility(visible = revisitLine.isNotBlank()) {
+            AnimatedVisibility(visible = revisitLine.isNotBlank() || recollectionLine.isNotBlank()) {
                 Surface(
                     Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
@@ -1391,17 +1690,27 @@ fun MysticGuideCard(
                         verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
                         Text(
-                            "回访",
+                            if (revisitLine.isNotBlank()) "回访" else "本机记忆",
                             style = MaterialTheme.typography.labelMedium,
                             fontWeight = FontWeight.Bold,
                             color = accent
                         )
-                        Text(
-                            revisitLine,
-                            style = MaterialTheme.typography.bodySmall,
-                            lineHeight = 20.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                        if (recollectionLine.isNotBlank()) {
+                            Text(
+                                recollectionLine,
+                                style = MaterialTheme.typography.bodySmall,
+                                lineHeight = 20.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        if (revisitLine.isNotBlank()) {
+                            Text(
+                                revisitLine,
+                                style = MaterialTheme.typography.bodySmall,
+                                lineHeight = 20.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
                 }
             }
@@ -1546,7 +1855,9 @@ fun MysticGuideCard(
                 }
             }
 
-            if (memoryNotes.isNotEmpty()) {
+            val storedCount = storedMemory.entries.size
+            val hasStoredMemory = recollectionBroken || storedCount > 0 || storedMemory.dropped > 0
+            if (memoryNotes.isNotEmpty() || hasStoredMemory) {
                 Surface(
                     Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
@@ -1591,6 +1902,81 @@ fun MysticGuideCard(
                                 )
                             }
                         }
+
+                        if (hasStoredMemory) {
+                            Text(
+                                "本机长期记忆",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                "这里只存你自己打的字、点过的选项和终局结果；角色说的话不留档。",
+                                style = MaterialTheme.typography.labelSmall,
+                                lineHeight = 17.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f)
+                            )
+                            if (recollectionBroken) {
+                                Text(
+                                    "本机记录读不出来，清除后从头记。",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    lineHeight = 19.sp,
+                                    color = MaterialTheme.colorScheme.error
+                                )
+                            }
+                            storedMemory.entries.asReversed().take(3).forEach { entry ->
+                                Text(
+                                    "${entry.dateKey.ifBlank { "未记日期" }} · " +
+                                        recollectionKindLabel(entry.kind) + " · " + entry.text,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    lineHeight = 19.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            if (storedCount > 0 || storedMemory.dropped > 0) {
+                                val summary = buildString {
+                                    append("本机共 $storedCount 条，最多留 ${RecollectionCodec.MAX_ENTRIES} 条。")
+                                    if (storedMemory.dropped > 0) {
+                                        append("更早的 ${storedMemory.dropped} 条已自动清理。")
+                                    }
+                                }
+                                Text(
+                                    summary,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    lineHeight = 17.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f)
+                                )
+                            }
+                            OutlinedButton(
+                                onClick = {
+                                    memoryClearFailed = false
+                                    coroutineScope.launch {
+                                        if (runCatching { memoryStore.clear(visitProfile) }.isSuccess) {
+                                            storedMemory = ConversationMemory()
+                                            recollectionBroken = false
+                                            recollectionLine = ""
+                                        } else {
+                                            memoryClearFailed = true
+                                        }
+                                    }
+                                },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .heightIn(min = 48.dp)
+                                    .semantics { contentDescription = "清除本机长期记忆" },
+                                shape = RoundedCornerShape(10.dp)
+                            ) {
+                                Text("清除本机长期记忆", style = MaterialTheme.typography.labelMedium, color = accent)
+                            }
+                            if (memoryClearFailed) {
+                                Text(
+                                    "清除失败，记忆仍留在本机。",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    lineHeight = 17.sp,
+                                    color = MaterialTheme.colorScheme.error
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -1602,14 +1988,14 @@ fun MysticGuideCard(
                 val scholarAccent = MaterialTheme.colorScheme.primary
                 val halfAccent = MaterialTheme.colorScheme.tertiary
                 MysticPersonaButton(
-                    "玄学家",
+                    MysticGuideGenerator.personaName("scholar"),
                     "心理按摩",
                     mode == "scholar",
                     scholarAccent,
                     Modifier.weight(1f)
                 ) { switchPersona("scholar") }
                 MysticPersonaButton(
-                    "半仙",
+                    MysticGuideGenerator.personaName("half"),
                     "浮夸吐槽",
                     mode == "half",
                     halfAccent,
@@ -1880,6 +2266,10 @@ fun MysticGuideCard(
                             onQuickPrompt = ::submitPanelInput,
                             onCancel = ::cancelPanelReply,
                             onRetry = ::retryPanelReply,
+                            onClarifierSelected = ::submitPanelInput,
+                            softMemoryTags = softMemoryTags,
+                            onRevokeSoftTag = ::revokeSoftTag,
+                            onClearSoftMemory = ::clearSoftMemory,
                             accent = accent,
                             showMessages = false
                         )

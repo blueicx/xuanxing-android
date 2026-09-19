@@ -5,7 +5,42 @@ object MysticIntentClassifier {
     fun classify(question: String): MysticIntent {
         val q = question.trim().lowercase()
         val normalized = q.trimEnd('.', ',', '，', '。', '!', '！', '?', '？', '~', '～')
-        return casual(normalized) ?: topic(q)
+        return casual(normalized) ?: game(normalized) ?: action(normalized) ?: topic(q)
+    }
+
+    /**
+     * Game intents: starting a board game, board-game moves/commands. Runs before the
+     * topic classifier so "走炮二平五" is never eaten by generic wording, and guards
+     * Everyday wording (车厘子 / 将军肚) from being misread as game commands.
+     */
+    private fun game(q: String): MysticIntent? {
+        val isStart = setOf("来一盘", "来一局", "下一盘", "下一局", "下一把", "开一盘", "开一局", "陪我下")
+            .any { q.contains(it) } && (q.contains("象棋") || q.contains("围棋") || q.contains("国际象棋"))
+        val isCommand = q == "悔棋" || q.contains("悔棋") ||
+            (q.contains("提示") && q.length <= 8) ||
+            q.contains("复盘") || q.contains("退出棋局") || q.contains("保存棋局") ||
+            q.contains("执黑") || q.contains("执红")
+        val isNotation = isMoveNotation(q)
+        return if (isStart || isCommand || isNotation) MysticIntent.Game else null
+    }
+
+    private fun isMoveNotation(q: String): Boolean {
+        val body = q.removePrefix("走").removePrefix("下").trim()
+        if (body.length !in 3..5) return false
+        val pieceChar = body.first()
+        if (pieceChar !in "车俥马傌相象仕士帅将炮砲兵卒") return false
+        val hasVerb = body[1] in "进退平" || (body.length >= 3 && body[2] in "进退平")
+        val hasNumeral = body.any { it in "一二三四五六七八九123456789" }
+        // guard: 车厘子/将军肚-style everyday words contain a piece char but no verb+numeral
+        return hasVerb && hasNumeral
+    }
+
+    private fun action(q: String): MysticIntent? = when {
+        containsAny(q, "早餐吃什么", "午餐吃什么", "午饭吃什么", "晚餐吃什么", "晚饭吃什么", "今天吃什么", "外卖吃什么") -> MysticIntent.TodayMeal
+        containsAny(q, "今天做什么", "今天适合做什么", "现在做什么") -> MysticIntent.TodayActivity
+        containsAny(q, "去哪玩", "去哪里玩", "今天去哪", "今天去哪里") -> MysticIntent.TodayOuting
+        containsAny(q, "适合什么工作", "适合做什么工作", "什么工作适合我", "什么颜色适合我", "适合什么颜色", "哪个城市适合我", "适合哪个城市", "适合什么地区") -> MysticIntent.LifeProfile
+        else -> null
     }
 
     private fun casual(q: String): MysticIntent? = when {

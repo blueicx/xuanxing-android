@@ -105,6 +105,16 @@ class MysticDialogueEngineTest {
     }
 
     @Test
+    fun ambiguous_reply_answers_primary_topic_and_exposes_at_most_two_clarifiers() {
+        val reply = DefaultMysticDialogueEngine().reply(contextFor("工作和感情都想问"), "工作和感情都想问")
+
+        assertEquals(MysticIntent.Career, reply.intent)
+        assertEquals(true, reply.text.isNotBlank())
+        assertEquals(true, reply.clarifiers.size <= 2)
+        assertEquals(true, reply.clarifiers.any { it.contains("感情") })
+    }
+
+    @Test
     fun sensitive_topics_stay_as_guidance_not_conclusions() {
         val engine = DefaultMysticDialogueEngine()
         val health = engine.reply(contextFor("我最近睡眠不好，健康怎么样"))
@@ -170,6 +180,26 @@ class MysticDialogueEngineTest {
         assertEquals(false, finance.text.contains("保证收益"))
         assertEquals(false, finance.text.contains("推荐买"))
         assertEquals(false, finance.text.contains("保证收益"))
+    }
+
+    @Test
+    fun custom_answer_routes_every_question_through_the_safety_guard() {
+        val engine = DefaultMysticDialogueEngine()
+
+        // 「吃什么药」被分类器送去 Daily，只有守卫能让它变成拒答；Daily 不加「你问：」前缀，
+        // 所以整条回复等于守卫产出的两句之一，才说明这道门确实还接着。
+        val question = "我该吃什么药"
+        val medical = engine.reply(contextFor(question), question)
+        assertEquals(true, MysticSafetyGuard.verdictDomainOf(question) == SafetyDomain.Health)
+        assertEquals(
+            true,
+            medical.text == MysticSafetyGuard.refusal("scholar", SafetyDomain.Health, 0) ||
+                medical.text == MysticSafetyGuard.refusal("scholar", SafetyDomain.Health, 1)
+        )
+
+        // 非结论式提问原样保留草稿，只在句尾补免责句。
+        val advisory = engine.reply(contextFor("最近体检要注意什么"), "最近体检要注意什么")
+        assertEquals(true, advisory.text.endsWith(MysticSafetyGuard.HEALTH_DISCLAIMER))
     }
 
     private fun contextFor(question: String) = DialogueContext(

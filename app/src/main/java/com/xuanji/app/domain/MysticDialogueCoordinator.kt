@@ -6,7 +6,8 @@ package com.xuanji.app.domain
  */
 class MysticDialogueCoordinator(
     private val provider: DialogueProvider,
-    private val engine: MysticDialogueEngine = DefaultMysticDialogueEngine()
+    private val engine: MysticDialogueEngine = DefaultMysticDialogueEngine(),
+    private val analyzer: MysticDialogueAnalyzer = DefaultMysticDialogueAnalyzer()
 ) {
     suspend fun complete(state: MysticSessionState, context: DialogueContext, input: String): List<MysticEvent> {
         val started = reduce(state, MysticEvent.SendInput(input))
@@ -25,18 +26,59 @@ class MysticDialogueCoordinator(
             provider.complete(DialogueRequest(requestContext, pending.input, pending.sessionToken))
         }.getOrElse { ProviderResult.Failure("provider_exception", retryable = true) }
         return when (result) {
-            is ProviderResult.Success -> listOf(
+            is ProviderResult.Success -> {
+                val analysis = analyzer.analyze(pending.input, requestContext)
+                val validation = if (provider is OfflineDialogueProvider) {
+                    ValidationResult.Accept
+                } else {
+                    DialogueReplyValidator.validate(result.text, requestContext)
+                }
+                val reply = when (validation) {
+                    ValidationResult.Accept -> DialogueReply(
+                        intent = analysis.intent,
+                        prefix = "",
+                        text = result.text,
+                        clarifiers = clarifiersFor(analysis),
+                        source = if (provider is OfflineDialogueProvider) ReplySource.Offline else ReplySource.OnlineValidated
+                    )
+                    is ValidationResult.Reject -> offlineReply(requestContext, pending.input, analysis)
+                }
+                listOf(
+                    MysticEvent.SendInput(pending.input),
+                    MysticEvent.ReplySucceeded(pending.sessionToken, pending.turnId, reply)
+                )
+            }
+            is ProviderResult.Failure -> listOf(
                 MysticEvent.SendInput(pending.input),
                 MysticEvent.ReplySucceeded(
                     pending.sessionToken,
                     pending.turnId,
-                    DialogueReply(engine.classify(pending.input), "", result.text)
+                    offlineReply(
+                        requestContext,
+                        pending.input,
+                        analyzer.analyze(pending.input, requestContext)
+                    )
                 )
             )
-            is ProviderResult.Failure -> listOf(
-                MysticEvent.SendInput(pending.input),
-                MysticEvent.ReplyFailed(pending.sessionToken, pending.turnId, result.reason)
+        }
+    }
+
+    private fun offlineReply(
+        context: DialogueContext,
+        input: String,
+        analysis: DialogueAnalysis
+    ): DialogueReply {
+        val reply = runCatching { engine.reply(context, input) }.getOrElse {
+            DialogueReply(
+                intent = analysis.intent,
+                prefix = "",
+                text = "我先按离线方式接住这句；盘面资料暂时不完整，我们可以换个角度再看。"
             )
         }
+        return reply.copy(
+            intent = analysis.intent,
+            clarifiers = clarifiersFor(analysis),
+            source = ReplySource.OnlineFallback
+        )
     }
 }

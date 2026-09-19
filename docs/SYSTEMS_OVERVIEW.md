@@ -6,19 +6,62 @@
 
 浮球和舞台都遵循系统导航栏/输入法安全区；系统开启“移除动画”时，浮球取消位移、旋转和面部微动。
 
-浮球实现已独立在 `MysticOrb.kt`，舞台与人物绘制仍保留在 `MysticFloatingGuide.kt`，后续可继续按同一边界渐进拆分。
+浮球实现独立在 `MysticOrb.kt`；舞台外壳、文化背景和人物画布分别由 `MysticStageLayout.kt`、`MysticCultureBackdrop.kt`、`MysticFigureCanvas.kt` 承担，`MysticFloatingGuide.kt` 只保留挂载与状态桥接。
 
 ## 对话与会话
 
-`MysticDialogueEngine` 负责输入分类和确定性本地回复，`MysticSessionState`/`reduce` 负责会话 token、上下文切换及旧异步结果丢弃。记忆仅接收用户主动输入或选择，不把生成内容伪装成长期记忆。
+`MysticDialogueEngine` 负责输入分类和确定性本地回复，`MysticSessionState`/`reduce` 负责会话 token、上下文切换及旧异步结果丢弃。跨会话的「本机长期记忆」由 `RecollectionKind` 限定种类，只有用户原话、用户主动选择与已结算棋局结果三种，生成文案在类型上无处可放，因此「不把生成内容伪装成长期记忆」不再依赖调用方自觉（见「本机长期记忆」一节）。
 
 意图规范化已抽到 `MysticIntentClassifier`，供 generator 与 engine 共用，避免两套关键词表继续漂移。
 
+对话输入先经过 `MysticDialogueAnalyzer`：统一 NFKC、标点和大小写，给出主主题、次主题实体、置信度与上一轮承接。`MysticTopicAnswerTemplates` 只接收已经计算出的盘面事实，`MysticCultureVoice` 维护文化皮肤的动作/语汇；因此换作风不会重新计算分数，也不会把文化装饰冒充事实。
+
+交流面板由 `MysticMessageList`、`MysticConversationInput`、`MysticClarifierRow` 和 `MysticSoftMemoryPanel` 组成。低置信度或多主题时最多给两个澄清入口，用户点选后仍走同一个 session token。软标签存于独立的 `soft_memory_<sha256(profileKey)>` 命名空间，显示“由对话推断”，可逐条撤回或全部清除，不进入 `RecollectionKind` 的长期访问记录。
+
+同日生页的音乐/诗歌目录由 `SameDayWorks` 提供确定性结果：公版作品才允许显示短摘录，非公版只显示标题、作者、年份与风格元数据。长评语默认折叠为首句，用户主动展开后才显示全文。作品与人物内容均属于人文陪伴，不是占断证据。
+
+对话承接由 `MysticDialogueContinuity` 读取最近回合的主题；“继续”“这个呢”“那怎么办”等省略式输入会继承上一主题，明确出现新主题时以当前输入为准。承接只改善表达相关性，不改变盘面算法，也不把生成内容写入长期记忆。
+
+B+C 视觉方案采用统一人物骨架加文化道具和场景层：每个 `skinId` 都映射到独立的 `MysticCultureSpec`，舞台会绘制对应的水榭、档案室、驿站、火塘、云台、城市夜景、沙海或节庆院落。它是文化视觉演绎，不宣称还原真实服饰、仪式或族群身份。
+
+## 棋局会话（2026-09）
+
+交流面板已接入真实中国象棋：`domain/game` 提供纯 Kotlin 规则核心（`XiangqiBoard`/`XiangqiRules`/`XiangqiNotation`）、会话级分析（`BoardAnalysis` 威胁扫描、`EndgameCatalog` 残局）、搜索引擎（`SmartBoardEngine`）、`GameSessionState`/`reduceGame` 会话 reducer 与 `GameDialogueBridge` 意图桥。游戏意图（`MysticIntent.Game`）优先于通用运势分类；游戏回复走独立卡片路径，不经过 `pendingCustom` 文本模板。角色棋局话术只引用 `BoardMove`/`RuleResult`/`GameOutcome` 中的事实，运势数据不参与棋局结论，反之亦然。Android 侧 `_dev/dialogue_contract.json` 由 `_dev/dialogue_contract_test.js` 直接与 Kotlin 源码交叉校验（事件枚举、错误码、判和措辞、存档字段、棋盘 UI 定位符与状态文案，以及 `explanation`、`conversation_memory`、`persona`、`safety` 四段），45 条 golden wording 每条都点名其验证用例，文档措辞与代码漂移会导致契约测试失败。
+
+本阶段不新增占卜体系，也不把未授权的 Ifá、纳迪、心理测验常模或在线模型包装成已接入能力；先治理角色陪伴、回答相关性、可撤回本地记忆和内容边界。默认仍为离线回复，在线 Provider 只作为显式扩展接缝。
+
+棋局异步纪律与会话一致：`GameEvent` 携带 token，token 不匹配即原样丢弃；悔棋一次回退一整回合并从初始局面重放恢复（含被吃子），重做沿 `redo` 列表逐手回放。默认引擎是 `SmartBoardEngine`（纯 Kotlin alpha-beta，难度对应 2/3/4 层搜索，红方开局走内置开局库），玩家走完后由 `Result.awaitEngine` 串接自动应手，「观战」模式下引擎走双方；`OfflineBoardEngine` 只保留为 `PikafishEngine` 的降级回退与测试接缝，`PikafishEngine` 的 UCI seam 已就绪但未打包原生引擎，所有请求显式回退。判和是会话级规则（三次重复局面 / 连续 60 个无吃子半回合，见 `GameSessionState.drawReason()`），`XiangqiRules.outcome` 本身不返回和棋。「保存棋局 / 继续棋局 / 战绩」由 `GameArchive`（FEN 起点 + UCI 棋谱）与 `GameArchiveStore` 落到 DataStore，恢复时逐手重放过规则校验、被拒的尾部手数显式回报；存档只含局面与棋谱，不含角色评语。围棋（GTP）与国际象棋（UCI）仅保留契约与 adapter，无 provider 时明确返回「尚未启用」。运行模式、指令清单、许可边界与排障见 `docs/BOARD_GAME_INTEGRATION.md`。
+
+棋局解释（2026-09-02）：`BoardExplanation` 只从 `XiangqiRules` 取事实——哪个子被谁盯住、攻击方落子后己方能否合法回吃——角色据此说清「这步为什么不好」「换个稳一点的走法」，措辞里不含胜率、等级分或任何强度数字，`SmartBoardEngine.evaluate` 保持 `private` 由契约脚本守住。细节见 `docs/BOARD_GAME_INTEGRATION.md` §2.3。
+
+## 本机长期记忆（2026-09-02）
+
+- **存什么**：只存用户自己打的字（`user_input`）、用户在卡面上主动点过的选项（`user_choice`）、以及棋盘规则已判定结束的棋局结果（`settled_game_result`）。角色生成的评语、现场手记文本一律不进这条路径。
+- **存哪里**：共享 `preferencesDataStore("xuanji_prefs")`，key 为 `talk_memory_<sha256(profileKey)>`（UTF-8 摘要），与 `game_save_` / `game_record_` / `mystic_visit_` / `card_layout_` / `user_profile` 互斥，换命盘读不到别人的记录。读写经 `PreferenceBridge` seam，因此 JVM 侧能用内存假桥验证存取与清除，而不只验证 JSON 编解码。
+- **上限与诚实降级**：本机最多留 20 条，超出挤掉最旧一条并把数量计入随记忆一起落盘的 `dropped`；「从没存过」与「存了但读不出来」是两种状态，后者必须明说「本机记录读不出来，这次不引旧话」，不假装什么都没丢。
+- **说什么**：召回文案的唯一输入是 `RecallFacts`（日期、话题键、终局结果、清理数、可读性），里面不含用户原话，所以角色只会说「你聊过「事业、财富」」而不会复述原句；开场句只陈述进来时本机已有的内容，本次访问新记的东西不改写它。
+- **可见与可清**：「现场手记」面板新增「本机长期记忆」区，列出最近 3 条与总数、说明只存哪三类，并提供「清除本机长期记忆」按钮（≥48dp，带 TalkBack 描述）；清除只删自己那一个键并立即回空态。卡面上的「重开对话」与切换 persona 只清会话状态，不动长期记忆。
+- **未验证**：真机上 DataStore 往返与跨进程存活、清除是否真的释放磁盘记录、召回句在气泡里的排布、按钮的实机触摸目标与播报，目前只有 JVM 与编译证据。
+
+## 对话红线：不作医疗与投资建议（2026-09-02）
+
+- **hook 在哪**：`MysticGuideGenerator.customAnswer` 是唯一随用户输入变化的应答生产者，它的 `when (intent)` 结果统一交给 `MysticSafetyGuard.enforce(mode, question, variant, draft)`（全仓唯一调用点）。开场签到、本机召回句、转场语是固定模板，不经这道关——它们本来也不回答用户的提问。
+- **怎么判**：领域词与结论词**成对命中**（如「药」+「该不该/吃什么」）才整句换成拒答；只命中领域词（如「最近体检要注意什么」）保留原回答、句尾补一次免责句，已有则不重复。因此「最近睡眠不好」这类陈述不会被当成问诊。词表由守卫自带，不复用 `MysticIntentClassifier`：「我该吃什么药」在分类器里因句中的「吃」落到 `Daily`，红线不能押在路由运气上。
+- **怎么说**：两个模式 × 两个领域 × 两个变体共 8 句拒答，变体由问题文本的 `customPulse` hash 选出，同一问题永远同一句。免责句沿用应用里已有的那两条（与 `domain/divination/IChing.kt` 同一句），不新造口径。
+- **守住什么**：不诊断、不评药与剂量、不荐股、不承诺收益，也不换成一套「替代诊断」；`_dev/dialogue_contract_test.js` 逐字镜像 13 项禁词并断言守卫不含 Android 依赖、`enforce` 调用点仍在。
+- **未验证**：8 句拒答与免责句在实机气泡里的换行、窄屏截断与 TalkBack 播报；语音转写出的医学/理财词是否与原话同域。
+
 ## Provider seam
 
-`DialogueProvider` 与 `OfflineDialogueProvider` 只提供扩展接口；当前默认实现完全离线，不请求网络、不写入密钥，也不改变现有盘面、健康和财务边界。未来接入在线 provider 时，结果仍需经过本地 persona/safety guard。
+`DialogueProvider` 与 `OfflineDialogueProvider` 只提供扩展接口；当前默认实现完全离线，不请求网络、不写入密钥，也不改变现有盘面、健康和财务边界。未来接入在线 provider 时，结果先由 `DialogueReplyValidator` 校验分数是否来自当前 `CompositeDailyFortune`、是否越过记忆/安全红线，再标记 `OnlineValidated`；失败、超时或校验拒绝统一回到 `OnlineFallback` 的本地生成器，不允许直接返回未校验文本。
 
-双端契约草案同步在小程序 `_dev/dialogue_contract.json`，固定意图枚举、规范化规则、seed 组成、session token 迁移和安全边界，便于后续 golden wording 对照测试。
+## 今日行动与人生画像
+
+`domain/action` 是独立的纯 Kotlin 离线模块。`DailyActionPlanner` 先按 profileKey 的本地饮食偏好过滤候选，再用 0.40 五行、0.25 星座、0.20 今日盘面、0.15 季节/城市标签计算分数；`LifeProfilePlanner` 使用命盘和太阳星座作为必需来源，测试记录只作为显式增强输入。主结果不使用随机数，同分才用 `profileKey|dateKey|candidateKey` 稳定 hash 排序。
+
+综合页的“今日行动”卡与对话引擎共享同一个 `DailyActionPlan`，我的页与对话共享同一个 `LifeProfile`。结果同时展示匹配分、来源链、置信度和边界说明。城市候选来自本地静态目录，最多显示 3 个匹配示例，不写“命中注定”“最适合移民”等绝对结论；食品建议不构成医疗、营养或过敏建议。
+
+两端各有一份同名但不同职责的契约：小程序 `_dev/dialogue_contract.json` 是双端共享的对话契约（意图枚举、规范化、seed 组成、session token、安全边界）；Android `_dev/dialogue_contract.json` 早已不止棋局（事件、判和、存档、棋盘 UI、讲棋、本机记忆、称谓与医疗/财务红线），只随本仓库的 Kotlin 源码演进，两者不互为副本。
 
 ## 体系一致性分级
 
@@ -38,3 +81,7 @@
 - 心理测验：IPIP Big Five-50 使用公开题库和透明计分；MMPI、Raven、16PF、MBTI 题目/手册/官方常模不随应用内置，常模缺失时只展示原始分数。
 
 核验入口：香港天文台公历/农历转换表（1901–2100）；IPIP 官方站点（题目与量表为公版、常模需自行说明）；联合国教科文组织 Ifá 传承说明（256 个 Odu 组合与口传 Ese 体系）。
+
+## 本轮验证边界
+
+本轮已完成 Android 纯 Kotlin 测试、编译、lint 与 debug assemble 的代码级验证；手机复测按需求暂缓，后续需重新执行安装、启动、截图、旋转/返回键、TalkBack 与 reduced-motion 检查，不以旧截图替代当前版本证据。

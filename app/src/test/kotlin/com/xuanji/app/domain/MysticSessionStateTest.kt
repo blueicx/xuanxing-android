@@ -89,4 +89,29 @@ class MysticSessionStateTest {
         assertEquals(MysticMessageRole.System, state.messages.last().role)
         assertEquals(state, reduce(state, MysticEvent.ReplySucceeded(0, 1, DialogueReply(MysticIntent.Chat, "", "旧"))))
     }
+
+    @Test
+    fun stale_provider_reply_is_dropped_after_context_change() {
+        val pending = reduce(MysticSessionState(), MysticEvent.SendInput("工作怎么办"))
+        val changed = reduce(pending, MysticEvent.ChangeContext(topicKey = "love"))
+        val stale = reduce(
+            changed,
+            MysticEvent.ReplySucceeded(
+                changed.sessionToken - 1,
+                1,
+                DialogueReply(MysticIntent.Career, "", "旧回复")
+            )
+        )
+
+        assertEquals(changed, stale)
+        assertEquals(false, stale.messages.any { it.text == "旧回复" })
+    }
+
+    @Test
+    fun clarifier_selected_reuses_the_same_pending_input_path() {
+        val state = reduce(MysticSessionState(), MysticEvent.ClarifierSelected("先看工作"))
+
+        assertEquals(MysticRequestState.Pending(0, 1, "先看工作"), state.requestState)
+        assertEquals("先看工作", state.messages.single().text)
+    }
 }

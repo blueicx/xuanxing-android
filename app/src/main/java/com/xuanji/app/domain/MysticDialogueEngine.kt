@@ -2,6 +2,8 @@ package com.xuanji.app.domain
 
 import com.xuanji.app.data.model.CompositeDailyFortune
 import com.xuanji.app.data.model.TestRecord
+import com.xuanji.app.domain.action.DailyActionPlan
+import com.xuanji.app.domain.action.LifeProfile
 
 enum class MysticIntent(val value: String) {
     Greeting("greeting"),
@@ -21,7 +23,12 @@ enum class MysticIntent(val value: String) {
     Why("why"),
     Care("care"),
     Outcome("outcome"),
-    Action("action")
+    Action("action"),
+    TodayMeal("today_meal"),
+    TodayActivity("today_activity"),
+    TodayOuting("today_outing"),
+    LifeProfile("life_profile"),
+    Game("game")
 }
 
 data class DialogueContext(
@@ -35,7 +42,9 @@ data class DialogueContext(
     val recentTurns: List<MysticTurn> = emptyList(),
     val memoryNotes: List<MysticMemoryNote> = emptyList(),
     val skinId: String = "",
-    val question: String = ""
+    val question: String = "",
+    val dailyActionPlan: DailyActionPlan? = null,
+    val lifeProfile: LifeProfile? = null
 )
 
 /** Minimal, UI-independent turn record used when the dialogue engine is called off-screen. */
@@ -54,8 +63,13 @@ data class MysticMemoryNote(
 data class DialogueReply(
     val intent: MysticIntent,
     val prefix: String,
-    val text: String
+    val text: String,
+    val clarifiers: List<String> = emptyList(),
+    val source: ReplySource = ReplySource.Offline,
+    val groundedFacts: List<String> = emptyList()
 )
+
+enum class ReplySource { Offline, OnlineFallback, OnlineValidated }
 
 interface MysticDialogueEngine {
     fun classify(question: String): MysticIntent
@@ -68,21 +82,87 @@ fun MysticDialogueEngine.reply(context: DialogueContext): DialogueReply =
     reply(context, context.question)
 
 class DefaultMysticDialogueEngine : MysticDialogueEngine {
-    override fun classify(question: String): MysticIntent = MysticIntentClassifier.classify(question)
+    private val analyzer: MysticDialogueAnalyzer = DefaultMysticDialogueAnalyzer()
+
+    override fun classify(question: String): MysticIntent = analyzer.classify(question)
 
     override fun reply(context: DialogueContext, input: String): DialogueReply {
         val normalizedInput = input.trim().take(200)
-        val intent = classify(normalizedInput)
+        val analysis = analyzer.analyze(normalizedInput, context)
+        val continuity = MysticDialogueContinuity.resolve(normalizedInput, context.recentTurns)
+        val intent = analysis.intent
+        val topicKey = analysis.topicKey ?: continuity.intent.topicKeyOrNull() ?: context.topicKey
         val prefix = MysticGuideGenerator.customAnswerPrefix(normalizedInput)
         val text = MysticGuideGenerator.customAnswer(
             context.mode,
-            context.topicKey,
-            normalizedInput,
+            topicKey,
+            continuity.generationInput,
             context.fortune,
             context.latestTest,
-            context.skinId
+            context.skinId,
+            context.dailyActionPlan,
+            context.lifeProfile
         )
-        return DialogueReply(intent, prefix, prefix + text)
+        val groundedFacts = when (intent) {
+            MysticIntent.TodayMeal -> context.dailyActionPlan?.meals?.firstOrNull()?.evidence?.map { it.label }.orEmpty()
+            MysticIntent.TodayActivity -> context.dailyActionPlan?.activities?.firstOrNull()?.evidence?.map { it.label }.orEmpty()
+            MysticIntent.TodayOuting -> context.dailyActionPlan?.outings?.firstOrNull()?.evidence?.map { it.label }.orEmpty()
+            MysticIntent.LifeProfile -> context.lifeProfile?.evidence?.map { it.label }.orEmpty()
+            else -> emptyList()
+        }
+        return DialogueReply(
+            intent = intent,
+            prefix = prefix,
+            text = prefix + text,
+            clarifiers = clarifiersFor(analysis),
+            groundedFacts = groundedFacts
+        )
     }
 
 }
+
+private fun MysticIntent.topicKeyOrNull(): String? = when (this) {
+    MysticIntent.Fortune -> "fortune"
+    MysticIntent.Mood -> "mood"
+    MysticIntent.Love -> "love"
+    MysticIntent.Wealth -> "wealth"
+    MysticIntent.Career -> "career"
+    MysticIntent.Study -> "study"
+    MysticIntent.Health -> "health"
+    MysticIntent.Why -> "why"
+    MysticIntent.Care -> "care"
+    MysticIntent.Outcome -> "outcome"
+    MysticIntent.Action -> "action"
+    MysticIntent.TodayMeal -> "daily"
+    MysticIntent.TodayActivity -> "action"
+    MysticIntent.TodayOuting -> "action"
+    MysticIntent.LifeProfile -> "career"
+    MysticIntent.Daily -> "daily"
+    else -> null
+}
+
+fun clarifiersFor(analysis: DialogueAnalysis): List<String> = buildList {
+    analysis.entities["secondary_topic"]?.let { secondary ->
+        add("先看${analysis.entities["topic_label"] ?: analysis.topicKey.orEmpty()}")
+        add("再看${topicLabelFor(secondary)}")
+    }
+    if (isEmpty() && analysis.needsClarification) {
+        add("先看今天运势")
+        add("先说说最近状态")
+    }
+}.take(2)
+
+private fun topicLabelFor(key: String): String = mapOf(
+    "fortune" to "运势",
+    "mood" to "情绪",
+    "love" to "感情",
+    "wealth" to "财富",
+    "career" to "工作",
+    "study" to "学习",
+    "health" to "健康",
+    "why" to "依据",
+    "care" to "注意事项",
+    "outcome" to "结果",
+    "action" to "行动",
+    "daily" to "日常"
+)[key] ?: key

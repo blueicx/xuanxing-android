@@ -29,7 +29,7 @@ class MysticDialogueCoordinatorTest {
         assertTrue(events[1] is MysticEvent.ReplySucceeded)
     }
 
-    @Test fun failure_is_retryable_at_state_layer() = runBlocking {
+    @Test fun provider_failure_returns_offline_reply_without_changing_default_provider() = runBlocking {
         val provider = object : DialogueProvider {
             override suspend fun complete(request: DialogueRequest) = ProviderResult.Failure("busy", retryable = true)
         }
@@ -38,7 +38,10 @@ class MysticDialogueCoordinatorTest {
         )
         var state = MysticSessionState()
         events.forEach { state = reduce(state, it) }
-        assertTrue(state.requestState is MysticRequestState.Failed)
+        assertTrue(state.messages.any { it.role == MysticMessageRole.Mystic })
+        assertEquals(MysticRequestState.Idle, state.requestState)
+        val reply = events.filterIsInstance<MysticEvent.ReplySucceeded>().single().reply
+        assertEquals(ReplySource.OnlineFallback, reply.source)
     }
 
     @Test fun a_context_change_drops_the_old_reply() = runBlocking {

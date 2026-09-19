@@ -24,7 +24,8 @@ data class MysticMessage(
     val text: String,
     val intent: MysticIntent? = null,
     val pending: Boolean = false,
-    val error: Boolean = false
+    val error: Boolean = false,
+    val clarifiers: List<String> = emptyList()
 )
 
 sealed interface MysticRequestState {
@@ -46,6 +47,7 @@ sealed interface MysticEvent {
     data object Clear : MysticEvent
     data class SendInput(val text: String) : MysticEvent
     data class QuickPrompt(val text: String) : MysticEvent
+    data class ClarifierSelected(val text: String) : MysticEvent
     data class ReplyStarted(val sessionToken: Long, val turnId: Long) : MysticEvent
     data class ReplySucceeded(val sessionToken: Long, val turnId: Long, val reply: DialogueReply) : MysticEvent
     data class ReplyFailed(val sessionToken: Long, val turnId: Long, val message: String) : MysticEvent
@@ -96,6 +98,7 @@ fun reduce(state: MysticSessionState, event: MysticEvent): MysticSessionState = 
     )
     is MysticEvent.SendInput -> beginInput(state, event.text)
     is MysticEvent.QuickPrompt -> beginInput(state, event.text)
+    is MysticEvent.ClarifierSelected -> beginInput(state, event.text)
     is MysticEvent.ReplyStarted -> when (val request = state.requestState) {
         is MysticRequestState.Pending -> if (request.sessionToken == event.sessionToken && request.turnId == event.turnId) state else state
         else -> state
@@ -107,7 +110,14 @@ fun reduce(state: MysticSessionState, event: MysticEvent): MysticSessionState = 
         } else {
             state.copy(
                 requestState = MysticRequestState.Idle,
-                messages = state.messages + MysticMessage(event.turnId, event.sessionToken, MysticMessageRole.Mystic, event.reply.text, event.reply.intent),
+                messages = state.messages + MysticMessage(
+                    turnId = event.turnId,
+                    sessionToken = event.sessionToken,
+                    role = MysticMessageRole.Mystic,
+                    text = event.reply.text,
+                    intent = event.reply.intent,
+                    clarifiers = event.reply.clarifiers
+                ),
                 recentTurns = (state.recentTurns + MysticTurn(request.input, event.reply.text, event.reply.intent.value)).takeLast(12)
             )
         }
