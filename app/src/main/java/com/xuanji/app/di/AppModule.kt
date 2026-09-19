@@ -1,6 +1,7 @@
 package com.xuanji.app.di
 
 import com.xuanji.app.data.repository.FortuneRepository
+import com.xuanji.app.data.repository.ActionRepository
 import com.xuanji.app.data.repository.HistoryRepository
 import com.xuanji.app.data.repository.LiuYaoRepository
 import com.xuanji.app.data.repository.ReferenceRepository
@@ -21,6 +22,8 @@ object AppModule {
         private set
     lateinit var testRecordRepository: TestRecordRepository
         private set
+    lateinit var actionRepository: ActionRepository
+        private set
 
     fun init(
         repository: FortuneRepository,
@@ -28,7 +31,8 @@ object AppModule {
         tarotRepository: TarotRepository,
         liuYaoRepository: LiuYaoRepository,
         referenceRepository: ReferenceRepository,
-        testRecordRepository: TestRecordRepository
+        testRecordRepository: TestRecordRepository,
+        actionRepository: ActionRepository
     ) {
         this.repository = repository
         this.historyRepository = historyRepository
@@ -36,5 +40,6 @@ object AppModule {
         this.liuYaoRepository = liuYaoRepository
         this.referenceRepository = referenceRepository
         this.testRecordRepository = testRecordRepository
+        this.actionRepository = actionRepository
     }
 }
