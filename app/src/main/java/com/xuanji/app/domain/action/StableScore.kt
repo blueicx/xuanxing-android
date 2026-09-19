@@ -24,8 +24,8 @@ object StableScore {
     fun tieBreak(profileKey: String, dateKey: String, candidateKey: String): Long =
         BigInteger(sha256("$profileKey|$dateKey|$candidateKey").take(16), 16).toLong()
 
-    fun <T : Candidate> orderTies(items: List<T>, profileKey: String, dateKey: String): List<T> =
-        items.sortedWith(compareByDescending<T> { it.score }
+    fun orderTies(items: List<Candidate>, profileKey: String, dateKey: String): List<Candidate> =
+        items.sortedWith(compareByDescending<Candidate> { it.score }
             .thenBy { tieBreak(profileKey, dateKey, it.key) })
 
     fun sha256(value: String): String = MessageDigest.getInstance("SHA-256")
