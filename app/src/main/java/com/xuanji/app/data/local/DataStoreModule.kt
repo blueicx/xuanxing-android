@@ -8,3 +8,6 @@ val Context.dataStore by preferencesDataStore(name = "xuanji_prefs")
 
 fun Context.softMemoryTagStore(): SoftMemoryTagStore =
     SoftMemoryTagStore(DataStorePreferenceBridge(this))
+
+fun Context.foodPreferenceStore(): FoodPreferenceStore =
+    FoodPreferenceStore(DataStorePreferenceBridge(this))
