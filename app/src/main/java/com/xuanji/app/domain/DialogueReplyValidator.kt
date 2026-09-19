@@ -35,7 +35,9 @@ object DialogueReplyValidator {
 
         if (MysticSafetyGuard.FORBIDDEN.any(reply::contains) ||
             MEMORY_CUES.any(reply::contains) ||
-            reply.contains("保证收益") || reply.contains("稳赚")) {
+            reply.contains("保证收益") || reply.contains("稳赚") ||
+            reply.contains("一定要移民") || reply.contains("最适合你移民") ||
+            reply.contains("保证健康") || reply.contains("治疗") || reply.contains("诊断")) {
             return ValidationResult.Reject(if (MEMORY_CUES.any(reply::contains)) "ungrounded_fact" else "safety_boundary")
         }
         return ValidationResult.Accept

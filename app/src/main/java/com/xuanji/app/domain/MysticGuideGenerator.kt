@@ -3,6 +3,8 @@ package com.xuanji.app.domain
 import com.xuanji.app.data.model.BaziFull
 import com.xuanji.app.data.model.CompositeDailyFortune
 import com.xuanji.app.data.model.TestRecord
+import com.xuanji.app.domain.action.DailyActionPlan
+import com.xuanji.app.domain.action.LifeProfile
 import java.text.Normalizer
 import kotlin.math.roundToInt
 
@@ -2701,7 +2703,9 @@ object MysticGuideGenerator {
         question: String,
         fortune: CompositeDailyFortune,
         test: TestRecord? = null,
-        skinId: String = ""
+        skinId: String = "",
+        dailyActionPlan: DailyActionPlan? = null,
+        lifeProfile: LifeProfile? = null
     ): String {
         val label = topics[topicKey] ?: "综合"
         val focus = if (topicKey == "test") {
@@ -2791,6 +2795,21 @@ object MysticGuideGenerator {
                     "「${low.label}」 ${low.score} 别硬闯；先做小事，再谈成不成。"
             }
             "action" -> actionAnswer(scholar, high.label, low.label, fortune.luckyColor, fortune.luckyDirection)
+            "today_meal" -> dailyActionPlan?.meals?.firstOrNull()?.let { meal ->
+                "今天先看「${meal.title}」：${meal.ingredients.joinToString("、")}。匹配分 ${meal.score}；替换项是「${meal.substitute}」，外卖可搜：${meal.deliveryKeywords.joinToString("、")}。依据：${meal.evidence.take(2).joinToString("；") { it.label }}。"
+            } ?: "今日行动还没算好；先打开综合页的「今日行动」卡，我再按同一份结果回答。"
+            "today_activity" -> dailyActionPlan?.activities?.firstOrNull()?.let { activity ->
+                "今天可以${activity.title}，建议安排在${activity.bestPeriod}，用时约 ${activity.durationMinutes.first}-${activity.durationMinutes.last} 分钟，匹配分 ${activity.score}。依据：${activity.evidence.take(2).joinToString("；") { it.label }}。"
+            } ?: "今日行动还没算好；先打开综合页的「今日行动」卡，我再按同一份结果回答。"
+            "today_outing" -> dailyActionPlan?.outings?.firstOrNull()?.let { outing ->
+                "今天可以去「${outing.cityLabel}」里的${outing.placeType}：${outing.reason}。匹配分 ${outing.score}。依据：${outing.evidence.take(2).joinToString("；") { it.label }}。"
+            } ?: "今日行动还没算好；先打开综合页的「今日行动」卡，我再按同一份结果回答。"
+            "life_profile" -> lifeProfile?.let { profile ->
+                val career = profile.careerClusters.firstOrNull()
+                val color = profile.colorPalette.firstOrNull()
+                val region = profile.regionCandidates.firstOrNull()
+                "画像目前给出「${career?.label ?: "待补充职业簇"}」、色彩灵感「${color?.label ?: "待补充"}」；地区只是匹配示例：${region?.country.orEmpty()}·${region?.city.orEmpty()}。置信度 ${profile.confidence}，依据：${profile.evidence.joinToString("；") { it.label }}。"
+            } ?: "人生画像还没算好；先在「我的」页填写出生信息，我再按同一份结果回答。"
             "fortune" -> if (scholar) {
                 "我把盘面摊开：综合 ${fortune.overallScore} 分，最强是「${high.label}」 ${high.score}，最需要照看是「${low.label}」 ${low.score}。" +
                     "它说的是今天的势，不是你一生的结论。"
@@ -2832,7 +2851,7 @@ object MysticGuideGenerator {
     fun customAnswerPrefix(question: String): String {
         if (question.isBlank()) return ""
         val intent = customIntent(question)
-        return if (intent in setOf("greeting", "farewell", "thanks", "identity", "smalltalk", "daily", "chat")) {
+        return if (intent in setOf("greeting", "farewell", "thanks", "identity", "smalltalk", "daily", "chat", "today_meal", "today_activity", "today_outing", "life_profile")) {
             ""
         } else {
             "你问：「$question」\n\n"

@@ -32,6 +32,10 @@ object MysticDialogueContinuity {
             MysticIntent.Outcome -> "结果"
             MysticIntent.Action -> "行动建议"
             MysticIntent.Daily -> "今天"
+            MysticIntent.TodayMeal -> "今天吃什么"
+            MysticIntent.TodayActivity -> "今天做什么"
+            MysticIntent.TodayOuting -> "今天去哪玩"
+            MysticIntent.LifeProfile -> "人生画像"
             else -> return DialogueContinuity(current, normalized, false)
         }
         val generated = "$hint；$normalized"

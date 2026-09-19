@@ -39,6 +39,11 @@ class DefaultMysticDialogueAnalyzer : MysticDialogueAnalyzer {
             return DialogueAnalysis(casual, null, confidence = 98, needsClarification = false)
         }
 
+        val action = actionIntent(normalized)
+        if (action != null) {
+            return DialogueAnalysis(action.first, action.second, confidence = 96, needsClarification = false)
+        }
+
         val topics = topicMatches(normalized)
         if (topics.isNotEmpty()) {
             val primary = topics.first()
@@ -101,6 +106,14 @@ class DefaultMysticDialogueAnalyzer : MysticDialogueAnalyzer {
         positions.minOrNull()?.let { TopicMatch(topic.key, topic.intent, topic.label, it) }
     }.sortedWith(compareBy<TopicMatch> { it.position }.thenBy { it.key })
 
+    private fun actionIntent(q: String): Pair<MysticIntent, String>? = when {
+        setOf("早餐吃什么", "午餐吃什么", "午饭吃什么", "晚餐吃什么", "晚饭吃什么", "今天吃什么", "外卖吃什么").any(q::contains) -> MysticIntent.TodayMeal to "daily_meal"
+        setOf("今天做什么", "今天适合做什么", "现在做什么").any(q::contains) -> MysticIntent.TodayActivity to "daily_activity"
+        setOf("去哪玩", "去哪里玩", "今天去哪", "今天去哪里").any(q::contains) -> MysticIntent.TodayOuting to "daily_outing"
+        setOf("适合什么工作", "适合做什么工作", "什么工作适合我", "什么颜色适合我", "适合什么颜色", "哪个城市适合我", "适合哪个城市", "适合什么地区").any(q::contains) -> MysticIntent.LifeProfile to "life_profile"
+        else -> null
+    }
+
     private fun previousTopic(recentTurns: List<MysticTurn>): Triple<MysticIntent, String, String>? {
         val previous = recentTurns.asReversed().firstNotNullOfOrNull { turn ->
             val intent = MysticIntent.entries.firstOrNull { it.value == turn.kind } ?: return@firstNotNullOfOrNull null
@@ -127,6 +140,10 @@ class DefaultMysticDialogueAnalyzer : MysticDialogueAnalyzer {
         MysticIntent.Care -> "care"
         MysticIntent.Outcome -> "outcome"
         MysticIntent.Action -> "action"
+        MysticIntent.TodayMeal -> "daily"
+        MysticIntent.TodayActivity -> "action"
+        MysticIntent.TodayOuting -> "action"
+        MysticIntent.LifeProfile -> "career"
         MysticIntent.Daily -> "daily"
         else -> null
     }

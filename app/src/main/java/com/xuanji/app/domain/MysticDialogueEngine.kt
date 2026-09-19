@@ -2,6 +2,8 @@ package com.xuanji.app.domain
 
 import com.xuanji.app.data.model.CompositeDailyFortune
 import com.xuanji.app.data.model.TestRecord
+import com.xuanji.app.domain.action.DailyActionPlan
+import com.xuanji.app.domain.action.LifeProfile
 
 enum class MysticIntent(val value: String) {
     Greeting("greeting"),
@@ -22,6 +24,10 @@ enum class MysticIntent(val value: String) {
     Care("care"),
     Outcome("outcome"),
     Action("action"),
+    TodayMeal("today_meal"),
+    TodayActivity("today_activity"),
+    TodayOuting("today_outing"),
+    LifeProfile("life_profile"),
     Game("game")
 }
 
@@ -36,7 +42,9 @@ data class DialogueContext(
     val recentTurns: List<MysticTurn> = emptyList(),
     val memoryNotes: List<MysticMemoryNote> = emptyList(),
     val skinId: String = "",
-    val question: String = ""
+    val question: String = "",
+    val dailyActionPlan: DailyActionPlan? = null,
+    val lifeProfile: LifeProfile? = null
 )
 
 /** Minimal, UI-independent turn record used when the dialogue engine is called off-screen. */
@@ -91,13 +99,23 @@ class DefaultMysticDialogueEngine : MysticDialogueEngine {
             continuity.generationInput,
             context.fortune,
             context.latestTest,
-            context.skinId
+            context.skinId,
+            context.dailyActionPlan,
+            context.lifeProfile
         )
+        val groundedFacts = when (intent) {
+            MysticIntent.TodayMeal -> context.dailyActionPlan?.meals?.firstOrNull()?.evidence?.map { it.label }.orEmpty()
+            MysticIntent.TodayActivity -> context.dailyActionPlan?.activities?.firstOrNull()?.evidence?.map { it.label }.orEmpty()
+            MysticIntent.TodayOuting -> context.dailyActionPlan?.outings?.firstOrNull()?.evidence?.map { it.label }.orEmpty()
+            MysticIntent.LifeProfile -> context.lifeProfile?.evidence?.map { it.label }.orEmpty()
+            else -> emptyList()
+        }
         return DialogueReply(
             intent = intent,
             prefix = prefix,
             text = prefix + text,
-            clarifiers = clarifiersFor(analysis)
+            clarifiers = clarifiersFor(analysis),
+            groundedFacts = groundedFacts
         )
     }
 
@@ -115,6 +133,10 @@ private fun MysticIntent.topicKeyOrNull(): String? = when (this) {
     MysticIntent.Care -> "care"
     MysticIntent.Outcome -> "outcome"
     MysticIntent.Action -> "action"
+    MysticIntent.TodayMeal -> "daily"
+    MysticIntent.TodayActivity -> "action"
+    MysticIntent.TodayOuting -> "action"
+    MysticIntent.LifeProfile -> "career"
     MysticIntent.Daily -> "daily"
     else -> null
 }

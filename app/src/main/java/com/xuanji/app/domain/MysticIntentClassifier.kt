@@ -5,7 +5,7 @@ object MysticIntentClassifier {
     fun classify(question: String): MysticIntent {
         val q = question.trim().lowercase()
         val normalized = q.trimEnd('.', ',', '，', '。', '!', '！', '?', '？', '~', '～')
-        return casual(normalized) ?: game(normalized) ?: topic(q)
+        return casual(normalized) ?: game(normalized) ?: action(normalized) ?: topic(q)
     }
 
     /**
@@ -33,6 +33,14 @@ object MysticIntentClassifier {
         val hasNumeral = body.any { it in "一二三四五六七八九123456789" }
         // guard: 车厘子/将军肚-style everyday words contain a piece char but no verb+numeral
         return hasVerb && hasNumeral
+    }
+
+    private fun action(q: String): MysticIntent? = when {
+        containsAny(q, "早餐吃什么", "午餐吃什么", "午饭吃什么", "晚餐吃什么", "晚饭吃什么", "今天吃什么", "外卖吃什么") -> MysticIntent.TodayMeal
+        containsAny(q, "今天做什么", "今天适合做什么", "现在做什么") -> MysticIntent.TodayActivity
+        containsAny(q, "去哪玩", "去哪里玩", "今天去哪", "今天去哪里") -> MysticIntent.TodayOuting
+        containsAny(q, "适合什么工作", "适合做什么工作", "什么工作适合我", "什么颜色适合我", "适合什么颜色", "哪个城市适合我", "适合哪个城市", "适合什么地区") -> MysticIntent.LifeProfile
+        else -> null
     }
 
     private fun casual(q: String): MysticIntent? = when {
