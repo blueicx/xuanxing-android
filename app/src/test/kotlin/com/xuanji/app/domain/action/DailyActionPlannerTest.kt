@@ -1,6 +1,17 @@
 package com.xuanji.app.domain.action
 
+import com.xuanji.app.data.model.BaziChart
+import com.xuanji.app.data.model.Branch
+import com.xuanji.app.data.model.CompositeDailyFortune
+import com.xuanji.app.data.model.Element
+import com.xuanji.app.data.model.EasternDailyFortune
+import com.xuanji.app.data.model.FortuneDimension
+import com.xuanji.app.data.model.Pillar
+import com.xuanji.app.data.model.Stem
+import com.xuanji.app.data.model.WesternDailyFortune
+import java.time.LocalDate
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -32,4 +43,55 @@ class DailyActionPlannerTest {
         assertTrue(ActionCatalog.meals.all { it.deliveryKeywords.isNotEmpty() })
         assertTrue(CityProfileCatalog.profiles.size >= 8)
     }
+
+    @Test
+    fun plan_is_specific_and_exposes_both_required_sources() {
+        val plan = DailyActionPlanner().plan(input(preference = FoodPreference(vegetarian = true)))
+        assertTrue(plan.meals.all { it.ingredients.isNotEmpty() && it.substitute.isNotBlank() })
+        assertTrue(plan.meals.all { it.deliveryKeywords.isNotEmpty() })
+        assertTrue(plan.meals.flatMap { it.evidence }.any { it.source == ActionSource.FiveElements })
+        assertTrue(plan.meals.flatMap { it.evidence }.any { it.source == ActionSource.Zodiac })
+    }
+
+    @Test
+    fun excluded_ingredients_filter_every_meal_and_report_degradation() {
+        val plan = DailyActionPlanner().plan(input(preference = FoodPreference(excludedIngredients = setOf("花生", "酒"))))
+        assertTrue(plan.meals.none { it.ingredients.any { ingredient -> ingredient.contains("花生") } })
+        assertFalse(plan.disclaimer.contains("无法计算"))
+    }
+
+    private fun input(
+        preference: FoodPreference = FoodPreference(),
+        city: CityProfile? = CityProfileCatalog.defaultCity,
+        date: LocalDate = LocalDate.of(2026, 9, 19)
+    ) = DailyActionInput(
+        profileKey = "profile-a",
+        date = date,
+        chart = BaziChart(
+            yearPillar = Pillar(Stem.甲, Branch.子),
+            monthPillar = Pillar(Stem.丙, Branch.寅),
+            dayPillar = Pillar(Stem.戊, Branch.辰),
+            hourPillar = Pillar(Stem.壬, Branch.申),
+            dayMaster = Stem.戊,
+            zodiac = "鼠",
+            elementCounts = mapOf(Element.WOOD to 2, Element.FIRE to 1, Element.EARTH to 3, Element.METAL to 1, Element.WATER to 1),
+            favorableElements = listOf(Element.WATER, Element.WOOD),
+            unfavorableElements = listOf(Element.FIRE)
+        ),
+        zodiacKey = "双鱼座",
+        zodiacElement = Element.WATER,
+        fortune = CompositeDailyFortune(
+            dateKey = date.toString(), overallScore = 72,
+            dimensions = listOf(
+                FortuneDimension("career", "事业", 70, "稳定"),
+                FortuneDimension("emotion", "情感", 76, "有回应"),
+                FortuneDimension("health", "健康", 68, "注意节奏"),
+                FortuneDimension("study", "学习", 74, "适合整理")
+            ), luckyNumber = 6, luckyColor = "青", luckyDirection = "东南", cautions = "慢一点",
+            eastern = EasternDailyFortune(date.toString(), 70, 70, 65, 66, 68, "平稳", "慢一点", "甲子", listOf(Element.WATER), "青", "东南"),
+            western = WesternDailyFortune(date.toString(), "双鱼座", 74, 73, 72, 71, 75, "平稳", 6, "青", "东南")
+        ),
+        city = city,
+        preference = preference
+    )
 }
