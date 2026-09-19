@@ -49,14 +49,19 @@ import com.xuanji.app.di.AppModule
 import com.xuanji.app.domain.ChinaLocations
 import com.xuanji.app.domain.SelectedLocation
 import com.xuanji.app.ui.components.FortuneCard
+import com.xuanji.app.ui.components.FoodPreferenceEditor
+import com.xuanji.app.ui.components.LifeProfileSection
 import com.xuanji.app.ui.components.SectionTitle
 import com.xuanji.app.ui.viewmodel.ProfileViewModel
+import com.xuanji.app.ui.viewmodel.ActionViewModel
 import com.xuanji.app.ui.xuanjiViewModel
 
 @Composable
 fun ProfileScreen() {
     val viewModel = xuanjiViewModel { ProfileViewModel(AppModule.repository) }
+    val actionViewModel = xuanjiViewModel { ActionViewModel(AppModule.actionRepository) }
     val profile by viewModel.profile.collectAsStateWithLifecycle()
+    val actionState by actionViewModel.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val locations = remember { ChinaLocations.load(context) }
 
@@ -130,6 +135,10 @@ fun ProfileScreen() {
         }
     }
 
+    LaunchedEffect(profile) {
+        actionViewModel.refresh()
+    }
+
     val province = locations.provinces.getOrNull(provinceIndex)
     val city = province?.cities?.getOrNull(cityIndex)
     val district = city?.districts?.getOrNull(districtIndex)
@@ -178,6 +187,18 @@ fun ProfileScreen() {
             style = MaterialTheme.typography.headlineSmall,
             color = MaterialTheme.colorScheme.primary
         )
+        LifeProfileSection(actionState.lifeProfile)
+        if (actionState.profileKey != null) {
+            FortuneCard {
+                SectionTitle("饮食偏好")
+                Spacer(Modifier.height(8.dp))
+                FoodPreferenceEditor(
+                    preference = actionState.preference,
+                    onSave = actionViewModel::savePreference,
+                    onClear = actionViewModel::clearPreference
+                )
+            }
+        }
         FortuneCard {
             SectionTitle("出生信息")
             Spacer(Modifier.height(12.dp))
