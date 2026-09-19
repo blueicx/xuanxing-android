@@ -21,6 +21,8 @@ class OfflineDialogueProvider(
     private val engine: MysticDialogueEngine = DefaultMysticDialogueEngine()
 ) : DialogueProvider {
     override suspend fun complete(request: DialogueRequest): ProviderResult = runCatching {
-        ProviderResult.Success(engine.reply(request.context, request.input).text)
+        val reply = engine.reply(request.context, request.input)
+        val guarded = SafetyResponseGuard.guard(request.input, reply.text, request.context)
+        ProviderResult.Success(guarded.text)
     }.getOrElse { ProviderResult.Failure("offline_dialogue_failed", retryable = false) }
 }

@@ -60,10 +60,24 @@ class DailyActionPlannerTest {
         assertFalse(plan.disclaimer.contains("无法计算"))
     }
 
+    @Test
+    fun budget_and_preparation_constraints_are_applied_before_ranking() {
+        val plan = DailyActionPlanner().plan(
+            input(
+                preference = FoodPreference(maxMealBudgetCents = 3000, maxPrepMinutes = 10),
+                constraints = ActionConstraints(maxMealBudgetCents = 3000, maxPrepMinutes = 10, energy = EnergyLevel.Low)
+            )
+        )
+        assertTrue(plan.meals.all { (it.estimatedPriceCents ?: 0) <= 3000 })
+        assertTrue(plan.meals.all { (it.prepMinutes ?: 0) <= 10 })
+        assertTrue(plan.activities.all { it.durationMinutes.first <= 30 })
+    }
+
     private fun input(
         preference: FoodPreference = FoodPreference(),
         city: CityProfile? = CityProfileCatalog.defaultCity,
-        date: LocalDate = LocalDate.of(2026, 9, 19)
+        date: LocalDate = LocalDate.of(2026, 9, 19),
+        constraints: ActionConstraints = ActionConstraints()
     ) = DailyActionInput(
         profileKey = "profile-a",
         date = date,
@@ -92,6 +106,7 @@ class DailyActionPlannerTest {
             western = WesternDailyFortune(date.toString(), "双鱼座", 74, 73, 72, 71, 75, "平稳", 6, "青", "东南")
         ),
         city = city,
-        preference = preference
+        preference = preference,
+        constraints = constraints
     )
 }

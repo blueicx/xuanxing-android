@@ -33,7 +33,8 @@ data class DailyActionCardModel(
     val score: Int,
     val confidence: String,
     val why: List<String>,
-    val boundary: String
+    val boundary: String,
+    val alternatives: List<String> = emptyList()
 ) {
     companion object {
         fun from(plan: DailyActionPlan): List<DailyActionCardModel> = listOf(
@@ -43,7 +44,8 @@ data class DailyActionCardModel(
                 plan.meals.firstOrNull()?.score ?: 0,
                 confidenceLabel(plan.confidence),
                 plan.meals.firstOrNull()?.evidence?.map { it.label }.orEmpty(),
-                "生活方式灵感，不是医疗、营养或过敏建议。"
+                "生活方式灵感，不是医疗、营养或过敏建议。",
+                plan.meals.drop(1).map { it.title }
             ),
             DailyActionCardModel(
                 "做什么",
@@ -51,7 +53,8 @@ data class DailyActionCardModel(
                 plan.activities.firstOrNull()?.score ?: 0,
                 confidenceLabel(plan.confidence),
                 plan.activities.firstOrNull()?.evidence?.map { it.label }.orEmpty(),
-                "按你的身体和时间调整，不把分数当成硬性要求。"
+                "按你的身体和时间调整，不把分数当成硬性要求。",
+                plan.activities.drop(1).map { it.title }
             ),
             DailyActionCardModel(
                 "去哪玩",
@@ -59,7 +62,8 @@ data class DailyActionCardModel(
                 plan.outings.firstOrNull()?.score ?: 0,
                 confidenceLabel(plan.confidence),
                 plan.outings.firstOrNull()?.evidence?.map { it.label }.orEmpty(),
-                "不是旅行安全、签证、收入或迁居建议。"
+                "不是旅行安全、签证、收入或迁居建议。",
+                plan.outings.drop(1).map { "${it.cityLabel} · ${it.placeType}" }
             )
         )
 
@@ -99,6 +103,9 @@ fun DailyActionSection(
 @Composable
 private fun ActionCard(card: DailyActionCardModel) {
     var expanded by rememberSaveable(card.title) { mutableStateOf(false) }
+    var alternativeIndex by rememberSaveable(card.title) { mutableStateOf(0) }
+    var feedback by rememberSaveable(card.title) { mutableStateOf<String?>(null) }
+    val displayedSummary = card.alternatives.getOrNull(alternativeIndex - 1) ?: card.summary
     Column(
         Modifier
             .fillMaxWidth()
@@ -111,7 +118,16 @@ private fun ActionCard(card: DailyActionCardModel) {
             Text(card.title, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
             Text("${card.score} · ${card.confidence}", style = MaterialTheme.typography.labelMedium)
         }
-        Text(card.summary, style = MaterialTheme.typography.bodyLarge)
+        Text(displayedSummary, style = MaterialTheme.typography.bodyLarge)
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            androidx.compose.material3.TextButton(onClick = {
+                if (card.alternatives.isNotEmpty()) alternativeIndex = (alternativeIndex + 1) % (card.alternatives.size + 1)
+                feedback = "已换一个"
+            }) { Text("换一个") }
+            androidx.compose.material3.TextButton(onClick = { feedback = "已采纳" }) { Text("已采纳") }
+            androidx.compose.material3.TextButton(onClick = { feedback = "标记为不合适" }) { Text("不合适") }
+        }
+        feedback?.let { Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.secondary) }
         Text(if (expanded) "收起依据" else "为什么？", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.secondary)
         if (expanded) {
             card.why.take(4).forEach { reason ->

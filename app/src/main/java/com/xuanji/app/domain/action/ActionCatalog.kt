@@ -15,7 +15,10 @@ internal data class MealCandidate(
     val vegetarian: Boolean,
     val halalCompatible: Boolean,
     val spicy: Boolean,
-    val alcohol: Boolean
+    val alcohol: Boolean,
+    val estimatedPriceCents: Int = 5000,
+    val prepMinutes: Int = 20,
+    val allergenTags: Set<String> = emptySet()
 )
 
 internal data class ActivityCandidate(
@@ -27,7 +30,8 @@ internal data class ActivityCandidate(
     val elementTags: Set<Element>,
     val zodiacTags: Set<Element>,
     val fortuneKeys: Set<String>,
-    val seasonTags: Set<String>
+    val seasonTags: Set<String>,
+    val energy: EnergyLevel = EnergyLevel.Medium
 )
 
 internal data class OutingCandidate(
@@ -37,7 +41,8 @@ internal data class OutingCandidate(
     val cityTags: Set<String>,
     val elementTags: Set<Element>,
     val zodiacTags: Set<Element>,
-    val seasonTags: Set<String>
+    val seasonTags: Set<String>,
+    val indoor: Boolean = false
 )
 
 internal data class CareerCandidate(

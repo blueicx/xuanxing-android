@@ -35,6 +35,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -45,16 +46,20 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.xuanji.app.R
 import com.xuanji.app.daily.ReminderScheduler
+import com.xuanji.app.data.local.externalContextConsentStore
 import com.xuanji.app.di.AppModule
 import com.xuanji.app.domain.ChinaLocations
 import com.xuanji.app.domain.SelectedLocation
 import com.xuanji.app.ui.components.FortuneCard
+import com.xuanji.app.ui.components.ExternalContextCard
 import com.xuanji.app.ui.components.FoodPreferenceEditor
 import com.xuanji.app.ui.components.LifeProfileSection
 import com.xuanji.app.ui.components.SectionTitle
 import com.xuanji.app.ui.viewmodel.ProfileViewModel
 import com.xuanji.app.ui.viewmodel.ActionViewModel
 import com.xuanji.app.ui.xuanjiViewModel
+import com.xuanji.app.domain.external.ExternalContextConsent
+import kotlinx.coroutines.launch
 
 @Composable
 fun ProfileScreen() {
@@ -63,6 +68,8 @@ fun ProfileScreen() {
     val profile by viewModel.profile.collectAsStateWithLifecycle()
     val actionState by actionViewModel.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val externalConsentStore = remember { context.externalContextConsentStore() }
     val locations = remember { ChinaLocations.load(context) }
 
     // 出生信息默认空白（由用户自行填写），避免预填他人/作者生日
@@ -80,6 +87,11 @@ fun ProfileScreen() {
     var showClearDialog by rememberSaveable { mutableStateOf(false) }
     val dailyReminderOn by viewModel.dailyReminderOn.collectAsStateWithLifecycle()
     val mysticGuideEnabled by viewModel.mysticGuideEnabled.collectAsStateWithLifecycle()
+    var networkContextEnabled by rememberSaveable { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        networkContextEnabled = externalConsentStore.read().networkEnabled
+    }
 
     val selectedLocation = if (
         provinceIndex >= 0 && cityIndex >= 0 && districtIndex >= 0 &&
@@ -187,267 +199,305 @@ fun ProfileScreen() {
             style = MaterialTheme.typography.headlineSmall,
             color = MaterialTheme.colorScheme.primary
         )
-        LifeProfileSection(actionState.lifeProfile)
-        if (actionState.profileKey != null) {
-            FortuneCard {
-                SectionTitle("饮食偏好")
-                Spacer(Modifier.height(8.dp))
-                FoodPreferenceEditor(
-                    preference = actionState.preference,
-                    onSave = actionViewModel::savePreference,
-                    onClear = actionViewModel::clearPreference
-                )
-            }
-        }
-        FortuneCard {
-            SectionTitle("出生信息")
-            Spacer(Modifier.height(12.dp))
-            OutlinedButton(
-                onClick = { datePicker.show() },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text(
-                    if (birthYear != null && birthMonth != null && birthDay != null)
-                        "出生日期：${birthYear}年${birthMonth}月${birthDay}日"
-                    else "出生日期：未设置（点击选择）"
-                )
-            }
-            Spacer(Modifier.height(8.dp))
-            OutlinedButton(
-                onClick = { timePicker.show() },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text(
-                    if (birthHour != null && birthMinute != null)
-                        "出生时间：${String.format("%02d:%02d", birthHour, birthMinute)}"
-                    else "出生时间：未设置（点击选择）"
-                )
-            }
-            Spacer(Modifier.height(8.dp))
-            OutlinedButton(
-                onClick = { locationDialog = "province" },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("省份：${province?.name ?: "请选择"}")
-            }
-            Spacer(Modifier.height(8.dp))
-            OutlinedButton(
-                onClick = { locationDialog = "city" },
-                enabled = province != null,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("市：${city?.name ?: "请先选择省份"}")
-            }
-            Spacer(Modifier.height(8.dp))
-            OutlinedButton(
-                onClick = { locationDialog = "district" },
-                enabled = city != null,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("县（区）：${district?.name ?: "请先选择市"}")
-            }
-            Spacer(Modifier.height(8.dp))
-            Row(
-                Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text("性别：", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Spacer(Modifier.width(8.dp))
-                OutlinedButton(onClick = { gender = "男" }) {
-                    Text("男", color = if (gender == "男") MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
-                }
-                Spacer(Modifier.width(8.dp))
-                OutlinedButton(onClick = { gender = "女" }) {
-                    Text("女", color = if (gender == "女") MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
-                }
-            }
-        }
-        Button(
-            onClick = {
-                val y = birthYear ?: return@Button
-                val m = birthMonth ?: return@Button
-                val d = birthDay ?: return@Button
-                val h = birthHour ?: return@Button
-                val min = birthMinute ?: return@Button
-                val selected = selectedLocation
-                if (selected == null) {
-                    Toast.makeText(context, "请填写出生地点", Toast.LENGTH_SHORT).show()
-                    return@Button
-                }
-                viewModel.save(y, m, d, h, min, selected, gender)
-                Toast.makeText(context, context.getString(R.string.saved_toast), Toast.LENGTH_SHORT).show()
-            },
-            enabled = missingProfileFields.isEmpty(),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text("保存命盘")
-        }
-        if (missingProfileFields.isNotEmpty()) {
-            Text(
-                "还需填写：${missingProfileFields.joinToString(" / ")}",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-        if (profileDirty) {
-            OutlinedButton(
-                onClick = {
-                    val target = currentProfile
-                    if (target == null) {
-                        birthYear = null
-                        birthMonth = null
-                        birthDay = null
-                        birthHour = null
-                        birthMinute = null
-                        provinceIndex = -1
-                        cityIndex = -1
-                        districtIndex = -1
-                        gender = null
-                        Toast.makeText(context, "已清空", Toast.LENGTH_SHORT).show()
-                    } else {
-                        birthYear = target.birthYear
-                        birthMonth = target.birthMonth
-                        birthDay = target.birthDay
-                        birthHour = target.birthHour
-                        birthMinute = target.birthMinute
-                        provinceIndex = savedLocation?.provinceIndex ?: -1
-                        cityIndex = savedLocation?.cityIndex ?: -1
-                        districtIndex = savedLocation?.districtIndex ?: -1
-                        gender = target.gender
-                        Toast.makeText(context, "已恢复", Toast.LENGTH_SHORT).show()
+        profileSectionOrder.forEach { section ->
+            when (section) {
+                ProfileSection.BirthInfo -> {
+                    FortuneCard {
+                        SectionTitle("出生信息")
+                        Spacer(Modifier.height(12.dp))
+                        OutlinedButton(
+                            onClick = { datePicker.show() },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                if (birthYear != null && birthMonth != null && birthDay != null)
+                                    "出生日期：${birthYear}年${birthMonth}月${birthDay}日"
+                                else "出生日期：未设置（点击选择）"
+                            )
+                        }
+                        Spacer(Modifier.height(8.dp))
+                        OutlinedButton(
+                            onClick = { timePicker.show() },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                if (birthHour != null && birthMinute != null)
+                                    "出生时间：${String.format("%02d:%02d", birthHour, birthMinute)}"
+                                else "出生时间：未设置（点击选择）"
+                            )
+                        }
+                        Spacer(Modifier.height(8.dp))
+                        OutlinedButton(
+                            onClick = { locationDialog = "province" },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("省份：${province?.name ?: "请选择"}")
+                        }
+                        Spacer(Modifier.height(8.dp))
+                        OutlinedButton(
+                            onClick = { locationDialog = "city" },
+                            enabled = province != null,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("市：${city?.name ?: "请先选择省份"}")
+                        }
+                        Spacer(Modifier.height(8.dp))
+                        OutlinedButton(
+                            onClick = { locationDialog = "district" },
+                            enabled = city != null,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("县（区）：${district?.name ?: "请先选择市"}")
+                        }
+                        Spacer(Modifier.height(8.dp))
+                        Row(
+                            Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("性别：", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Spacer(Modifier.width(8.dp))
+                            OutlinedButton(onClick = { gender = "男" }) {
+                                Text("男", color = if (gender == "男") MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
+                            }
+                            Spacer(Modifier.width(8.dp))
+                            OutlinedButton(onClick = { gender = "女" }) {
+                                Text("女", color = if (gender == "女") MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
+                            }
+                        }
                     }
-                },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text(
-                    if (currentProfile == null) "清空重填" else "放弃修改",
-                    color = MaterialTheme.colorScheme.secondary
-                )
-            }
-        }
-        FortuneCard {
-            SectionTitle("当前档案")
-            Spacer(Modifier.height(8.dp))
-            StatusChip(
-                label = when {
-                    currentProfile == null && !profileDirty -> "尚未设置"
-                    profileDirty -> "有未保存更改"
-                    else -> "已保存"
-                },
-                dirty = profileDirty
-            )
-            ProfileInfoRow(
-                label = "生日",
-                value = currentProfile?.let {
-                    String.format(
-                        "%04d-%02d-%02d %02d:%02d",
-                        it.birthYear, it.birthMonth, it.birthDay, it.birthHour, it.birthMinute
-                    )
-                } ?: "未设置"
-            )
-            ProfileInfoRow(
-                label = "地点",
-                value = currentProfile?.locationName ?: "未设置"
-            )
-            ProfileInfoRow(
-                label = "性别",
-                value = currentProfile?.gender ?: "未设置"
-            )
-            if (currentProfile != null) {
-                Spacer(Modifier.height(4.dp))
-                OutlinedButton(
-                    onClick = { showClearProfileDialog = true },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("清除并重新设置")
+                    Button(
+                        onClick = {
+                            val y = birthYear ?: return@Button
+                            val m = birthMonth ?: return@Button
+                            val d = birthDay ?: return@Button
+                            val h = birthHour ?: return@Button
+                            val min = birthMinute ?: return@Button
+                            val selected = selectedLocation
+                            if (selected == null) {
+                                Toast.makeText(context, "请填写出生地点", Toast.LENGTH_SHORT).show()
+                                return@Button
+                            }
+                            viewModel.save(y, m, d, h, min, selected, gender)
+                            Toast.makeText(context, context.getString(R.string.saved_toast), Toast.LENGTH_SHORT).show()
+                        },
+                        enabled = missingProfileFields.isEmpty(),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("保存命盘")
+                    }
+                    if (missingProfileFields.isNotEmpty()) {
+                        Text(
+                            "还需填写：${missingProfileFields.joinToString(" / ")}",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    if (profileDirty) {
+                        OutlinedButton(
+                            onClick = {
+                                val target = currentProfile
+                                if (target == null) {
+                                    birthYear = null
+                                    birthMonth = null
+                                    birthDay = null
+                                    birthHour = null
+                                    birthMinute = null
+                                    provinceIndex = -1
+                                    cityIndex = -1
+                                    districtIndex = -1
+                                    gender = null
+                                    Toast.makeText(context, "已清空", Toast.LENGTH_SHORT).show()
+                                } else {
+                                    birthYear = target.birthYear
+                                    birthMonth = target.birthMonth
+                                    birthDay = target.birthDay
+                                    birthHour = target.birthHour
+                                    birthMinute = target.birthMinute
+                                    provinceIndex = savedLocation?.provinceIndex ?: -1
+                                    cityIndex = savedLocation?.cityIndex ?: -1
+                                    districtIndex = savedLocation?.districtIndex ?: -1
+                                    gender = target.gender
+                                    Toast.makeText(context, "已恢复", Toast.LENGTH_SHORT).show()
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                if (currentProfile == null) "清空重填" else "放弃修改",
+                                color = MaterialTheme.colorScheme.secondary
+                            )
+                        }
+                    }
                 }
-            }
-        }
-        FortuneCard {
-            SectionTitle("悬浮玄师")
-            Spacer(Modifier.height(8.dp))
-            Row(
-                Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        "运势页显示微光浮球",
-                        style = MaterialTheme.typography.titleSmall,
-                        color = MaterialTheme.colorScheme.onSurface
+
+                ProfileSection.CurrentProfile -> FortuneCard {
+                    SectionTitle("当前档案")
+                    Spacer(Modifier.height(8.dp))
+                    StatusChip(
+                        label = when {
+                            currentProfile == null && !profileDirty -> "尚未设置"
+                            profileDirty -> "有未保存更改"
+                            else -> "已保存"
+                        },
+                        dirty = profileDirty
                     )
+                    ProfileInfoRow(
+                        label = "生日",
+                        value = currentProfile?.let {
+                            String.format(
+                                "%04d-%02d-%02d %02d:%02d",
+                                it.birthYear, it.birthMonth, it.birthDay, it.birthHour, it.birthMinute
+                            )
+                        } ?: "未设置"
+                    )
+                    ProfileInfoRow(
+                        label = "地点",
+                        value = currentProfile?.locationName ?: "未设置"
+                    )
+                    ProfileInfoRow(
+                        label = "性别",
+                        value = currentProfile?.gender ?: "未设置"
+                    )
+                    if (currentProfile != null) {
+                        Spacer(Modifier.height(4.dp))
+                        OutlinedButton(
+                            onClick = { showClearProfileDialog = true },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("清除并重新设置")
+                        }
+                    }
+                }
+
+                ProfileSection.LifeProfile -> LifeProfileSection(actionState.lifeProfile)
+
+                ProfileSection.FoodPreference -> if (actionState.profileKey != null) {
+                    FortuneCard {
+                        SectionTitle("饮食偏好")
+                        Spacer(Modifier.height(8.dp))
+                        FoodPreferenceEditor(
+                            preference = actionState.preference,
+                            onSave = actionViewModel::savePreference,
+                            onClear = actionViewModel::clearPreference
+                        )
+                    }
+                }
+
+                ProfileSection.MysticGuide -> FortuneCard {
+                    SectionTitle("悬浮法师开关")
+                    Spacer(Modifier.height(8.dp))
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                "运势页显示微光浮球",
+                                style = MaterialTheme.typography.titleSmall,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                if (mysticGuideEnabled) "已显示，点击浮球可召回完整玄师舞台" else "已完全隐藏，可从这里恢复浮球",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Switch(
+                            checked = mysticGuideEnabled,
+                            onCheckedChange = { enabled ->
+                                viewModel.setMysticGuideEnabled(enabled)
+                            }
+                        )
+                    }
+                }
+
+                ProfileSection.About -> FortuneCard {
+                    SectionTitle("关于玄星")
+                    Spacer(Modifier.height(8.dp))
                     Text(
-                        if (mysticGuideEnabled) "已显示，点击浮球可召回完整玄师舞台" else "已完全隐藏，可从这里恢复浮球",
+                        "玄星融合东方八字与西方星座，提供每日运势、占卜抽签、心理测试与手相参考。所有命理推算仅供娱乐与自我探索，请理性看待。",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        "占卜支持随机体验，也支持按档案、日期、问题和牌阵稳定复现；结果仅供娱乐与自我探索。",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-                Switch(
-                    checked = mysticGuideEnabled,
-                    onCheckedChange = { enabled ->
-                        viewModel.setMysticGuideEnabled(enabled)
-                    }
-                )
-            }
-        }
-        FortuneCard {
-            SectionTitle("关于玄星")
-            Spacer(Modifier.height(8.dp))
-            Text(
-                "玄星融合东方八字与西方星座，提供每日运势、占卜抽签、心理测试与手相参考。所有命理推算仅供娱乐与自我探索，请理性看待。",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Spacer(Modifier.height(6.dp))
-            Text(
-                "占卜抽签均为纯随机抽取，每一次结果都独一无二。",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-        FortuneCard {
-            SectionTitle("隐私与数据")
-            Spacer(Modifier.height(8.dp))
-            Text(
-                "玄星的命理推算在本地完成，不上传或统计你的出生档案与测试记录。开启每日提醒时仅使用本地通知。",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .padding(top = 12.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(Modifier.weight(1f)) {
+
+                ProfileSection.Privacy -> FortuneCard {
+                    SectionTitle("隐私与数据")
+                    Spacer(Modifier.height(8.dp))
                     Text(
-                        "每日运势提醒",
-                        style = MaterialTheme.typography.titleSmall,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Text(
-                        "每天 09:00 · 本地通知",
+                        "玄星的命理推算默认在本地完成，不上传或统计你的出生档案与测试记录。天气/城市联网是可选扩展，仅在你手动开启并选择城市后请求。",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                }
-                Switch(
-                    checked = dailyReminderOn,
-                    onCheckedChange = { enabled ->
-                        viewModel.setDailyReminderOn(enabled)
-                        Toast.makeText(context, if (enabled) "已开启" else "已关闭", Toast.LENGTH_SHORT).show()
+                    Spacer(Modifier.height(12.dp))
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            Text("可选天气与城市联网", style = MaterialTheme.typography.titleSmall)
+                            Text(
+                                if (networkContextEnabled) "已开启：只使用手动城市，不读取 GPS；失败时回退离线标签。"
+                                else "默认关闭：不联网、不读取 GPS。",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Switch(
+                            checked = networkContextEnabled,
+                            onCheckedChange = { enabled ->
+                                networkContextEnabled = enabled
+                                scope.launch {
+                                    externalConsentStore.save(ExternalContextConsent(networkEnabled = enabled))
+                                }
+                            }
+                        )
                     }
-                )
-            }
-            Spacer(Modifier.height(12.dp))
-            OutlinedButton(
-                onClick = { showClearDialog = true },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text(
-                    "清除全部本地数据",
-                    color = MaterialTheme.colorScheme.error
-                )
+                    Spacer(Modifier.height(12.dp))
+                    ExternalContextCard(networkEnabled = networkContextEnabled)
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(top = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                "每日运势提醒",
+                                style = MaterialTheme.typography.titleSmall,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                "每天 09:00 · 本地通知",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Switch(
+                            checked = dailyReminderOn,
+                            onCheckedChange = { enabled ->
+                                viewModel.setDailyReminderOn(enabled)
+                                Toast.makeText(context, if (enabled) "已开启" else "已关闭", Toast.LENGTH_SHORT).show()
+                            }
+                        )
+                    }
+                    Spacer(Modifier.height(12.dp))
+                    OutlinedButton(
+                        onClick = { showClearDialog = true },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            "清除全部本地数据",
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
+                }
             }
         }
 
@@ -574,6 +624,7 @@ fun ProfileScreen() {
                         onClick = {
                             showClearDialog = false
                             viewModel.clearAllLocalData()
+                            scope.launch { externalConsentStore.clear() }
                             ReminderScheduler.cancel(context)
                             Toast.makeText(context, "已全部清除", Toast.LENGTH_SHORT).show()
                         }

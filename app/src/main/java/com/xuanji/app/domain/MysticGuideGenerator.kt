@@ -2705,7 +2705,10 @@ object MysticGuideGenerator {
         test: TestRecord? = null,
         skinId: String = "",
         dailyActionPlan: DailyActionPlan? = null,
-        lifeProfile: LifeProfile? = null
+        lifeProfile: LifeProfile? = null,
+        divinationSummary: String? = null,
+        weatherSummary: String? = null,
+        personalitySource: PersonalitySource = PersonalitySource.Unknown
     ): String {
         val label = topics[topicKey] ?: "综合"
         val focus = if (topicKey == "test") {
@@ -2810,6 +2813,19 @@ object MysticGuideGenerator {
                 val region = profile.regionCandidates.firstOrNull()
                 "画像目前给出「${career?.label ?: "待补充职业簇"}」、色彩灵感「${color?.label ?: "待补充"}」；地区只是匹配示例：${region?.country.orEmpty()}·${region?.city.orEmpty()}。置信度 ${profile.confidence}，依据：${profile.evidence.joinToString("；") { it.label }}。"
             } ?: "人生画像还没算好；先在「我的」页填写出生信息，我再按同一份结果回答。"
+            "tarot" -> "${divinationSummary?.takeIf { it.isNotBlank() } ?: "塔罗结果还没展开；请打开「占卜 → 塔罗牌」选择牌阵后抽牌。"} 牌面是自我反思的象征入口，不替你保证未来。"
+            "rune" -> "${divinationSummary?.takeIf { it.isNotBlank() } ?: "符文结果还没展开；请打开「占卜 → 北欧符文」选择单符或三符牌阵。"} 把它当作提问和行动的提示，不是确定预言。"
+            "numerology" -> "${divinationSummary?.takeIf { it.isNotBlank() } ?: "数字命理结果还没展开；请打开「占卜 → 生命数字」查看个人年、月、日周期。"} 计算步骤会显示在结果旁，方便你复核。"
+            "weather" -> weatherSummary?.takeIf { it.isNotBlank() }?.let { "天气数据：$it 以实时天气服务返回为准，若未开启联网则不会猜测。" }
+                ?: "我不会凭盘面猜天气；打开「我的 → 隐私与数据」并手动选择城市后，才可查询实时天气。"
+            "place" -> dailyActionPlan?.outings?.firstOrNull()?.let { outing ->
+                "按今天的五行、星座、盘面和城市标签，先看${outing.cityLabel}的${outing.placeType}：${outing.reason}。这只是生活方式灵感；要查附近真实地点，请在联网后手动搜索。"
+            } ?: "我可以按盘面给环境类型，但不会假装知道你附近的真实店铺；请先选择城市或打开地图搜索。"
+            "personality" -> if (personalitySource == PersonalitySource.ExplicitAssessment && test != null) {
+                "你主动完成的「${test.testName}」结果是「${test.resultName}」。它是测验材料，不是固定人格判决；你也可以随时清除。"
+            } else {
+                "我不会仅凭聊天推断你的性格。若你愿意，请先完成一个明确标注来源的心理测验，再由你决定是否保留结果。"
+            }
             "fortune" -> if (scholar) {
                 "我把盘面摊开：综合 ${fortune.overallScore} 分，最强是「${high.label}」 ${high.score}，最需要照看是「${low.label}」 ${low.score}。" +
                     "它说的是今天的势，不是你一生的结论。"
@@ -2851,7 +2867,7 @@ object MysticGuideGenerator {
     fun customAnswerPrefix(question: String): String {
         if (question.isBlank()) return ""
         val intent = customIntent(question)
-        return if (intent in setOf("greeting", "farewell", "thanks", "identity", "smalltalk", "daily", "chat", "today_meal", "today_activity", "today_outing", "life_profile")) {
+        return if (intent in setOf("greeting", "farewell", "thanks", "identity", "smalltalk", "daily", "chat", "today_meal", "today_activity", "today_outing", "life_profile", "tarot", "rune", "numerology", "weather", "place", "personality")) {
             ""
         } else {
             "你问：「$question」\n\n"

@@ -2,7 +2,7 @@
 
 ## 默认陪伴形态
 
-综合、东方和西方运势页默认只显示 52dp 微光浮球（`OrbVisible`）。点击浮球才打开完整玄师舞台；关闭舞台后回到浮球。用户可在「我的 → 悬浮玄师」关闭浮球，入口会保留用于恢复。
+综合、东方和西方运势页默认只显示 52dp 微光浮球（`OrbVisible`）。点击浮球才打开完整玄师舞台；关闭舞台后回到浮球。用户可在「我的 → 悬浮法师开关」关闭浮球，入口会保留用于恢复。
 
 浮球和舞台都遵循系统导航栏/输入法安全区；系统开启“移除动画”时，浮球取消位移、旋转和面部微动。
 
@@ -54,6 +54,24 @@ B+C 视觉方案采用统一人物骨架加文化道具和场景层：每个 `sk
 ## Provider seam
 
 `DialogueProvider` 与 `OfflineDialogueProvider` 只提供扩展接口；当前默认实现完全离线，不请求网络、不写入密钥，也不改变现有盘面、健康和财务边界。未来接入在线 provider 时，结果先由 `DialogueReplyValidator` 校验分数是否来自当前 `CompositeDailyFortune`、是否越过记忆/安全红线，再标记 `OnlineValidated`；失败、超时或校验拒绝统一回到 `OnlineFallback` 的本地生成器，不允许直接返回未校验文本。
+
+## 占卜扩展与可复现输入
+
+`domain/divination/DivinationQuery` 是塔罗、卢恩和数字命理的共同输入契约。`DeterministicDraw` 用 SHA-256 派生种子，组合算法版本、档案摘要、日期、问题和牌阵；同样输入得到同样结果，不保存原始姓名。塔罗由 `DeterministicTarot` 支持单张/三张/五张，卢恩由 `Rune.read` 支持单符/三符，`NumerologyCycles` 输出个人年/月/日周期与计算步骤。随机按钮仍保留为用户主动的另一种体验。`DivinationHistoryStore` 只保存用户主动确认的结果摘要，支持按档案删除。
+
+## 天气、地点与联网边界
+
+`domain/external` 提供 `OfflineContextProvider` 和可选的 `OpenMeteoContextProvider`。应用默认不联网、不读取 GPS；用户在「我的 → 隐私与数据」打开开关并手动输入城市后，才会发起一次地理编码或天气请求。请求失败、超时或关闭开关时回退到离线城市目录，不猜测实时天气。地图按钮只调用手机现有地图应用的 `geo:` 深链，不内嵌瓦片、不做后台定位。联网结果只用于显示天气/地点上下文，不能覆盖盘面、医疗或投资护栏。
+
+对外接口约束：Open-Meteo 地理编码与预报接口分别要求城市名或经纬度；OSM/Nominatim 若未来作为地图 provider，必须遵守手动触发、限速、缓存、User-Agent、署名与不做自动补全等政策，不在本轮内置瓦片服务。
+
+## 今日行动约束与反馈
+
+`FoodPreference` 现在可保存过敏原、单餐预算与准备时长；`DailyActionPlanner` 在五行/星座/盘面/季节权重排序前先过滤这些硬约束，过滤为空时明确说明而不伪造菜名。`DailyActionCards` 展示具体食材、替代菜、时间和“换一个/已采纳/不合适”按钮；反馈是用户主动选择，不转化为隐式性格或健康推断。行动卡仍只出现在日周期。
+
+## 安全响应护栏
+
+`SafetyResponseGuard` 位于离线与可选 provider 文本之后：健康结论式问题转为安全拒答和专业帮助入口；投资结论式问题不输出买卖、仓位或收益承诺；人格只接受 `ExplicitAssessment`（用户主动完成并确认的测验），聊天内容一律为 `Unknown`。provider 结果先过 `DialogueReplyValidator`，不合格则回退到本地安全文案。
 
 ## 今日行动与人生画像
 

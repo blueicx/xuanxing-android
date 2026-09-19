@@ -22,6 +22,8 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.xuanji.app.di.AppModule
 import com.xuanji.app.domain.divination.Numerology
+import com.xuanji.app.domain.divination.NumerologyCycles
+import java.time.LocalDate
 import com.xuanji.app.ui.components.FortuneCard
 import com.xuanji.app.ui.components.InfoRow
 import com.xuanji.app.ui.components.SectionTitle
@@ -60,6 +62,18 @@ fun NumerologyScreen() {
                     Text(it.verdict, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Spacer(Modifier.height(8.dp))
                 }
+            }
+
+            FortuneCard {
+                SectionTitle("个人周期（可复核）")
+                Spacer(Modifier.height(8.dp))
+                NumerologyCycles.calculate(p, LocalDate.now()).forEach { cycle ->
+                    InfoRow(cycle.label, cycle.number.toString())
+                    Text("计算：${cycle.calculation}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(cycle.interpretation, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(Modifier.height(8.dp))
+                }
+                Text("周期是数字命理的文化解释，不是现实事件的确定预测。", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
 
             FortuneCard {

@@ -111,6 +111,12 @@ class DefaultMysticDialogueAnalyzer : MysticDialogueAnalyzer {
         setOf("今天做什么", "今天适合做什么", "现在做什么").any(q::contains) -> MysticIntent.TodayActivity to "daily_activity"
         setOf("去哪玩", "去哪里玩", "今天去哪", "今天去哪里").any(q::contains) -> MysticIntent.TodayOuting to "daily_outing"
         setOf("适合什么工作", "适合做什么工作", "什么工作适合我", "什么颜色适合我", "适合什么颜色", "哪个城市适合我", "适合哪个城市", "适合什么地区").any(q::contains) -> MysticIntent.LifeProfile to "life_profile"
+        setOf("抽塔罗", "塔罗牌", "塔罗怎么抽", "三张塔罗", "五张塔罗").any(q::contains) -> MysticIntent.Tarot to "tarot"
+        setOf("抽符文", "北欧符文", "卢恩", "卢恩怎么抽", "三符文").any(q::contains) -> MysticIntent.Rune to "rune"
+        setOf("数字命理", "生命数字", "个人年", "个人月", "个人日").any(q::contains) -> MysticIntent.Numerology to "numerology"
+        setOf("实时天气", "天气预报", "降雨概率", "当前气温", "温度多少").any(q::contains) -> MysticIntent.Weather to "weather"
+        setOf("附近哪里", "附近去哪", "附近游玩", "地图上去哪").any(q::contains) -> MysticIntent.Place to "place"
+        setOf("做个性格测验", "性格测验", "人格测试结果", "我的人格").any(q::contains) -> MysticIntent.Personality to "personality"
         else -> null
     }
 
@@ -145,6 +151,12 @@ class DefaultMysticDialogueAnalyzer : MysticDialogueAnalyzer {
         MysticIntent.TodayOuting -> "action"
         MysticIntent.LifeProfile -> "career"
         MysticIntent.Daily -> "daily"
+        MysticIntent.Tarot -> "tarot"
+        MysticIntent.Rune -> "rune"
+        MysticIntent.Numerology -> "numerology"
+        MysticIntent.Weather -> "weather"
+        MysticIntent.Place -> "place"
+        MysticIntent.Personality -> "personality"
         else -> null
     }
 

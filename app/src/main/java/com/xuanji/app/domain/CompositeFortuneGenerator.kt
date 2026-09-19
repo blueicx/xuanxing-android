@@ -81,7 +81,7 @@ object CompositeFortuneGenerator {
             eastern = eastern,
             western = western,
             period = period,
-            periodSummary = periodSummary(blends, eastern, western, overall, label),
+            periodSummary = periodSummary(blends, overall, label),
             insights = insights.filter { it.weight != 0 }
                 .sortedByDescending { abs(it.weight) }
                 .take(8)
@@ -215,30 +215,34 @@ object CompositeFortuneGenerator {
         return "$trend。$eastText；$westText。$verdict"
     }
 
-    /** 本周期总评：两套体系各自立论 + 最强最弱 + 最大分歧的落地办法 */
+    /** 本周期总评：只呈现两套体系合参后的行动结论。 */
     private fun periodSummary(
         blends: List<Blend>,
-        eastern: EasternDailyFortune,
-        western: WesternDailyFortune,
         overall: Int,
         label: String
     ): String {
-        val pillar = eastern.periodPillarText.ifBlank { eastern.dayPillarText }
         val best = blends.maxByOrNull { it.score }
         val worst = blends.minByOrNull { it.score }
         val diverging = blends.maxByOrNull { abs(it.east - it.west) }
         return buildString {
             append("${label}综合 $overall 分。")
-            append("八字以「$pillar」立论判${eastern.overallScore}分：${eastern.summary}")
-            append(" 星盘以${western.sign}当值相位立论判${western.overallScore}分：${western.summary}")
+            append(
+                when {
+                    overall >= 82 -> "合参结果偏强，适合把重要事项拆成小步推进，主动争取反馈。"
+                    overall >= 68 -> "合参结果偏顺，适合稳步推进，给临时变化留出余量。"
+                    overall >= 52 -> "合参结果持平，先做可控的小动作，再根据反馈调整节奏。"
+                    overall >= 38 -> "合参结果有阻，宜先收窄范围、降低承诺，不急着一次解决全部问题。"
+                    else -> "合参结果偏低，先守住作息、预算与边界，重要决定可以延后复核。"
+                }
+            )
             if (best != null && best.score >= 68) {
-                append(" 全周期最能借力的维度是${best.dim.label}（${best.score}分），有限的心力先花在这上面。")
+                append(" 最能借力的维度是${best.dim.label}（${best.score}分），有限的心力先花在这上面。")
             }
             if (worst != null && worst.score < 52) {
-                append(" 最容易吃亏的是${worst.dim.label}（${worst.score}分），这一维宜委托、宜延后、宜降低预期。")
+                append(" 最需要照看的是${worst.dim.label}（${worst.score}分），这一维宜委托、宜延后、宜降低预期。")
             }
             if (diverging != null && abs(diverging.east - diverging.west) >= 15) {
-                append(" 分歧最大的是${diverging.dim.label}：八字${diverging.east}分、星盘${diverging.west}分，说明外部条件与你的准备度不匹配，别当纯机会也别当纯阻碍处理。")
+                append(" ${diverging.dim.label}的信号有明显分歧，说明外部条件与准备度暂未对齐，别当纯机会也别当纯阻碍处理。")
             }
         }
     }

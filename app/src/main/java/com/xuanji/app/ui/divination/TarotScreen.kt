@@ -20,12 +20,14 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -40,17 +42,23 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.xuanji.app.data.model.DrawnTarot
 import com.xuanji.app.data.model.TarotCard
 import com.xuanji.app.di.AppModule
+import com.xuanji.app.domain.divination.DivinationQuery
 import com.xuanji.app.ui.components.FortuneCard
 import com.xuanji.app.ui.components.SectionTitle
 import com.xuanji.app.ui.components.SystemExplanation
 import com.xuanji.app.ui.viewmodel.TarotViewModel
 import com.xuanji.app.ui.xuanjiViewModel
+import java.time.LocalDate
 
 @Composable
 fun TarotScreen() {
     val viewModel = xuanjiViewModel { TarotViewModel(AppModule.tarotRepository) }
     val drawn by viewModel.drawn.collectAsStateWithLifecycle()
     val spread by viewModel.spread.collectAsStateWithLifecycle()
+    val stableSeed by viewModel.stableSeed.collectAsStateWithLifecycle()
+    val stableExplanation by viewModel.stableExplanation.collectAsStateWithLifecycle()
+    val profile by AppModule.repository.userProfileFlow.collectAsStateWithLifecycle(initialValue = null)
+    var question by remember { mutableStateOf("") }
 
     // 翻牌动画：flipProgress 由 LaunchedEffect(drawKey) 驱动，0→1 翻面
     var flipProgress by remember { mutableFloatStateOf(0f) }
@@ -91,13 +99,44 @@ fun TarotScreen() {
             ) {
                 Text("三张 · 过去现在未来", color = if (spread == "three") MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
             }
+            Spacer(Modifier.width(8.dp))
+            OutlinedButton(
+                onClick = { viewModel.setSpread("five") },
+                modifier = Modifier.weight(1f)
+            ) {
+                Text("五张 · 交叉")
+            }
         }
+
+        OutlinedTextField(
+            value = question,
+            onValueChange = { question = it.take(120) },
+            label = { Text("可选问题（用于稳定抽牌）") },
+            supportingText = { Text("同一档案、日期、问题和牌阵会得到同一组牌") },
+            modifier = Modifier.fillMaxWidth()
+        )
 
         Button(onClick = {
             viewModel.draw()
             drawKey++
         }, modifier = Modifier.fillMaxWidth()) {
-            Text("抽牌")
+            Text("随机抽牌")
+        }
+        OutlinedButton(onClick = {
+            val p = profile
+            val profileKey = p?.let { "${it.birthYear}-${it.birthMonth}-${it.birthDay}-${it.birthHour}-${it.locationCode.orEmpty()}" } ?: "anonymous"
+            viewModel.drawDeterministic(
+                DivinationQuery(
+                    system = "tarot",
+                    profileKey = profileKey,
+                    dateKey = LocalDate.now().toString(),
+                    question = question,
+                    spread = spread
+                )
+            )
+            drawKey++
+        }, modifier = Modifier.fillMaxWidth()) {
+            Text("按问题稳定抽牌")
         }
 
         // 牌面动画区
@@ -134,6 +173,10 @@ fun TarotScreen() {
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+        }
+        if (stableSeed != null) {
+            Text("算法种子：${stableSeed!!.take(12)}…", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(stableExplanation.orEmpty(), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         SystemExplanation("tarot")
     }

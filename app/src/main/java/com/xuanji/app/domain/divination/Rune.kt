@@ -264,4 +264,32 @@ object Rune {
         val rune = RUNES[idx]
         return DrawResult(rune, rev, verdictFor(rune, rev))
     }
+
+    /** 可复现的单符/三符牌阵，供对话与历史使用；不会改动原有随机抽签入口。 */
+    fun read(query: DivinationQuery): RuneReading {
+        val count = when (query.spread.lowercase()) {
+            "three", "三张", "past-present-future" -> 3
+            else -> 1
+        }
+        val positions = if (count == 3) listOf("根因", "当下", "方向") else listOf("指引")
+        val indices = DeterministicDraw.order(RUNES.size, query, "rune").take(count)
+        val draws = indices.mapIndexed { index, runeIndex ->
+            val reversed = DeterministicDraw.boolean(query, "rune-reversed-$runeIndex")
+            DrawResult(RUNES[runeIndex], reversed, verdictFor(RUNES[runeIndex], reversed)) to positions[index]
+        }
+        return RuneReading(
+            query = query,
+            seed = DeterministicDraw.seed(query, "rune"),
+            draws = draws.map { (result, position) -> RunePosition(position, result) }
+        )
+    }
 }
+
+data class RunePosition(val position: String, val result: Rune.DrawResult)
+
+data class RuneReading(
+    val query: DivinationQuery,
+    val seed: String,
+    val draws: List<RunePosition>,
+    val explanation: String = "符文序列由日期、问题、档案摘要和牌阵派生；同样输入会得到同样结果。"
+)

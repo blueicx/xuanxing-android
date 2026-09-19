@@ -11,7 +11,8 @@ data class DailyActionPlan(
     val outings: List<OutingSuggestion>,
     val evidence: List<ActionEvidence>,
     val confidence: ConfidenceLevel,
-    val disclaimer: String
+    val disclaimer: String,
+    val constraints: ActionConstraints = ActionConstraints()
 )
 
 data class MealSuggestion(
@@ -21,7 +22,9 @@ data class MealSuggestion(
     val substitute: String,
     val deliveryKeywords: List<String>,
     val score: Int,
-    val evidence: List<ActionEvidence>
+    val evidence: List<ActionEvidence>,
+    val estimatedPriceCents: Int? = null,
+    val prepMinutes: Int? = null
 )
 
 data class ActivitySuggestion(
@@ -38,7 +41,8 @@ data class OutingSuggestion(
     val reason: String,
     val cityLabel: String,
     val score: Int,
-    val evidence: List<ActionEvidence>
+    val evidence: List<ActionEvidence>,
+    val indoor: Boolean? = null
 )
 
 data class ActionEvidence(
@@ -57,8 +61,21 @@ data class FoodPreference(
     val halal: Boolean = false,
     val avoidSpicy: Boolean = false,
     val avoidAlcohol: Boolean = false,
-    val excludedIngredients: Set<String> = emptySet()
+    val excludedIngredients: Set<String> = emptySet(),
+    val allergens: Set<String> = emptySet(),
+    val maxMealBudgetCents: Int? = null,
+    val maxPrepMinutes: Int? = null
 )
+
+data class ActionConstraints(
+    val maxMealBudgetCents: Int? = null,
+    val maxPrepMinutes: Int? = null,
+    val energy: EnergyLevel = EnergyLevel.Any,
+    val indoorOnly: Boolean = false,
+    val maxActivityMinutes: Int? = null
+)
+
+enum class EnergyLevel { Any, Low, Medium, High }
 
 data class CityProfile(
     val key: String,

@@ -15,7 +15,8 @@ data class DailyActionInput(
     val zodiacElement: Element,
     val fortune: CompositeDailyFortune,
     val city: CityProfile?,
-    val preference: FoodPreference
+    val preference: FoodPreference,
+    val constraints: ActionConstraints = ActionConstraints()
 )
 
 class DailyActionPlanner {
@@ -30,10 +31,18 @@ class DailyActionPlanner {
             val excluded = input.preference.excludedIngredients.any { token ->
                 token.isNotBlank() && ingredients.contains(token.trim().lowercase())
             }
+            val allergens = input.preference.allergens.any { token ->
+                token.isNotBlank() && (ingredients.contains(token.trim().lowercase()) || candidate.allergenTags.any { it.equals(token.trim(), ignoreCase = true) })
+            }
+            val maxBudget = input.constraints.maxMealBudgetCents ?: input.preference.maxMealBudgetCents
+            val maxPrep = input.constraints.maxPrepMinutes ?: input.preference.maxPrepMinutes
             !excluded && (!input.preference.vegetarian || candidate.vegetarian) &&
                 (!input.preference.halal || candidate.halalCompatible) &&
                 (!input.preference.avoidSpicy || !candidate.spicy) &&
-                (!input.preference.avoidAlcohol || !candidate.alcohol)
+                (!input.preference.avoidAlcohol || !candidate.alcohol) &&
+                !allergens &&
+                (maxBudget == null || candidate.estimatedPriceCents <= maxBudget) &&
+                (maxPrep == null || candidate.prepMinutes <= maxPrep)
         }
 
         val mealRanked = eligibleMeals.map { candidate ->
@@ -56,12 +65,19 @@ class DailyActionPlanner {
                     substitute = candidate.substitute,
                     deliveryKeywords = candidate.deliveryKeywords,
                     score = rank.score,
-                    evidence = evidenceForMeal(input, candidate, season, favorable, rank.score)
+                    evidence = evidenceForMeal(input, candidate, season, favorable, rank.score),
+                    estimatedPriceCents = candidate.estimatedPriceCents,
+                    prepMinutes = candidate.prepMinutes
                 )
             }
         }
 
-        val activityRanked = ActionCatalog.activities.map { candidate ->
+        val activityRanked = ActionCatalog.activities.filter { candidate ->
+            val maxMinutes = input.constraints.maxActivityMinutes
+            val maxEnergy = input.constraints.energy
+            (maxMinutes == null || candidate.durationMinutes.first <= maxMinutes) &&
+                (maxEnergy == EnergyLevel.Any || candidate.energy.ordinal <= maxEnergy.ordinal)
+        }.map { candidate ->
             val score = score(
                 elementFit = elementFit(favorable, candidate.elementTags),
                 zodiacFit = zodiacFit(input.zodiacElement, candidate.zodiacTags),
@@ -84,7 +100,9 @@ class DailyActionPlanner {
             )
         }
 
-        val outingRanked = ActionCatalog.outings.map { candidate ->
+        val outingRanked = ActionCatalog.outings.filter { candidate ->
+            !input.constraints.indoorOnly || candidate.indoor
+        }.map { candidate ->
             val score = score(
                 elementFit = elementFit(favorable, candidate.elementTags),
                 zodiacFit = zodiacFit(input.zodiacElement, candidate.zodiacTags),
@@ -103,7 +121,8 @@ class DailyActionPlanner {
                 reason = candidate.reason,
                 cityLabel = cityLabel,
                 score = rank.score,
-                evidence = evidenceForOuting(input, candidate, season, rank.score)
+                evidence = evidenceForOuting(input, candidate, season, rank.score),
+                indoor = candidate.indoor
             )
         }
 
@@ -111,7 +130,7 @@ class DailyActionPlanner {
         val disclaimer = buildString {
             append("这是基于五行、星座、今日盘面与季节/城市标签的离线生活方式灵感，不是医疗、营养、过敏或安全结论。")
             if (input.city == null) append("未选择目录城市，出游部分按环境类型表达。")
-            if (eligibleMeals.isEmpty()) append("当前饮食偏好过滤掉了目录中的全部候选，请按偏好自选食物；本次不伪造具体菜名。")
+            if (eligibleMeals.isEmpty()) append("当前饮食偏好、预算或准备时间过滤掉了目录中的全部候选，请按偏好自选食物；本次不伪造具体菜名。")
         }
         val planEvidence = listOf(
             ActionEvidence(ActionSource.FiveElements, "favorable", "喜用五行：${favorable.joinToString { elementName(it) }}", (40 * 0.4).roundToInt()),
@@ -131,7 +150,8 @@ class DailyActionPlanner {
             outings = outings,
             evidence = planEvidence,
             confidence = confidence,
-            disclaimer = disclaimer
+            disclaimer = disclaimer,
+            constraints = input.constraints
         )
     }
 

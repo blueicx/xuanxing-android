@@ -4,6 +4,8 @@
 
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <!-- Optional weather/geocoding provider; disabled by default and never implies location access. -->
+    <uses-permission android:name="android.permission.INTERNET" />
 
     <application
         android:name=".XuanjiApplication"

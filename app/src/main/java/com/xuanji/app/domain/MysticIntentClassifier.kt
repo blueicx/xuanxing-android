@@ -40,6 +40,12 @@ object MysticIntentClassifier {
         containsAny(q, "今天做什么", "今天适合做什么", "现在做什么") -> MysticIntent.TodayActivity
         containsAny(q, "去哪玩", "去哪里玩", "今天去哪", "今天去哪里") -> MysticIntent.TodayOuting
         containsAny(q, "适合什么工作", "适合做什么工作", "什么工作适合我", "什么颜色适合我", "适合什么颜色", "哪个城市适合我", "适合哪个城市", "适合什么地区") -> MysticIntent.LifeProfile
+        containsAny(q, "抽塔罗", "塔罗牌", "塔罗怎么抽", "三张塔罗", "五张塔罗") -> MysticIntent.Tarot
+        containsAny(q, "抽符文", "北欧符文", "卢恩", "卢恩怎么抽", "三符文") -> MysticIntent.Rune
+        containsAny(q, "数字命理", "生命数字", "个人年", "个人月", "个人日") -> MysticIntent.Numerology
+        containsAny(q, "实时天气", "天气预报", "降雨概率", "当前气温", "温度多少") -> MysticIntent.Weather
+        containsAny(q, "附近哪里", "附近去哪", "附近游玩", "地图上去哪") -> MysticIntent.Place
+        containsAny(q, "做个性格测验", "性格测验", "人格测试结果", "我的人格") -> MysticIntent.Personality
         else -> null
     }
 

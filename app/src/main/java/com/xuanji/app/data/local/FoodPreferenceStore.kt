@@ -40,7 +40,15 @@ class FoodPreferenceStore(private val bridge: PreferenceBridge) {
                 .filter { it.isNotBlank() }
                 .distinct()
                 .take(MAX_EXCLUDED)
-                .toSet()
+                .toSet(),
+            allergens = preference.allergens
+                .map { it.trim() }
+                .filter { it.isNotBlank() }
+                .distinct()
+                .take(MAX_EXCLUDED)
+                .toSet(),
+            maxMealBudgetCents = preference.maxMealBudgetCents?.coerceIn(100, 1_000_000),
+            maxPrepMinutes = preference.maxPrepMinutes?.coerceIn(5, 240)
         )
         root.add("preference", gson.toJsonTree(clean))
         bridge.write(memoryKey(profileKey), root.toString())

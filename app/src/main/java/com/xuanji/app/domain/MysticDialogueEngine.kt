@@ -28,6 +28,12 @@ enum class MysticIntent(val value: String) {
     TodayActivity("today_activity"),
     TodayOuting("today_outing"),
     LifeProfile("life_profile"),
+    Tarot("tarot"),
+    Rune("rune"),
+    Numerology("numerology"),
+    Weather("weather"),
+    Place("place"),
+    Personality("personality"),
     Game("game")
 }
 
@@ -44,7 +50,10 @@ data class DialogueContext(
     val skinId: String = "",
     val question: String = "",
     val dailyActionPlan: DailyActionPlan? = null,
-    val lifeProfile: LifeProfile? = null
+    val lifeProfile: LifeProfile? = null,
+    val divinationSummary: String? = null,
+    val weatherSummary: String? = null,
+    val personalitySource: PersonalitySource = PersonalitySource.Unknown
 )
 
 /** Minimal, UI-independent turn record used when the dialogue engine is called off-screen. */
@@ -101,7 +110,10 @@ class DefaultMysticDialogueEngine : MysticDialogueEngine {
             context.latestTest,
             context.skinId,
             context.dailyActionPlan,
-            context.lifeProfile
+            context.lifeProfile,
+            context.divinationSummary,
+            context.weatherSummary,
+            context.personalitySource
         )
         val groundedFacts = when (intent) {
             MysticIntent.TodayMeal -> context.dailyActionPlan?.meals?.firstOrNull()?.evidence?.map { it.label }.orEmpty()
@@ -138,6 +150,12 @@ private fun MysticIntent.topicKeyOrNull(): String? = when (this) {
     MysticIntent.TodayOuting -> "action"
     MysticIntent.LifeProfile -> "career"
     MysticIntent.Daily -> "daily"
+    MysticIntent.Tarot -> "tarot"
+    MysticIntent.Rune -> "rune"
+    MysticIntent.Numerology -> "numerology"
+    MysticIntent.Weather -> "weather"
+    MysticIntent.Place -> "place"
+    MysticIntent.Personality -> "personality"
     else -> null
 }
 
@@ -164,5 +182,11 @@ private fun topicLabelFor(key: String): String = mapOf(
     "care" to "注意事项",
     "outcome" to "结果",
     "action" to "行动",
-    "daily" to "日常"
+    "daily" to "日常",
+    "tarot" to "塔罗",
+    "rune" to "符文",
+    "numerology" to "数字命理",
+    "weather" to "天气",
+    "place" to "地点",
+    "personality" to "测验画像"
 )[key] ?: key
