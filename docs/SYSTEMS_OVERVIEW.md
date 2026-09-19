@@ -55,6 +55,12 @@ B+C 视觉方案采用统一人物骨架加文化道具和场景层：每个 `sk
 
 `DialogueProvider` 与 `OfflineDialogueProvider` 只提供扩展接口；当前默认实现完全离线，不请求网络、不写入密钥，也不改变现有盘面、健康和财务边界。未来接入在线 provider 时，结果先由 `DialogueReplyValidator` 校验分数是否来自当前 `CompositeDailyFortune`、是否越过记忆/安全红线，再标记 `OnlineValidated`；失败、超时或校验拒绝统一回到 `OnlineFallback` 的本地生成器，不允许直接返回未校验文本。
 
+## 今日行动与人生画像
+
+`domain/action` 是独立的纯 Kotlin 离线模块。`DailyActionPlanner` 先按 profileKey 的本地饮食偏好过滤候选，再用 0.40 五行、0.25 星座、0.20 今日盘面、0.15 季节/城市标签计算分数；`LifeProfilePlanner` 使用命盘和太阳星座作为必需来源，测试记录只作为显式增强输入。主结果不使用随机数，同分才用 `profileKey|dateKey|candidateKey` 稳定 hash 排序。
+
+综合页的“今日行动”卡与对话引擎共享同一个 `DailyActionPlan`，我的页与对话共享同一个 `LifeProfile`。结果同时展示匹配分、来源链、置信度和边界说明。城市候选来自本地静态目录，最多显示 3 个匹配示例，不写“命中注定”“最适合移民”等绝对结论；食品建议不构成医疗、营养或过敏建议。
+
 两端各有一份同名但不同职责的契约：小程序 `_dev/dialogue_contract.json` 是双端共享的对话契约（意图枚举、规范化、seed 组成、session token、安全边界）；Android `_dev/dialogue_contract.json` 早已不止棋局（事件、判和、存档、棋盘 UI、讲棋、本机记忆、称谓与医疗/财务红线），只随本仓库的 Kotlin 源码演进，两者不互为副本。
 
 ## 体系一致性分级

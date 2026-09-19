@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "offline": true,
+  "requiredSources": ["FiveElements", "Zodiac"],
+  "dailyWeights": {"fiveElements": 0.4, "zodiac": 0.25, "dailyFortune": 0.2, "seasonOrCity": 0.15},
+  "lifeProfileWeights": {
+    "careerWithTests": [0.45, 0.25, 0.3],
+    "careerWithoutTests": [0.6, 0.4],
+    "colors": [0.6, 0.25, 0.15],
+    "regions": [0.35, 0.25, 0.2, 0.2]
+  },
+  "mealCandidates": [
+    {"key":"oat-berry","ingredients":["燕麦","蓝莓","原味酸奶"],"substitute":"豆乳燕麦碗","deliveryKeywords":["燕麦","蓝莓","酸奶"],"evidence":["FiveElements","Zodiac"]},
+    {"key":"lotus-lily-porridge","ingredients":["莲子","百合","小米"],"substitute":"南瓜小米粥","deliveryKeywords":["莲子","百合","小米粥"],"evidence":["FiveElements","Zodiac"]},
+    {"key":"tomato-egg-noodle","ingredients":["番茄","鸡蛋","面条"],"substitute":"番茄豆腐面","deliveryKeywords":["番茄鸡蛋面","家常面"],"evidence":["FiveElements","Zodiac"]},
+    {"key":"halal-lamb-rice","ingredients":["羊肉","米饭","孜然"],"substitute":"孜然鸡肉饭","deliveryKeywords":["清真羊肉饭","羊肉盖饭"],"evidence":["FiveElements","Zodiac"]},
+    {"key":"mushroom-tofu","ingredients":["香菇","豆腐","青菜"],"substitute":"菌菇粉丝煲","deliveryKeywords":["菌菇豆腐","素食午餐"],"evidence":["FiveElements","Zodiac"]},
+    {"key":"salmon-greens","ingredients":["三文鱼","西兰花","南瓜"],"substitute":"柠檬豆腐配烤蔬菜","deliveryKeywords":["三文鱼","烤蔬菜"],"evidence":["FiveElements","Zodiac"]},
+    {"key":"pepper-chicken","ingredients":["鸡胸肉","青椒","糙米"],"substitute":"彩椒豆腐糙米饭","deliveryKeywords":["青椒鸡丁","糙米饭"],"evidence":["FiveElements","Zodiac"]},
+    {"key":"ginger-tea","ingredients":["生姜","红枣","温水"],"substitute":"桂圆枸杞热饮","deliveryKeywords":["姜枣茶","无酒精热饮"],"evidence":["FiveElements","Zodiac"]}
+  ],
+  "regionMax": 3,
+  "tieBreak": {"allowed": true, "scope": "profileKey|dateKey|candidateKey", "changesMainScore": false},
+  "forbiddenText": ["保证", "命中注定", "最适合你移民", "一定要搬", "治疗", "诊断", "稳赚", "保证收益"]
+}

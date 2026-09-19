@@ -8,6 +8,7 @@
 - CI（`.github/workflows/build.yml`）：此前 `Build Debug APK` 在 `eb4c3bb`/`887e1ee`/`7dc3b52` 连续失败且 Gradle 从未启动；`1dbe42f`、`457dc7a` 已修复 SDK 包名与 wrapper jar，run #17（`f89f2f1`）已在干净 runner 通过 `testDebugUnitTest` / `assembleDebug` / `lintDebug`。本轮新增 Node 20 步骤并在 Gradle 前执行 `node _dev/dialogue_contract_test.js`，使 45 条 golden wording 成为 CI 阻断门禁；本机最终树验证为 `dialogue contract: PASS (45 golden entries)`，但本轮改动尚未推送，因此远端尚未产生新的 CI run。Gradle 成功日志不打印逐条测试数，instrumented `app/src/androidTest`、真机与 DataStore 运行时行为仍不在 CI 覆盖范围内。
 - Android 测试：纯 Kotlin domain/generator 测试已存在，覆盖对话分类、确定性、离线 provider、会话 token、生成器空输入与棋局规则 / 引擎 / 存档 / 解释事实，以及本机长期记忆的编解码与存储（`PreferenceBridge` 用内存假桥，不需 Robolectric 即可验证读写与清除）；`app/src/androidTest` 源码集已建立（棋盘 12 项 Compose 交互用例），能被 `assembleDebugAndroidTest` 编译，但**未在设备或 CI 上执行**。
 - 小程序：结构 lint 与 7 项引擎/题库测试已分开执行并通过；双端契约位于 `_dev/dialogue_contract.json`。
+- 今日行动与人生画像（2026-09-19）：`domain/action` 已落地五行 + 星座必需来源、固定权重、静态食物/城市目录、按档案隔离的饮食偏好和对话复用；`_dev/action_profile_contract_test.js` 锁定离线与同分排序边界。静态目录覆盖范围、设备窄屏展示和 TalkBack 仍需用户通知后复测，不把评分当成医疗、职业能力或迁居结论。
 - 设备证据：曾完成 `com.xuanji.app` AVD 安装、启动、综合/东方/西方浮球、召回舞台和关闭回浮球截图，证据保存在 `.superpowers/round46-*`。没有把当前无在线设备误报为实体机验证。
 - 同日生增强：`SameDayWorks` 已加入确定性音乐/诗歌卡，`HistoryCopy` 与 `AnimatedVisibility` 支持长评语折叠；后续可继续扩充经过版权核验的作品元数据。
 - B+C 视觉：`MysticCultureSpec` 已为 8 个皮肤提供结构化道具和舞台场景；后续仍需设备上检查人物比例、遮挡和不同屏幕密度的视觉细节。
