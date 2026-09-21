@@ -163,7 +163,7 @@ object MysticGuideGenerator {
             MysticSkin(
                 "festival-costume", "节庆戏袍", "纸符袋 · 撞色滚边", 0xFFF4DBD8, 0xFFA05F63, 0xFFD9A05B,
                 "台前班主", "好戏能给你搭台，可彩头得按我的规矩分。", "锣槌斜着一点——", "漂亮。但最好的扣子还留在我手里。",
-                visualStyleId = "academy_astral"
+                visualStyleId = "jiangnan_scholar"
             )
         )
     } else {
@@ -186,7 +186,7 @@ object MysticGuideGenerator {
             MysticSkin(
                 "northland-mantle", "北地游学斗篷", "银扣 · 苔绿毛边", 0xFFE1EBDC, 0xFF799458, 0xFFD7E0C6,
                 "稳拙守边", "风大的时候，边界比速度更要紧。", "先扎稳帐篷：", "行，这一步踩得实。",
-                visualStyleId = "silkroad_astrologer"
+                visualStyleId = "elder_ink"
             )
         )
     }

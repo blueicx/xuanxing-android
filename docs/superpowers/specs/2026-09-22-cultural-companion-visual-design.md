@@ -26,8 +26,10 @@
 | --- | --- | --- |
 | `jiangnan-robe` | 三联图左侧江南书生 | `jiangnan_scholar` |
 | `cloud-daoist` | 单独截图的老玄学家 | `elder_ink` |
-| `academy-gown`、`street-jacket`、`festival-costume` | 三联图中间学院星象学者 | `academy_astral` |
-| `silkroad-robe`、`northland-mantle`、`desert-traveler` | 三联图右侧丝路沙海占星师 | `silkroad_astrologer` |
+| `academy-gown`、`street-jacket` | 三联图中间学院星象学者 | `academy_astral` |
+| `festival-costume` | 三联图左侧江南书生 | `jiangnan_scholar` |
+| `silkroad-robe`、`desert-traveler` | 三联图右侧丝路沙海占星师 | `silkroad_astrologer` |
+| `northland-mantle` | 单独截图的老玄学家 | `elder_ink` |
 
 ## 数据与状态边界
 

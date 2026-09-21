@@ -17,5 +17,8 @@ class MysticSkinTest {
         assertEquals("academy_astral", all.first { it.id == "academy-gown" }.visualStyleId)
         assertEquals("silkroad_astrologer", all.first { it.id == "desert-traveler" }.visualStyleId)
         assertEquals(4, all.map { it.visualStyleId }.toSet().size)
+        assertTrue(listOf("scholar", "half").all { mode ->
+            MysticGuideGenerator.mysticSkins(mode).map { it.visualStyleId }.toSet().size == 4
+        })
     }
 }

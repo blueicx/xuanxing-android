@@ -29,9 +29,9 @@
     "cloud-daoist": "elder_ink",
     "academy-gown": "academy_astral",
     "street-jacket": "academy_astral",
-    "festival-costume": "academy_astral",
+    "festival-costume": "jiangnan_scholar",
     "silkroad-robe": "silkroad_astrologer",
-    "northland-mantle": "silkroad_astrologer",
+    "northland-mantle": "elder_ink",
     "desert-traveler": "silkroad_astrologer"
   },
   "resource_names": ["mystic_figure_ink", "mystic_figure_elder", "mystic_figure_cel", "mystic_figure_lowpoly"],
