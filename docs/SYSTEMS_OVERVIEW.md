@@ -6,7 +6,7 @@
 
 浮球和舞台都遵循系统导航栏/输入法安全区；系统开启“移除动画”时，浮球取消位移、旋转和面部微动。
 
-浮球实现独立在 `MysticOrb.kt`；舞台外壳、文化背景和人物画布分别由 `MysticStageLayout.kt`、`MysticCultureBackdrop.kt`、`MysticFigureCanvas.kt` 承担，`MysticFloatingGuide.kt` 只保留挂载与状态桥接。
+浮球实现独立在 `MysticOrb.kt`；舞台外壳、文化背景、人物资源选择和 Canvas 回退分别由 `MysticStageLayout.kt`、`MysticCultureBackdrop.kt`、`MysticFigureAsset.kt`、`MysticFigureCanvas.kt` 承担，`MysticFloatingGuide.kt` 只保留挂载与状态桥接。
 
 ## 对话与会话
 
@@ -22,11 +22,11 @@
 
 对话承接由 `MysticDialogueContinuity` 读取最近回合的主题；“继续”“这个呢”“那怎么办”等省略式输入会继承上一主题，明确出现新主题时以当前输入为准。承接只改善表达相关性，不改变盘面算法，也不把生成内容写入长期记忆。
 
-B+C 视觉方案采用统一人物骨架加文化道具和场景层：每个 `skinId` 都映射到独立的 `MysticCultureSpec`，舞台会绘制对应的水榭、档案室、驿站、火塘、云台、城市夜景、沙海或节庆院落。它是文化视觉演绎，不宣称还原真实服饰、仪式或族群身份。
+文化人物视觉现在按 `MysticSkin.visualStyleId` 切换四套用户确认的人物：三联图左侧江南书生、单独截图的老玄学家、三联图中间学院星象学者、三联图右侧丝路沙海占星师。`MysticFigureAsset` 从本地 `drawable-nodpi` WebP 取图，`MysticFigureCanvas` 保留资源异常时的 Canvas 回退；`MysticCultureSpec` 仍负责水榭、档案室、驿站、云台和沙海等背景。它是文化视觉演绎，不宣称还原真实服饰、仪式或族群身份。
 
 ## 棋局会话（2026-09）
 
-交流面板已接入真实中国象棋：`domain/game` 提供纯 Kotlin 规则核心（`XiangqiBoard`/`XiangqiRules`/`XiangqiNotation`）、会话级分析（`BoardAnalysis` 威胁扫描、`EndgameCatalog` 残局）、搜索引擎（`SmartBoardEngine`）、`GameSessionState`/`reduceGame` 会话 reducer 与 `GameDialogueBridge` 意图桥。游戏意图（`MysticIntent.Game`）优先于通用运势分类；游戏回复走独立卡片路径，不经过 `pendingCustom` 文本模板。角色棋局话术只引用 `BoardMove`/`RuleResult`/`GameOutcome` 中的事实，运势数据不参与棋局结论，反之亦然。Android 侧 `_dev/dialogue_contract.json` 由 `_dev/dialogue_contract_test.js` 直接与 Kotlin 源码交叉校验（事件枚举、错误码、判和措辞、存档字段、棋盘 UI 定位符与状态文案，以及 `explanation`、`conversation_memory`、`persona`、`safety` 四段），45 条 golden wording 每条都点名其验证用例，文档措辞与代码漂移会导致契约测试失败。
+交流面板已接入真实中国象棋：`domain/game` 提供纯 Kotlin 规则核心（`XiangqiBoard`/`XiangqiRules`/`XiangqiNotation`）、会话级分析（`BoardAnalysis` 威胁扫描、`EndgameCatalog` 残局）、搜索引擎（`SmartBoardEngine`）、`GameSessionState`/`reduceGame` 会话 reducer 与 `GameDialogueBridge` 意图桥。快捷区现在直接提供「来一盘象棋」，游戏意图（`MysticIntent.Game`）优先于通用运势分类；游戏回复走独立卡片路径，不经过 `pendingCustom` 文本模板。角色棋局话术只引用 `BoardMove`/`RuleResult`/`GameOutcome` 中的事实，运势数据不参与棋局结论，反之亦然。Android 侧 `_dev/dialogue_contract.json` 由 `_dev/dialogue_contract_test.js` 直接与 Kotlin 源码交叉校验（事件枚举、错误码、判和措辞、存档字段、棋盘 UI 定位符与状态文案，以及 `explanation`、`conversation_memory`、`persona`、`safety`、`visual_companion` 四段），45 条 golden wording 每条都点名其验证用例，文档措辞与代码漂移会导致契约测试失败。
 
 本阶段不新增占卜体系，也不把未授权的 Ifá、纳迪、心理测验常模或在线模型包装成已接入能力；先治理角色陪伴、回答相关性、可撤回本地记忆和内容边界。默认仍为离线回复，在线 Provider 只作为显式扩展接缝。
 

@@ -2,7 +2,7 @@
 
 > **面向 AI 代理的工作者：** 必需子技能：使用 superpowers:executing-plans 逐任务实现此计划。步骤使用复选框（`- [ ]`）语法来跟踪进度。
 
-**目标：** 将玄师舞台升级为三套真正不同的文化视觉皮肤，并让真实中国象棋在快捷区可发现。
+**目标：** 将玄师舞台升级为四套真正不同的文化人物皮肤，并让真实中国象棋在快捷区可发现。
 
 **架构：** `MysticSkin.visualStyleId` 负责领域层稳定映射；`MysticFigureAsset` 负责 UI 资源选择；`MysticFigureCanvas` 负责资源渲染与 Canvas 回退。现有对话、命盘、记忆和棋局状态不改写，象棋快捷按钮只复用已有游戏命令。
 
@@ -23,18 +23,18 @@
 
 ```json
 "visual_companion": {
-  "style_ids": ["ink_scholar", "cel_astrologer", "lowpoly_guardian"],
+  "style_ids": ["jiangnan_scholar", "elder_ink", "academy_astral", "silkroad_astrologer"],
   "skin_style_map": {
-    "jiangnan-robe": "ink_scholar",
-    "cloud-daoist": "ink_scholar",
-    "academy-gown": "cel_astrologer",
-    "street-jacket": "cel_astrologer",
-    "festival-costume": "cel_astrologer",
-    "silkroad-robe": "lowpoly_guardian",
-    "northland-mantle": "lowpoly_guardian",
-    "desert-traveler": "lowpoly_guardian"
+    "jiangnan-robe": "jiangnan_scholar",
+    "cloud-daoist": "elder_ink",
+    "academy-gown": "academy_astral",
+    "street-jacket": "academy_astral",
+    "festival-costume": "academy_astral",
+    "silkroad-robe": "silkroad_astrologer",
+    "northland-mantle": "silkroad_astrologer",
+    "desert-traveler": "silkroad_astrologer"
   },
-  "resource_names": ["mystic_figure_ink", "mystic_figure_cel", "mystic_figure_lowpoly"],
+  "resource_names": ["mystic_figure_ink", "mystic_figure_elder", "mystic_figure_cel", "mystic_figure_lowpoly"],
   "quick_game_prompt": "来一盘象棋",
   "verify": "MysticSkinTest.visual_styles_are_bounded_and_mapped"
 }
@@ -70,14 +70,15 @@ git commit -m "test: contract cultural companion visuals"
 ```kotlin
 @Test
 fun visual_styles_are_bounded_and_mapped() {
-    val allowed = setOf("ink_scholar", "cel_astrologer", "lowpoly_guardian")
+    val allowed = setOf("jiangnan_scholar", "elder_ink", "academy_astral", "silkroad_astrologer")
     val all = listOf("scholar", "half").flatMap(MysticGuideGenerator::mysticSkins)
     assertEquals(8, all.size)
     assertTrue(all.all { it.visualStyleId in allowed })
-    assertEquals("ink_scholar", all.first { it.id == "jiangnan-robe" }.visualStyleId)
-    assertEquals("cel_astrologer", all.first { it.id == "academy-gown" }.visualStyleId)
-    assertEquals("lowpoly_guardian", all.first { it.id == "desert-traveler" }.visualStyleId)
-    assertEquals(3, all.map { it.visualStyleId }.toSet().size)
+    assertEquals("jiangnan_scholar", all.first { it.id == "jiangnan-robe" }.visualStyleId)
+    assertEquals("elder_ink", all.first { it.id == "cloud-daoist" }.visualStyleId)
+    assertEquals("academy_astral", all.first { it.id == "academy-gown" }.visualStyleId)
+    assertEquals("silkroad_astrologer", all.first { it.id == "desert-traveler" }.visualStyleId)
+    assertEquals(4, all.map { it.visualStyleId }.toSet().size)
 }
 ```
 
@@ -90,7 +91,7 @@ fun visual_styles_are_bounded_and_mapped() {
 在 `MysticSkin` 末尾增加：
 
 ```kotlin
-val visualStyleId: String = "ink_scholar"
+val visualStyleId: String = "jiangnan_scholar"
 ```
 
 为八个既有构造调用使用命名参数写入任务 1 的三值映射，保持现有 ID、颜色、语气和 deterministic seed 不变。
@@ -111,13 +112,14 @@ git commit -m "feat: add cultural visual style ids"
 ### 任务 3：生成并放入三套透明角色资源
 
 **文件：**
-- 创建：`app/src/main/res/drawable-nodpi/mystic_figure_ink.webp`。
-- 创建：`app/src/main/res/drawable-nodpi/mystic_figure_cel.webp`。
-- 创建：`app/src/main/res/drawable-nodpi/mystic_figure_lowpoly.webp`。
+- 创建：`app/src/main/res/drawable-nodpi/mystic_figure_ink.webp`（三联图左侧江南书生）。
+- 创建：`app/src/main/res/drawable-nodpi/mystic_figure_elder.webp`（单独截图的老玄学家）。
+- 创建：`app/src/main/res/drawable-nodpi/mystic_figure_cel.webp`（三联图中间学院星象学者）。
+- 创建：`app/src/main/res/drawable-nodpi/mystic_figure_lowpoly.webp`（三联图右侧丝路沙海占星师；保留旧文件名只为避免碰触已有未跟踪资源）。
 
 - [ ] **步骤 1：生成透明资源**
 
-使用内置 image generation，分别生成全身透明 cutout；保留 A 水墨老年玄学家、B 图形化二次元星象角色、C 低多边形沙海守望者的轮廓、道具和材质，不把背景烘进资源。输出复制到上述三个 `drawable-nodpi` 路径。
+使用用户提供的三联图与单独老玄学家截图作为唯一参考，准备四份角色资源；不得使用现代二次元或低多边形概念稿。三联图三份保留文化场景，单独老玄学家保留透明 cutout；输出复制到上述 `drawable-nodpi` 路径。
 
 - [ ] **步骤 2：检查资源约束**
 
@@ -145,16 +147,18 @@ git commit -m "feat: add cultural companion figure assets"
 创建：
 
 ```kotlin
-internal enum class MysticFigureAssetId { Ink, Cel, LowPoly }
+internal enum class MysticFigureAssetId { Jiangnan, Elder, Academy, Silkroad }
 
 internal fun figureAssetId(styleId: String): MysticFigureAssetId = when (styleId) {
-    "cel_astrologer" -> MysticFigureAssetId.Cel
-    "lowpoly_guardian" -> MysticFigureAssetId.LowPoly
-    else -> MysticFigureAssetId.Ink
+    "jiangnan_scholar" -> MysticFigureAssetId.Jiangnan
+    "elder_ink" -> MysticFigureAssetId.Elder
+    "academy_astral" -> MysticFigureAssetId.Academy
+    "silkroad_astrologer" -> MysticFigureAssetId.Silkroad
+    else -> MysticFigureAssetId.Jiangnan
 }
 ```
 
-并在同文件提供 `@Composable fun MysticFigureAsset(styleId, contentDescription, modifier)`，用 `painterResource` + `Image(contentScale = ContentScale.Fit)` 显示三份 drawable。
+并在同文件提供 `@Composable fun MysticFigureAsset(styleId, contentDescription, modifier)`，用本地资源解码 + `Image(contentScale = ContentScale.Fit)` 显示四份 drawable。
 
 - [ ] **步骤 2：把现有 Canvas 变成回退路径**
 
@@ -254,4 +258,3 @@ git push origin main
 - [ ] **步骤 4：交付检查**
 
 运行 `git status -sb`、`git log -1 --oneline --decorate`、`git rev-list --left-right --count HEAD...origin/main`。确认只剩既有未跟踪截图/dump/宣传图，不把它们加入提交。
-

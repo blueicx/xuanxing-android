@@ -20,11 +20,13 @@
 - `:app:lintDebug`：PASS
 - `:app:assembleDebug`：PASS
 - 当前 APK：`app/build/outputs/apk/debug/app-debug.apk`
-- 当前 SHA-256：`EE528BEC05B669D87B76350F0D4C88442C7E1FE336DEDC804E25C4A94C0BF606`
+- 当前 SHA-256：`DCECCEE24B8461C460C7084CD4E67C8DA679DED19E91EE098D275E3561B4629D`
 - 手机安装：无线调试配对 `192.168.101.38:41003` 成功，设备 `SM-S9310`；`adb install -r` 返回 `Success`。
 - 启动核验：`com.xuanji.app/.MainActivity` 获得焦点；最近 300 行 Logcat 未观察到 `FATAL EXCEPTION` 或 `AndroidRuntime`。
 - 悬浮球崩溃根因：Xperia XZ2 上点击浮球后，舞台外壳的 `verticalScroll` 与沉浸式 `MysticGuideCard` 的滚动容器嵌套，触发 Compose 的无限高度约束异常。
 - 修复验证：移除舞台外壳滚动，仅保留沉浸式对话卡滚动；Xperia XZ2（Android 15，`adb-QV7017NH1F-yD13DI._adb-tls-connect._tcp`）安装时间 `2026-09-22 01:56:24`，点击浮球后舞台正常显示，应用保持前台，未观察到 `com.xuanji.app` 崩溃。
+- 文化人物视觉：四套用户确认素材已接入本地资源映射——三联图左侧江南书生、单独截图老玄学家、三联图中间学院星象学者、三联图右侧丝路沙海占星师；现代二次元和低多边形试稿未接入。快捷区新增「来一盘象棋」，仍复用真实 `GameDialogueBridge`。
+- 本轮设备视觉复测暂缓，等待用户通知；本机证据为 Node 契约、JVM 测试、lint 与 debug APK 构建通过，未将未执行的四套人物实机截图或棋盘点击写成已完成。
 
 ## 暂缓项
 
