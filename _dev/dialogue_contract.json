@@ -231,6 +231,30 @@
     "retention": "until_manual_delete"
   },
   "stage_title": "persona-only",
+  "visual_companion": {
+    "style_ids": [
+      "ink_scholar",
+      "cel_astrologer",
+      "lowpoly_guardian"
+    ],
+    "skin_style_map": {
+      "jiangnan-robe": "ink_scholar",
+      "cloud-daoist": "ink_scholar",
+      "academy-gown": "cel_astrologer",
+      "street-jacket": "cel_astrologer",
+      "festival-costume": "cel_astrologer",
+      "silkroad-robe": "lowpoly_guardian",
+      "northland-mantle": "lowpoly_guardian",
+      "desert-traveler": "lowpoly_guardian"
+    },
+    "resource_names": [
+      "mystic_figure_ink",
+      "mystic_figure_cel",
+      "mystic_figure_lowpoly"
+    ],
+    "quick_game_prompt": "来一盘象棋",
+    "verify": "MysticSkinTest.visual_styles_are_bounded_and_mapped"
+  },
   "golden_wording": [
     {"input": "来一盘象棋", "expect": "starts xiangqi, grounded=true", "verify": "GameAutoReplyTest.player_move_marks_engine_turn_pending"},
     {"input": "我执黑", "expect": "acknowledges color choice", "verify": "GameAutoReplyTest.color_change_before_the_first_move_switches_sides"},

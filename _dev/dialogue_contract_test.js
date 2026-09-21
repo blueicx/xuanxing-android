@@ -320,6 +320,27 @@ assert(stageSource.includes('MysticGuideGenerator.personaName'), 'stage title mu
 assert(!/sceneLabel|scene\.sceneLabel/.test(stageSource), 'stage title must not expose the cultural scene as a role title');
 assert(stageSource.includes('navigationBarsPadding') && stageSource.includes('imePadding'), 'stage must respect system safe areas');
 
+// ---- 文化皮肤：人物不能再只是同一张 Canvas 换色 -------------------------------------
+const visual = contract.visual_companion;
+assert(Array.isArray(visual.style_ids) && visual.style_ids.length === 3, 'visual companion must keep exactly three style ids');
+const visualAssetSource = fs.readFileSync(path.join(UI_SRC, 'components', 'MysticFigureAsset.kt'), 'utf8');
+visual.style_ids.forEach((styleId) => {
+  assert(visualAssetSource.includes(`"${styleId}"`), `figure asset renderer lost ${styleId}`);
+  assert(stageSource.includes('visualStyleId'), 'stage must pass the skin visualStyleId to the figure renderer');
+});
+Object.entries(visual.skin_style_map).forEach(([skinId, styleId]) => {
+  assert(generatorSource.includes(`"${skinId}"`), `skin ${skinId} disappeared from MysticGuideGenerator`);
+  assert(generatorSource.includes(`visualStyleId = "${styleId}"`), `skin ${skinId} must map to ${styleId}`);
+});
+const drawableDir = path.join(__dirname, '..', 'app', 'src', 'main', 'res', 'drawable-nodpi');
+visual.resource_names.forEach((resourceName) => {
+  assert(
+    fs.existsSync(path.join(drawableDir, `${resourceName}.webp`)),
+    `missing cultural companion drawable: ${resourceName}.webp`
+  );
+});
+assert(panelSource.includes(`"${visual.quick_game_prompt}"`), 'the companion panel must expose the xiangqi shortcut');
+
 const messageListSource = fs.readFileSync(path.join(UI_SRC, 'components', 'MysticMessageList.kt'), 'utf8');
 const inputSource = fs.readFileSync(path.join(UI_SRC, 'components', 'MysticConversationInput.kt'), 'utf8');
 assert(messageListSource.includes('MAX_VISIBLE_MESSAGES = 12'), 'message list window changed without a contract update');
