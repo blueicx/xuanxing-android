@@ -242,6 +242,14 @@ const floatingSource = fs.readFileSync(path.join(UI_SRC, 'components', 'MysticFl
 const panelSource = fs.readFileSync(path.join(UI_SRC, 'components', 'MysticConversationPanel.kt'), 'utf8');
 const stageSource = fs.readFileSync(path.join(UI_SRC, 'components', 'MysticStageLayout.kt'), 'utf8');
 assert(
+  !stageSource.includes('.verticalScroll(rememberScrollState())'),
+  'the stage shell must not wrap the immersive guide card in a second vertical scroll container'
+);
+assert(
+  mysticCardSource.includes('.verticalScroll(rememberScrollState())'),
+  'the immersive guide card must remain the single owner of transcript scrolling'
+);
+assert(
   orbSource.includes(pp.orb_motion) && orbSource.includes(pp.orb_amplitude),
   'the orb motion must be driven by the mode itself'
 );

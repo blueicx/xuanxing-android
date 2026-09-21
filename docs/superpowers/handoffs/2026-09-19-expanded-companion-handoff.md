@@ -20,9 +20,11 @@
 - `:app:lintDebug`：PASS
 - `:app:assembleDebug`：PASS
 - 当前 APK：`app/build/outputs/apk/debug/app-debug.apk`
-- 当前 SHA-256：`BBEEC5779297425B3CD91701E6EF1FF70F96D2ABD26F224D30239765EE8BC97B`
+- 当前 SHA-256：`EE528BEC05B669D87B76350F0D4C88442C7E1FE336DEDC804E25C4A94C0BF606`
 - 手机安装：无线调试配对 `192.168.101.38:41003` 成功，设备 `SM-S9310`；`adb install -r` 返回 `Success`。
 - 启动核验：`com.xuanji.app/.MainActivity` 获得焦点；最近 300 行 Logcat 未观察到 `FATAL EXCEPTION` 或 `AndroidRuntime`。
+- 悬浮球崩溃根因：Xperia XZ2 上点击浮球后，舞台外壳的 `verticalScroll` 与沉浸式 `MysticGuideCard` 的滚动容器嵌套，触发 Compose 的无限高度约束异常。
+- 修复验证：移除舞台外壳滚动，仅保留沉浸式对话卡滚动；Xperia XZ2（Android 15，`adb-QV7017NH1F-yD13DI._adb-tls-connect._tcp`）安装时间 `2026-09-22 01:56:24`，点击浮球后舞台正常显示，应用保持前台，未观察到 `com.xuanji.app` 崩溃。
 
 ## 暂缓项
 

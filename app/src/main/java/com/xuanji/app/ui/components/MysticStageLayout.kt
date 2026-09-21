@@ -19,9 +19,7 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Icon
@@ -77,8 +75,7 @@ fun MysticStageLayout(
                 Column(
                     Modifier.fillMaxWidth().weight(1f)
                         .background(Brush.verticalGradient(listOf(Color.Transparent, Color(0xE60D0817), Color(0xFF0D0817))))
-                        .navigationBarsPadding().imePadding().padding(horizontal = 18.dp, vertical = 10.dp)
-                        .verticalScroll(rememberScrollState()),
+                        .navigationBarsPadding().imePadding().padding(horizontal = 18.dp, vertical = 10.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Text(mode.let { MysticGuideGenerator.personaName(it) }, style = MaterialTheme.typography.headlineSmall, color = gold)
