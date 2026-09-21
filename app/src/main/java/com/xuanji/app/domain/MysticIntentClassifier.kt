@@ -1,5 +1,7 @@
 package com.xuanji.app.domain
 
+import com.xuanji.app.domain.game.CompanionGameCatalog
+
 /** Shared, deterministic intent normalization for Android and the offline dialogue seam. */
 object MysticIntentClassifier {
     fun classify(question: String): MysticIntent {
@@ -14,6 +16,7 @@ object MysticIntentClassifier {
      * Everyday wording (车厘子 / 将军肚) from being misread as game commands.
      */
     private fun game(q: String): MysticIntent? {
+        if (CompanionGameCatalog.gameIdForInput(q) != null) return MysticIntent.Game
         val isStart = setOf("来一盘", "来一局", "下一盘", "下一局", "下一把", "开一盘", "开一局", "陪我下")
             .any { q.contains(it) } && (q.contains("象棋") || q.contains("围棋") || q.contains("国际象棋"))
         val isCommand = q == "悔棋" || q.contains("悔棋") ||

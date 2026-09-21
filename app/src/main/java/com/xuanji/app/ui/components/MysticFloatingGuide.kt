@@ -76,6 +76,7 @@ import com.xuanji.app.domain.MysticGuideGenerator
 import com.xuanji.app.domain.MysticCharacterCatalog
 import com.xuanji.app.domain.MysticCharacterId
 import com.xuanji.app.domain.MysticCharacterProfile
+import com.xuanji.app.domain.game.CompanionGameCatalog
 import android.content.Context
 import android.content.ContextWrapper
 import android.app.Activity
@@ -229,7 +230,14 @@ fun MysticFloatingGuide(
                     moodLevel = mysticMoodLevel(fortune!!.overallScore),
                     onCharacterSelected = ::selectCharacter,
                     onConversation = { stageActionRequest = "我只是想聊聊" },
-                    onStartGame = { stageActionRequest = "来一盘象棋" },
+                    onStartGame = {
+                        val game = CompanionGameCatalog.forCharacter(stageCharacter.id)
+                        stageActionRequest = if (game.id == "xiangqi") {
+                            "来一盘象棋"
+                        } else {
+                            "__companion_game__:${game.id}"
+                        }
+                    },
                     onClose = { detailOpen = false },
                 ) {
                     MysticGuideCard(

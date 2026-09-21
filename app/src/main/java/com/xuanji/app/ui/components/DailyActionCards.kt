@@ -21,6 +21,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.xuanji.app.domain.action.ActionEvidence
+import com.xuanji.app.domain.action.ActionFeedbackKind
 import com.xuanji.app.domain.action.ActivitySuggestion
 import com.xuanji.app.domain.action.ConfidenceLevel
 import com.xuanji.app.domain.action.DailyActionPlan
@@ -40,7 +41,14 @@ data class DailyActionCardModel(
         fun from(plan: DailyActionPlan): List<DailyActionCardModel> = listOf(
             DailyActionCardModel(
                 "吃什么",
-                plan.meals.firstOrNull()?.title ?: "当前偏好没有可用目录候选",
+                plan.meals.firstOrNull()?.let { meal ->
+                    buildString {
+                        append(meal.title)
+                        if (meal.ingredients.isNotEmpty()) append(" · ${meal.ingredients.joinToString("、")}")
+                        meal.estimatedPriceCents?.let { append(" · 约 ¥${it / 100.0}") }
+                        meal.prepMinutes?.let { append(" · ${it}分钟准备") }
+                    }
+                } ?: "当前偏好没有可用目录候选",
                 plan.meals.firstOrNull()?.score ?: 0,
                 confidenceLabel(plan.confidence),
                 plan.meals.firstOrNull()?.evidence?.map { it.label }.orEmpty(),
@@ -78,6 +86,7 @@ data class DailyActionCardModel(
 @Composable
 fun DailyActionSection(
     plan: DailyActionPlan?,
+    onFeedback: (category: String, candidateKey: String, kind: ActionFeedbackKind) -> Unit = { _, _, _ -> },
     modifier: Modifier = Modifier
 ) {
     if (plan == null) return
@@ -92,7 +101,7 @@ fun DailyActionSection(
         )
         Spacer(Modifier.height(10.dp))
         cards.forEachIndexed { index, card ->
-            ActionCard(card)
+            ActionCard(card, onFeedback)
             if (index != cards.lastIndex) Spacer(Modifier.height(8.dp))
         }
         Spacer(Modifier.height(10.dp))
@@ -101,7 +110,10 @@ fun DailyActionSection(
 }
 
 @Composable
-private fun ActionCard(card: DailyActionCardModel) {
+private fun ActionCard(
+    card: DailyActionCardModel,
+    onFeedback: (category: String, candidateKey: String, kind: ActionFeedbackKind) -> Unit
+) {
     var expanded by rememberSaveable(card.title) { mutableStateOf(false) }
     var alternativeIndex by rememberSaveable(card.title) { mutableStateOf(0) }
     var feedback by rememberSaveable(card.title) { mutableStateOf<String?>(null) }
@@ -123,9 +135,16 @@ private fun ActionCard(card: DailyActionCardModel) {
             androidx.compose.material3.TextButton(onClick = {
                 if (card.alternatives.isNotEmpty()) alternativeIndex = (alternativeIndex + 1) % (card.alternatives.size + 1)
                 feedback = "已换一个"
+                onFeedback(card.title, displayedSummary, ActionFeedbackKind.Replaced)
             }) { Text("换一个") }
-            androidx.compose.material3.TextButton(onClick = { feedback = "已采纳" }) { Text("已采纳") }
-            androidx.compose.material3.TextButton(onClick = { feedback = "标记为不合适" }) { Text("不合适") }
+            androidx.compose.material3.TextButton(onClick = {
+                feedback = "已采纳"
+                onFeedback(card.title, displayedSummary, ActionFeedbackKind.Accepted)
+            }) { Text("已采纳") }
+            androidx.compose.material3.TextButton(onClick = {
+                feedback = "标记为不合适"
+                onFeedback(card.title, displayedSummary, ActionFeedbackKind.NotSuitable)
+            }) { Text("不合适") }
         }
         feedback?.let { Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.secondary) }
         Text(if (expanded) "收起依据" else "为什么？", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.secondary)

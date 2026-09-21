@@ -1,6 +1,7 @@
 package com.xuanji.app.ui.components
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -8,9 +9,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -31,6 +31,7 @@ import androidx.compose.ui.unit.dp
 import com.xuanji.app.domain.MysticCharacterCatalog
 import com.xuanji.app.domain.MysticCharacterId
 import com.xuanji.app.domain.MysticCharacterProfile
+import com.xuanji.app.domain.game.CompanionGameCatalog
 
 data class MysticCharacterUiModel(
     val id: MysticCharacterId,
@@ -54,7 +55,7 @@ data class MysticCharacterUiModel(
             specialties = profile.specialties.map { it.label },
             primarySpecialty = profile.specialties.firstOrNull()?.label ?: "综合合参",
             specialtySources = profile.specialties.map { it.sourceLabel },
-            actions = listOf("进入对话", "查看专长", "来一盘象棋"),
+            actions = listOf("进入对话", "查看专长", "进入${CompanionGameCatalog.forCharacter(profile.id).title}"),
             usesScenePlate = profile.visualStyleId != "elder_ink"
         )
     }
@@ -105,6 +106,7 @@ fun mysticGameThemePalette(key: String): MysticGameThemePalette = when (key) {
     )
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 internal fun MysticCharacterGallery(
     selectedId: MysticCharacterId,
@@ -113,23 +115,23 @@ internal fun MysticCharacterGallery(
 ) {
     val profiles = MysticCharacterCatalog.all
     val selectedIndex = profiles.indexOfFirst { it.id == selectedId }.coerceAtLeast(0)
-    val listState = rememberLazyListState(initialFirstVisibleItemIndex = selectedIndex)
+    val pagerState = rememberPagerState(initialPage = selectedIndex, pageCount = { profiles.size })
     LaunchedEffect(selectedId) {
-        listState.animateScrollToItem(selectedIndex)
+        if (pagerState.currentPage != selectedIndex) pagerState.animateScrollToPage(selectedIndex)
     }
-    LaunchedEffect(listState.firstVisibleItemIndex) {
-        profiles.getOrNull(listState.firstVisibleItemIndex)?.let { profile ->
+    LaunchedEffect(pagerState.currentPage) {
+        profiles.getOrNull(pagerState.currentPage)?.let { profile ->
             if (profile.id != selectedId) onSelected(profile.id)
         }
     }
-    LazyRow(
-        state = listState,
+    HorizontalPager(
+        state = pagerState,
+        beyondBoundsPageCount = profiles.size - 1,
         modifier = modifier
             .fillMaxWidth()
             .semantics { contentDescription = "玄师角色画廊，可左右滑动切换角色" },
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        items(profiles, key = { it.id.key }) { profile ->
+    ) { page ->
+        val profile = profiles[page]
             val selected = profile.id == selectedId
             Surface(
                 onClick = { onSelected(profile.id) },
@@ -165,7 +167,6 @@ internal fun MysticCharacterGallery(
                     )
                 }
             }
-        }
     }
 }
 
@@ -191,10 +192,11 @@ internal fun MysticCharacterActionBar(
             modifier = Modifier.weight(1f).semantics { contentDescription = "查看${character.displayName}的专长" },
             contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 8.dp, vertical = 5.dp)
         ) { Text("查看专长", style = MaterialTheme.typography.labelSmall) }
+        val game = CompanionGameCatalog.forCharacter(character.id)
         OutlinedButton(
             onClick = onGame,
-            modifier = Modifier.weight(1f).semantics { contentDescription = "与${character.displayName}来一盘象棋" },
+            modifier = Modifier.weight(1f).semantics { contentDescription = "与${character.displayName}进入${game.title}" },
             contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 8.dp, vertical = 5.dp)
-        ) { Text("来一盘象棋", style = MaterialTheme.typography.labelSmall) }
+        ) { Text("进入${game.title}", style = MaterialTheme.typography.labelSmall) }
     }
 }

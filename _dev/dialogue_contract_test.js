@@ -332,6 +332,8 @@ assert(characterSource.includes('sharedMemoryNotes') && characterSource.includes
 requireVerify(visual.character_verify, `visual ${visual.character_verify}`);
 requireVerify(visual.session_verify, `visual ${visual.session_verify}`);
 requireVerify(visual.ui_verify, `visual ${visual.ui_verify}`);
+assert(characterUiSource.includes('CompanionGameCatalog.forCharacter(profile.id)'), 'gallery actions must be driven by the character game catalog');
+requireVerify(visual.game_verify, `visual ${visual.game_verify}`);
 assert(Array.isArray(visual.style_ids) && visual.style_ids.length === 4, 'visual companion must keep exactly four selected culture figures');
 const visualAssetSource = fs.readFileSync(path.join(UI_SRC, 'components', 'MysticFigureAsset.kt'), 'utf8');
 visual.style_ids.forEach((styleId) => {
@@ -355,6 +357,38 @@ const messageListSource = fs.readFileSync(path.join(UI_SRC, 'components', 'Mysti
 const inputSource = fs.readFileSync(path.join(UI_SRC, 'components', 'MysticConversationInput.kt'), 'utf8');
 assert(messageListSource.includes('MAX_VISIBLE_MESSAGES = 12'), 'message list window changed without a contract update');
 assert(inputSource.includes('take(maxLength)') && inputSource.includes('maxLength: Int = 200'), 'input bound must stay 200 characters');
+
+// ---- 四角色扩充：游戏、线程快照和依据抽屉 ------------------------------------------
+const games = contract.companion_games;
+const gameContractSource = readGame('CompanionGameContracts.kt');
+const gameEngineSource = readGame('CompanionGameEngines.kt');
+games.ids.forEach((id) => assert(gameContractSource.includes(`"${id}"`), `companion game ${id} disappeared`));
+Object.entries(games.availability).forEach(([id, availability]) => {
+  assert(gameContractSource.includes(`id = "${id}"`), `game profile ${id} missing`);
+  assert(gameContractSource.includes(`availability = GameAvailability.${availability}`), `game availability ${id} drifted`);
+});
+Object.entries(games.shortcut_inputs).forEach(([id, input]) => {
+  assert(gameContractSource.includes(`"${input}"`) || readTest('MysticDialogueGameIntentTest').includes(`"${input}"`),
+    `companion game shortcut ${id} disappeared`);
+});
+assert(gameContractSource.includes('gameIdForInput'), 'typed game shortcuts need one shared resolver');
+requireVerify(games.shortcut_verify, `companion_games ${games.shortcut_verify}`);
+requireVerify(games.verify, `companion_games ${games.verify}`);
+requireVerify(games.engine_verify, `companion_games ${games.engine_verify}`);
+
+const persistence = contract.session_persistence;
+const codecSource = fs.readFileSync(path.join(APP_SRC, 'domain', 'MysticSessionSnapshotCodec.kt'), 'utf8');
+const storeSource = fs.readFileSync(path.join(APP_SRC, 'data', 'local', 'MysticCharacterSessionStore.kt'), 'utf8');
+assert(codecSource.includes(`const val VERSION = ${persistence.codec_version}`), 'session codec version drifted');
+assert(storeSource.includes(`KEY_PREFIX = "${persistence.key_prefix}"`), 'session store key namespace drifted');
+assert(codecSource.includes('requestState = MysticRequestState.Idle'), 'pending work must be dropped on restore');
+requireVerify(persistence.verify, `session_persistence ${persistence.verify}`);
+requireVerify(persistence.store_verify, `session_persistence ${persistence.store_verify}`);
+
+const evidence = contract.evidence_trace;
+const evidenceSource = fs.readFileSync(path.join(APP_SRC, 'domain', 'MysticEvidence.kt'), 'utf8');
+assert(evidenceSource.includes(`ALGORITHM_VERSION = "${evidence.algorithm_version}"`), 'evidence algorithm version drifted');
+requireVerify(evidence.verify, `evidence_trace ${evidence.verify}`);
 
 // ---- 安全守卫：随用户文本变化的回复只有一个出口 --------------------------------------
 const sg = contract.safety;

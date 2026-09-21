@@ -34,13 +34,35 @@ class MysticDialogueCoordinator(
                     DialogueReplyValidator.validate(result.text, requestContext)
                 }
                 val reply = when (validation) {
-                    ValidationResult.Accept -> DialogueReply(
-                        intent = analysis.intent,
-                        prefix = "",
-                        text = result.text,
-                        clarifiers = clarifiersFor(analysis),
-                        source = if (provider is OfflineDialogueProvider) ReplySource.Offline else ReplySource.OnlineValidated
-                    )
+                    ValidationResult.Accept -> {
+                        val voice = if (provider is OfflineDialogueProvider) {
+                            MysticCharacterVoiceResult(
+                                text = result.text,
+                                selection = MysticCharacterVoiceAdapter.selectSpecialty(
+                                    requestContext.characterId ?: MysticCharacterId.ShenYanzhou,
+                                    analysis.intent,
+                                    analysis.topicKey ?: requestContext.topicKey
+                                )
+                            )
+                        } else {
+                            MysticCharacterVoiceAdapter.adapt(requestContext, analysis, result.text)
+                        }
+                        val guarded = SafetyResponseGuard.guard(
+                            pending.input,
+                            voice.text,
+                            requestContext,
+                            requestContext.personalitySource
+                        )
+                        DialogueReply(
+                            intent = analysis.intent,
+                            prefix = "",
+                            text = guarded.text,
+                            clarifiers = clarifiersFor(analysis),
+                            source = if (provider is OfflineDialogueProvider) ReplySource.Offline else ReplySource.OnlineValidated,
+                            specialtyKey = voice.selection.specialtyKey,
+                            evidence = MysticEvidenceBuilder.forDialogue(requestContext, analysis, voice.selection)
+                        )
+                    }
                     is ValidationResult.Reject -> offlineReply(requestContext, pending.input, analysis)
                 }
                 listOf(

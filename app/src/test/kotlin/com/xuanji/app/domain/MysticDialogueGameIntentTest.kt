@@ -2,6 +2,7 @@ package com.xuanji.app.domain.game
 
 import com.xuanji.app.domain.MysticIntent
 import com.xuanji.app.domain.MysticIntentClassifier
+import com.xuanji.app.domain.MysticCharacterId
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -14,6 +15,22 @@ class MysticDialogueGameIntentTest {
         assertEquals(MysticIntent.Game, MysticIntentClassifier.classify("来一盘中国象棋"))
         assertEquals(MysticIntent.Game, MysticIntentClassifier.classify("下一盘象棋"))
         assertEquals(MysticIntent.Game, MysticIntentClassifier.classify("陪我下象棋"))
+    }
+
+    @Test
+    fun each_character_game_shortcut_reaches_game_without_opening_fortune_chat() {
+        val shortcuts = mapOf(
+            MysticCharacterId.ShenYanzhou to "开始诗句接龙",
+            MysticCharacterId.MoHeng to "来一盘象棋",
+            MysticCharacterId.EvelynNova to "开始星图观测",
+            MysticCharacterId.NadirRashid to "开始丝路路线规划"
+        )
+        shortcuts.forEach { (character, input) ->
+            val gameId = CompanionGameCatalog.gameIdForInput(input)
+            requireNotNull(gameId)
+            assertEquals(character, CompanionGameCatalog.byId(gameId)?.characterId)
+            assertEquals(MysticIntent.Game, MysticIntentClassifier.classify(input))
+        }
     }
 
     @Test
