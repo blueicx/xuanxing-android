@@ -2717,7 +2717,8 @@ object MysticGuideGenerator {
         lifeProfile: LifeProfile? = null,
         divinationSummary: String? = null,
         weatherSummary: String? = null,
-        personalitySource: PersonalitySource = PersonalitySource.Unknown
+        personalitySource: PersonalitySource = PersonalitySource.Unknown,
+        characterName: String? = null
     ): String {
         val label = topics[topicKey] ?: "综合"
         val focus = if (topicKey == "test") {
@@ -2845,7 +2846,11 @@ object MysticGuideGenerator {
             "greeting" -> MysticDialogueTemplates.greetingAnswer(scholar, styleKey, skinId, question)
             "farewell" -> MysticDialogueTemplates.farewellAnswer(scholar, styleKey)
             "thanks" -> MysticDialogueTemplates.thanksAnswer(scholar, styleKey)
-            "identity" -> MysticDialogueTemplates.identityAnswer(scholar, styleKey, personaName(mode))
+            "identity" -> MysticDialogueTemplates.identityAnswer(
+                scholar,
+                styleKey,
+                characterName?.takeIf { it.isNotBlank() } ?: personaName(mode)
+            )
             "smalltalk" -> MysticDialogueTemplates.smallTalkAnswer(scholar, styleKey, question)
             "daily" -> MysticDialogueTemplates.dailyChatAnswer(scholar, styleKey, skinId, question)
             "chat" -> MysticDialogueTemplates.chatAnswer(scholar, styleKey, skinId, question)

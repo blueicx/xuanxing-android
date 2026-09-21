@@ -22,7 +22,13 @@
 
 对话承接由 `MysticDialogueContinuity` 读取最近回合的主题；“继续”“这个呢”“那怎么办”等省略式输入会继承上一主题，明确出现新主题时以当前输入为准。承接只改善表达相关性，不改变盘面算法，也不把生成内容写入长期记忆。
 
-文化人物视觉现在按 `MysticSkin.visualStyleId` 切换四套用户确认的人物：三联图左侧江南书生、单独截图的老玄学家、三联图中间学院星象学者、三联图右侧丝路沙海占星师。`MysticFigureAsset` 从本地 `drawable-nodpi` WebP 取图，`MysticFigureCanvas` 保留资源异常时的 Canvas 回退；`MysticCultureSpec` 仍负责水榭、档案室、驿站、云台和沙海等背景。它是文化视觉演绎，不宣称还原真实服饰、仪式或族群身份。
+文化人物视觉现在由 `MysticCharacterCatalog` 管理四位独立来客，而不是把角色当成服饰皮肤：沈砚舟（江南书生）、墨衡（灰发水墨老法师）、伊芙琳·诺瓦（学院星象师）和纳迪尔·拉希德（丝路占星师）。`MysticFigureAsset` 从本地 `drawable-nodpi` WebP 取图，三联图作为完整场景画面，墨衡使用透明人物叠加水墨背景；`MysticFigureCanvas` 保留资源异常时的 Canvas 回退；`MysticCultureSpec` 仍负责水榭、档案室、驿站、云台和沙海等背景。它是文化视觉演绎，不宣称还原真实服饰、仪式或族群身份。
+
+角色舞台由 `MysticStageLayout` 承载全屏画廊，`MysticCharacterGallery` 提供左右滑动与 TalkBack 角色目标，统一的动作栏提供「进入对话 / 查看专长 / 来一盘象棋」。角色专长只做已有计算体系的策展入口：`MysticCharacterSpecialty.systemIds` 指向实际系统，`sourceLabel` 与 `availability` 明示文化参考或未启用边界，不生成伪造经文、叶脉文本或心理测验常模。浮球显示当前角色首字与剪影，推荐由 `topicKey + dateKey + fortune` 稳定派生，用户手动选择后当天沿用。
+
+角色状态由 `MysticCharacterSessionState` 按角色保存独立消息线程，共享盘面事实与用户主动记忆；切换时追加交接语，并递增旧线程 token，使迟到的异步回复丢弃。`MysticDialogueEngine` 只把角色姓名作为解释层输入，不改变盘面计算或安全护栏。「玄学家 / 半仙」只保留为内部语气模式，界面身份统一显示四位来客。
+
+棋局仍是四位角色共用的真实中国象棋规则与会话引擎，`mysticGameThemePalette` 只替换木案、水墨宣纸、学院星盘、丝路铜盘四套视觉材质；围棋和国际象棋继续显示 provider 未启用，不渲染假棋局。
 
 ## 棋局会话（2026-09）
 

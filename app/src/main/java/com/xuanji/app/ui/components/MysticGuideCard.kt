@@ -41,6 +41,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -70,6 +71,8 @@ import com.xuanji.app.domain.MysticClarifierOption
 import com.xuanji.app.domain.MysticInteraction
 import com.xuanji.app.domain.MysticInteractionOption
 import com.xuanji.app.domain.MysticGuideGenerator
+import com.xuanji.app.domain.MysticCharacterCatalog
+import com.xuanji.app.domain.MysticCharacterId
 import com.xuanji.app.domain.DefaultMysticDialogueEngine
 import com.xuanji.app.domain.DialogueContext
 import com.xuanji.app.domain.DialogueProvider
@@ -192,9 +195,19 @@ private class MysticCompanionState(initialMode: String, initialTopic: String) {
     var guestChoiceCarryoverKey by mutableStateOf<String?>(null)
     var pendingGuestChoiceEcho by mutableStateOf<String?>(null)
     var memoryNotes by mutableStateOf(emptyList<MysticMemoryNote>())
+    /** User-authored notes are shared across character threads; generated replies are not. */
+    var sharedMemoryNotes by mutableStateOf(emptyList<DomainMysticMemoryNote>())
     var memorySequence by mutableStateOf(0)
     var memoryExpanded by mutableStateOf(false)
     var skinId by mutableStateOf("")
+    val characterThreads = mutableMapOf<MysticCharacterId, SnapshotStateList<MysticTurn>>()
+    val characterSessionStates = mutableStateMapOf<MysticCharacterId, MysticSessionState>()
+
+    fun threadFor(characterId: MysticCharacterId): SnapshotStateList<MysticTurn> =
+        characterThreads.getOrPut(characterId) { mutableStateListOf() }
+
+    fun sessionFor(characterId: MysticCharacterId): MysticSessionState =
+        characterSessionStates[characterId] ?: MysticSessionState()
 }
 
 private val mysticCompanionStates = mutableMapOf<String, MysticCompanionState>()
@@ -215,10 +228,13 @@ fun MysticGuideCard(
     bazi: BaziFull,
     fortune: CompositeDailyFortune,
     immersive: Boolean = false,
+    characterId: MysticCharacterId = MysticCharacterId.ShenYanzhou,
     onStageModeChange: (String) -> Unit = {},
     onStageSkinChange: (String) -> Unit = {},
     stageCostumeRequest: Pair<String, String>? = null,
-    onStageCostumeConsumed: () -> Unit = {}
+    onStageCostumeConsumed: () -> Unit = {},
+    stageActionRequest: String? = null,
+    onStageActionConsumed: () -> Unit = {}
 ) {
     val records by AppModule.testRecordRepository.records.collectAsStateWithLifecycle(initialValue = emptyList())
     val context = LocalContext.current
@@ -229,6 +245,7 @@ fun MysticGuideCard(
     val visitProfile = remember(bazi) { "bazi|${bazi.chart.display}" }
     val companionKey = "${bazi.hashCode()}|${fortune.hashCode()}"
     val companion = remember(companionKey) { mysticCompanionState(companionKey, fortune) }
+    val characterProfile = remember(characterId) { MysticCharacterCatalog.byId(characterId) }
     var topic by remember(companion) { companion::topic }
     var mode by remember(companion) { companion::mode }
     var interactionCarryoverOption by remember(companion) { companion::interactionCarryoverOption }
@@ -267,7 +284,14 @@ fun MysticGuideCard(
     }
     val dialogueEngine = remember { DefaultMysticDialogueEngine() }
     val dialogueProvider: DialogueProvider = remember { OfflineDialogueProvider(dialogueEngine) }
-    var sessionState by remember { mutableStateOf(MysticSessionState()) }
+    var sessionState by remember(characterId) { mutableStateOf(companion.sessionFor(characterId)) }
+    LaunchedEffect(sessionState, characterId) {
+        companion.characterSessionStates[characterId] = sessionState
+    }
+    LaunchedEffect(characterId) {
+        companion.mode = characterProfile.dialogueMode
+        companion.skinId = characterProfile.legacySkinId
+    }
     var gameSession by remember { mutableStateOf(com.xuanji.app.domain.game.GameSessionState()) }
     var gameReply by remember { mutableStateOf("") }
     var gameInputEcho by remember { mutableStateOf<String?>(null) }
@@ -332,7 +356,8 @@ fun MysticGuideCard(
     }
     var selectedFollowUp by remember(guide) { mutableStateOf("") }
     var evidenceOpen by remember(guide) { mutableStateOf(false) }
-    val conversation = remember(guide) { mutableStateListOf<MysticTurn>() }
+    val conversation = companion.threadFor(characterId)
+    val expandedBubbles = remember(characterId) { mutableStateMapOf<String, Boolean>() }
     var arrivalVisible by remember(guide) { mutableStateOf(false) }
     val openAsideTurnKey = conversation.firstOrNull { turn ->
         turn.aside != null && turn.asideExit == null
@@ -421,8 +446,12 @@ fun MysticGuideCard(
         val text = MysticGuideGenerator.memoryNote(mode, guide.styleKey, kind, detail)
         if (text.isBlank()) return
         val note = MysticMemoryNote("memory-$kind-$memorySequence", text)
+        val sharedNote = DomainMysticMemoryNote(note.id, note.text)
         memoryNotes = (listOf(note) + memoryNotes).take(3)
-        sessionState = reduce(sessionState, MysticEvent.Remember(DomainMysticMemoryNote(note.id, note.text)))
+        companion.sharedMemoryNotes = (companion.sharedMemoryNotes + sharedNote)
+            .distinctBy { it.id }
+            .takeLast(12)
+        sessionState = reduce(sessionState, MysticEvent.Remember(sharedNote))
         memorySequence += 1
     }
 
@@ -435,8 +464,12 @@ fun MysticGuideCard(
         )
         if (text.isBlank()) return
         val note = MysticMemoryNote("memory-aside-$memorySequence", text)
+        val sharedNote = DomainMysticMemoryNote(note.id, note.text)
         memoryNotes = (listOf(note) + memoryNotes).take(3)
-        sessionState = reduce(sessionState, MysticEvent.Remember(DomainMysticMemoryNote(note.id, note.text)))
+        companion.sharedMemoryNotes = (companion.sharedMemoryNotes + sharedNote)
+            .distinctBy { it.id }
+            .takeLast(12)
+        sessionState = reduce(sessionState, MysticEvent.Remember(sharedNote))
         memorySequence += 1
     }
 
@@ -468,9 +501,10 @@ fun MysticGuideCard(
                 fortune = fortune,
                 latestTest = latestTest,
                 recentTurns = sessionState.recentTurns,
-                memoryNotes = sessionState.memoryNotes,
+                memoryNotes = companion.sharedMemoryNotes,
                 skinId = companion.skinId,
-                question = text
+                question = text,
+                characterName = characterProfile.displayName
             )
         )
         val topicKey = analysis.topicKey ?: return
@@ -602,6 +636,12 @@ fun MysticGuideCard(
         }
         customQuestion = text
         submitCustom()
+    }
+
+    LaunchedEffect(stageActionRequest, characterId) {
+        val action = stageActionRequest ?: return@LaunchedEffect
+        submitPanelInput(action)
+        onStageActionConsumed()
     }
 
     fun revokeSoftTag(id: String) {
@@ -1131,9 +1171,10 @@ fun MysticGuideCard(
             fortune = fortune,
             latestTest = latestTest,
             recentTurns = sessionState.recentTurns,
-            memoryNotes = sessionState.memoryNotes,
+            memoryNotes = companion.sharedMemoryNotes,
             skinId = companion.skinId,
-            question = question
+            question = question,
+            characterName = characterProfile.displayName
         )
         val providerResult = dialogueProvider.complete(
             DialogueRequest(dialogueContext, question, requestToken)
@@ -1424,13 +1465,29 @@ fun MysticGuideCard(
                         shape = RoundedCornerShape(topStart = 4.dp, topEnd = 16.dp, bottomStart = 16.dp, bottomEnd = 16.dp),
                         color = accent.copy(alpha = 0.13f)
                     ) {
-                        Text(
-                            if (turn.reaction.isBlank()) turn.answer else "${turn.answer}\n\n${turn.reaction}",
-                            modifier = Modifier.padding(horizontal = 13.dp, vertical = 10.dp),
-                            style = MaterialTheme.typography.bodySmall,
-                            lineHeight = 21.sp,
-                            color = Color(0xFFEFE6D7)
+                        val bubble = MysticDialogueBubbleModel(
+                            fullText = if (turn.reaction.isBlank()) turn.answer else "${turn.answer}\n\n${turn.reaction}",
+                            expanded = expandedBubbles[turn.key] == true
                         )
+                        Column(Modifier.padding(horizontal = 13.dp, vertical = 10.dp)) {
+                            Text(
+                                bubble.preview,
+                                style = MaterialTheme.typography.bodySmall,
+                                lineHeight = 21.sp,
+                                color = Color(0xFFEFE6D7)
+                            )
+                            if (bubble.shouldCollapse) {
+                                OutlinedButton(
+                                    onClick = { expandedBubbles[turn.key] = !bubble.expanded },
+                                    modifier = Modifier.semantics {
+                                        contentDescription = if (bubble.expanded) "收起${characterProfile.displayName}的长回复" else "展开${characterProfile.displayName}的长回复"
+                                    },
+                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                                ) {
+                                    Text(if (bubble.expanded) "收起" else "展开全文", style = MaterialTheme.typography.labelSmall)
+                                }
+                            }
+                        }
                     }
                 }
 
@@ -1479,6 +1536,7 @@ fun MysticGuideCard(
                             onStep = { ply ->
                                 gameViewPly = ply.takeIf { it < gameSession.history.size }
                             },
+                            gameTheme = mysticGameThemePalette(characterProfile.gameTheme),
                             footer = if (gameReply.isNotBlank()) {
                                 {
                                     Text(
@@ -1588,7 +1646,7 @@ fun MysticGuideCard(
                             .background(Color(skin.trim))
                     )
                     Text(
-                        if (mode == "half") "半" else "玄",
+                        characterProfile.displayName.take(1),
                         style = MaterialTheme.typography.labelLarge,
                         fontWeight = FontWeight.Bold,
                         color = accent
@@ -1596,17 +1654,22 @@ fun MysticGuideCard(
                 }
                 Column(Modifier.weight(1f)) {
                     Text(
-                        MysticGuideGenerator.personaName(mode),
+                        characterProfile.displayName,
                         style = MaterialTheme.typography.titleSmall,
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
-                        "${guide.styleName} · ${guide.styleIntro}",
+                        "${characterProfile.title} · ${characterProfile.cultureLabel}",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
-                        "服饰 · ${skin.label} · ${skin.detail}",
+                        "语气 · ${guide.styleName} · ${guide.styleIntro}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        "形象 · ${skin.label} · ${skin.detail}",
                         style = MaterialTheme.typography.labelSmall,
                         color = accent.copy(alpha = 0.86f)
                     )
@@ -1988,14 +2051,14 @@ fun MysticGuideCard(
                 val scholarAccent = MaterialTheme.colorScheme.primary
                 val halfAccent = MaterialTheme.colorScheme.tertiary
                 MysticPersonaButton(
-                    MysticGuideGenerator.personaName("scholar"),
+                    "理性口吻",
                     "心理按摩",
                     mode == "scholar",
                     scholarAccent,
                     Modifier.weight(1f)
                 ) { switchPersona("scholar") }
                 MysticPersonaButton(
-                    MysticGuideGenerator.personaName("half"),
+                    "俏皮口吻",
                     "浮夸吐槽",
                     mode == "half",
                     halfAccent,

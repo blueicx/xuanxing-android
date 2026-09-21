@@ -256,13 +256,12 @@ assert(
 assert(!/roleName\s*==/.test(orbSource), 'the orb must never branch on a display string');
 assert(
   floatingSource.includes(pp.orb_role_binding) && floatingSource.includes(pp.orb_mode_binding),
-  'the orb must take its label from personaName and its motion from the mode'
+  'the orb must take its label from the selected character and its motion from the mode'
 );
 assert(!floatingSource.includes('roleName: String'), 'the stage kept a roleName parameter it never reads');
 assert(
-  floatingSource.includes('MysticGuideGenerator.personaName(key)') &&
-    mysticCardSource.includes('MysticGuideGenerator.personaName(mode)'),
-  'the persona buttons and the costume switch must read the labels from personaName'
+  mysticCardSource.includes('"理性口吻"') && mysticCardSource.includes('"俏皮口吻"'),
+  'the legacy mode buttons must be presented as tone controls, not character names'
 );
 pp.identity_answers.forEach((line) => {
   assert.strictEqual(line.split('$name').length - 1, 1, `an identity answer must name the persona once: ${line}`);
@@ -315,13 +314,24 @@ const coordinatorSource = fs.readFileSync(path.join(APP_SRC, 'domain', 'MysticDi
 assert(coordinatorSource.includes('OnlineValidated') && providerSource.includes('allowedScores'), 'provider replies must be fact-checked before acceptance');
 assert(coordinatorSource.includes('OnlineFallback') && coordinatorSource.includes('validate'), 'provider failures must fall back to offline replies');
 
-assert.strictEqual(contract.stage_title, 'persona-only', 'stage title policy changed');
-assert(stageSource.includes('MysticGuideGenerator.personaName'), 'stage title must use the canonical persona name');
-assert(!/sceneLabel|scene\.sceneLabel/.test(stageSource), 'stage title must not expose the cultural scene as a role title');
+assert.strictEqual(contract.stage_title, 'character-gallery', 'stage title policy changed');
+assert(stageSource.includes('character.displayName'), 'stage title must use the selected character name');
+assert(stageSource.includes('MysticCharacterGallery'), 'stage must expose the character gallery');
+assert(!stageSource.includes('MysticGuideGenerator.personaName'), 'stage title must not fall back to legacy persona labels');
 assert(stageSource.includes('navigationBarsPadding') && stageSource.includes('imePadding'), 'stage must respect system safe areas');
 
 // ---- 文化皮肤：人物不能再只是同一张 Canvas 换色 -------------------------------------
 const visual = contract.visual_companion;
+const characterSource = fs.readFileSync(path.join(APP_SRC, 'domain', 'MysticCharacter.kt'), 'utf8');
+const characterUiSource = fs.readFileSync(path.join(UI_SRC, 'components', 'MysticCharacterUiModel.kt'), 'utf8');
+visual.character_ids.forEach((id) => assert(characterSource.includes(`"${id}"`), `character ${id} disappeared from the catalog`));
+visual.character_names.forEach((name) => assert(characterSource.includes(`"${name}"`), `character name ${name} disappeared from the catalog`));
+visual.gallery_actions.forEach((action) => assert(characterUiSource.includes(`"${action}"`), `gallery action disappeared: ${action}`));
+visual.game_theme_keys.forEach((theme) => assert(characterUiSource.includes(`"${theme}"`), `game theme disappeared: ${theme}`));
+assert(characterSource.includes('sharedMemoryNotes') && characterSource.includes('reduceCharacterSession'), 'character session reducer lost shared-memory or token boundary');
+requireVerify(visual.character_verify, `visual ${visual.character_verify}`);
+requireVerify(visual.session_verify, `visual ${visual.session_verify}`);
+requireVerify(visual.ui_verify, `visual ${visual.ui_verify}`);
 assert(Array.isArray(visual.style_ids) && visual.style_ids.length === 4, 'visual companion must keep exactly four selected culture figures');
 const visualAssetSource = fs.readFileSync(path.join(UI_SRC, 'components', 'MysticFigureAsset.kt'), 'utf8');
 visual.style_ids.forEach((styleId) => {

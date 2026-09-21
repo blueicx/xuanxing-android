@@ -11,10 +11,11 @@
 - 今日行动与人生画像（2026-09-19）：`domain/action` 已落地五行 + 星座必需来源、固定权重、静态食物/城市目录、按档案隔离的饮食偏好和对话复用；`_dev/action_profile_contract_test.js` 锁定离线与同分排序边界。静态目录覆盖范围、设备窄屏展示和 TalkBack 仍需用户通知后复测，不把评分当成医疗、职业能力或迁居结论。
 - 设备证据：曾完成 `com.xuanji.app` AVD 安装、启动、综合/东方/西方浮球、召回舞台和关闭回浮球截图，证据保存在 `.superpowers/round46-*`。没有把当前无在线设备误报为实体机验证。
 - 同日生增强：`SameDayWorks` 已加入确定性音乐/诗歌卡，`HistoryCopy` 与 `AnimatedVisibility` 支持长评语折叠；后续可继续扩充经过版权核验的作品元数据。
-- 文化人物视觉：四套用户确认的本地 WebP 资源已经接入 `MysticFigureAsset`，八个既有皮肤通过 `visualStyleId` 映射到江南书生、老玄学家、学院星象学者、丝路沙海占星师；`MysticFigureCanvas` 保留回退。仍需设备上检查四套人物在舞台中的比例、遮挡和不同屏幕密度的视觉细节。
+- 文化人物视觉：四位独立来客已由 `MysticCharacterCatalog`、`MysticCharacterSessionState` 和 `MysticCharacterGallery` 接入；三联图角色使用完整场景画面，墨衡使用透明人物叠加水墨背景，象棋按角色切换四套视觉主题。`MysticFigureCanvas` 保留资源异常回退。新增 Compose UI 测试覆盖四角色画廊、TalkBack 目标和三项动作入口；仍需设备上检查四套人物在舞台中的比例、遮挡、滑动焦点和不同屏幕密度的视觉细节。
 - 对话承接：`MysticDialogueContinuity` 已让省略式追问继承最近主题；后续应继续扩充中英文标点、连续 5 轮、换 persona/皮肤和跨端 golden wording。
 - 深陪伴计划（2026-09-12）：实现入口见 [`docs/superpowers/plans/2026-09-12-deep-companion.md`](superpowers/plans/2026-09-12-deep-companion.md)，本阶段只治理现有陪伴体验，不新增占卜体系。默认离线；在线 Provider 仅保留显式扩展接缝，外部文本仍需本地事实/安全校验。设备、TalkBack、Logcat 和真实视觉复测等待用户通知，不能用 JVM/编译结果替代。
 - 深陪伴实现（本分支）：已完成分析器、澄清入口、旧 token 丢弃、软标签撤回/清除、Provider 本地事实校验与离线回退；舞台拆为 `MysticStageLayout` / `MysticCultureBackdrop` / `MysticFigureAsset` / `MysticFigureCanvas`，交流面板拆为消息列表与输入状态，主题回答和文化语气表已从生成器抽出；棋局快捷入口已显式显示。最终门禁仍以本轮最后一次命令输出为准，设备、TalkBack、Logcat 和真实视觉复测等待用户通知。
+- 四角色融入（本分支，2026-09-22）：新增稳定角色目录、专长来源映射、独立角色会话线程、角色切换交接语、旧 token 丢弃、全屏画廊、悬浮对话气泡折叠和角色棋盘主题。UI 不再把「玄学家 / 半仙」当人物身份；它们只保留为内部语气模式。`MysticCharacterGalleryTest` 补上四角色名称/文化标签、画廊可访问描述和「进入对话 / 查看专长 / 来一盘象棋」入口的 Compose 编译测试。真实设备滑动、TalkBack 播报、人物比例、旋转/返回与 reduced-motion 仍未执行。
 - 棋局功能（2026-09-01）：四个切片已交付并通过门禁。
   1. 引擎与对话：`SmartBoardEngine`（alpha-beta，难度 2/3/4 层 + 开局库）成为默认应手，走子后自动串接引擎回包，新增难度切换、换色 / 观战、威胁扫描、残局目录、重做与和棋措辞。
   2. 棋盘 UI：难度选择、回放控件、落子滑动动画（系统动画时长为 0 时跳过）、吃子记录与 TalkBack 描述。

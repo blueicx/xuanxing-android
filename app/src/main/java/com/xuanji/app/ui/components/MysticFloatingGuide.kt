@@ -73,6 +73,9 @@ import androidx.compose.ui.semantics.semantics
 import com.xuanji.app.data.model.BaziFull
 import com.xuanji.app.data.model.CompositeDailyFortune
 import com.xuanji.app.domain.MysticGuideGenerator
+import com.xuanji.app.domain.MysticCharacterCatalog
+import com.xuanji.app.domain.MysticCharacterId
+import com.xuanji.app.domain.MysticCharacterProfile
 import android.content.Context
 import android.content.ContextWrapper
 import android.app.Activity
@@ -150,20 +153,23 @@ fun MysticFloatingGuide(
     val companionKey = remember(bazi, fortune) {
         if (bazi == null || fortune == null) "unavailable" else "${bazi.hashCode()}|${fortune.hashCode()}"
     }
-    val suggestedMode = if (guideAvailable) {
-        remember(companionKey) { MysticGuideGenerator.suggestedMode("composite", fortune!!) }
-    } else ""
-    var stageMode by rememberSaveable(companionKey) { mutableStateOf(suggestedMode) }
-    var stageSkinId by rememberSaveable(companionKey) {
-        mutableStateOf(
-            if (guideAvailable) {
-                MysticGuideGenerator.defaultMysticSkin(stageMode, fortune!!).id
-            } else {
-                ""
-            }
-        )
+    val suggestedCharacter = if (guideAvailable) {
+        remember(companionKey) {
+            MysticCharacterCatalog.recommend(
+                topicKey = "composite",
+                fortune = fortune!!
+            )
+        }
+    } else {
+        MysticCharacterCatalog.byId(MysticCharacterId.ShenYanzhou)
     }
-    var costumeRequest by rememberSaveable(companionKey) { mutableStateOf<Pair<String, String>?>(null) }
+    var stageCharacterKey by rememberSaveable(companionKey) { mutableStateOf(suggestedCharacter.id.key) }
+    val stageCharacter = remember(stageCharacterKey) {
+        MysticCharacterCatalog.all.firstOrNull { it.id.key == stageCharacterKey } ?: suggestedCharacter
+    }
+    var stageMode by rememberSaveable(companionKey) { mutableStateOf(suggestedCharacter.dialogueMode) }
+    var stageSkinId by rememberSaveable(companionKey) { mutableStateOf(suggestedCharacter.legacySkinId) }
+    var stageActionRequest by rememberSaveable(companionKey) { mutableStateOf<String?>(null) }
     val skin = if (guideAvailable) {
         MysticGuideGenerator.mysticSkinVoice(stageMode, stageSkinId)
             ?: MysticGuideGenerator.defaultMysticSkin(stageMode, fortune!!)
@@ -178,12 +184,21 @@ fun MysticFloatingGuide(
         stageOpen = detailOpen
     )
 
+    fun selectCharacter(id: MysticCharacterId) {
+        val profile = MysticCharacterCatalog.byId(id)
+        stageCharacterKey = profile.id.key
+        stageMode = profile.dialogueMode
+        stageSkinId = profile.legacySkinId
+        stageActionRequest = null
+    }
+
     Box(modifier.fillMaxSize()) {
         content(pageScroll)
 
         if (skin != null && companionUiState.presence == CompanionPresence.OrbVisible && !companionUiState.stageOpen) {
             MysticOrb(
-                roleName = MysticGuideGenerator.personaName(stageMode),
+                roleName = stageCharacter.displayName,
+                characterInitial = stageCharacter.displayName.take(1),
                 half = stageMode == "half",
                 color = Color(skin.garment),
                 trimColor = Color(skin.trim),
@@ -207,29 +222,25 @@ fun MysticFloatingGuide(
                     ) { /* consume clicks so they don't fall through */ }
             ) {
                 MysticImmersiveStage(
-                    half = stageMode == "half",
+                    character = stageCharacter,
                     skinId = skin.id,
                     garment = Color(skin.garment),
                     trimColor = Color(skin.trim),
                     moodLevel = mysticMoodLevel(fortune!!.overallScore),
+                    onCharacterSelected = ::selectCharacter,
+                    onConversation = { stageActionRequest = "我只是想聊聊" },
+                    onStartGame = { stageActionRequest = "来一盘象棋" },
                     onClose = { detailOpen = false },
-                    topStartContent = {
-                        MysticStageCostumeSwitch(
-                            selectedMode = stageMode,
-                            selectedSkinId = stageSkinId
-                        ) { target ->
-                            costumeRequest = target
-                        }
-                    }
                 ) {
                     MysticGuideCard(
                         bazi,
                         fortune,
                         immersive = true,
+                        characterId = stageCharacter.id,
                         onStageModeChange = { stageMode = it },
                         onStageSkinChange = { stageSkinId = it },
-                        stageCostumeRequest = costumeRequest,
-                        onStageCostumeConsumed = { costumeRequest = null }
+                        stageActionRequest = stageActionRequest,
+                        onStageActionConsumed = { stageActionRequest = null }
                     )
                 }
             }
@@ -239,13 +250,15 @@ fun MysticFloatingGuide(
 
 @Composable
 private fun MysticImmersiveStage(
-    half: Boolean,
+    character: MysticCharacterProfile,
     skinId: String,
     garment: Color,
     trimColor: Color,
     moodLevel: Float,
+    onCharacterSelected: (MysticCharacterId) -> Unit,
+    onConversation: () -> Unit,
+    onStartGame: () -> Unit,
     onClose: () -> Unit,
-    topStartContent: @Composable () -> Unit,
     content: @Composable () -> Unit
 ) {
     val view = LocalView.current
@@ -271,45 +284,17 @@ private fun MysticImmersiveStage(
         }
     }
     MysticStageLayout(
-        mode = if (half) "half" else "scholar",
+        character = character,
         skinId = skinId,
         garment = garment,
         trimColor = trimColor,
         moodLevel = moodLevel,
+        onCharacterSelected = onCharacterSelected,
+        onConversation = onConversation,
+        onStartGame = onStartGame,
         onClose = onClose,
-        topStartContent = topStartContent,
         content = content
     )
-}
-
-@Composable
-private fun MysticStageCostumeSwitch(
-    selectedMode: String,
-    selectedSkinId: String,
-    onSelect: (Pair<String, String>) -> Unit
-) {
-    val modes = listOf("scholar", "half").map { key -> key to MysticGuideGenerator.personaName(key) }
-    Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
-        modes.forEach { (mode, label) ->
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                MysticGuideGenerator.mysticSkins(mode).forEach { item ->
-                    val selected = selectedMode == mode && selectedSkinId == item.id
-                    Surface(
-                        onClick = { onSelect(mode to item.id) },
-                        shape = CircleShape,
-                        color = Color(item.garment),
-                        border = BorderStroke(
-                            if (selected) 2.dp else 1.dp,
-                            if (selected) Color(0xFFF4EEE5) else Color(item.trim)
-                        ),
-                        modifier = Modifier.size(17.dp)
-                    ) {
-                        Box(Modifier.fillMaxSize().semantics { contentDescription = "$label · ${item.label}" })
-                    }
-                }
-            }
-        }
-    }
 }
 
 @Composable

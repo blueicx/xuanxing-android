@@ -44,6 +44,7 @@ internal fun MysticFigureAsset(
     styleId: String,
     contentDescription: String,
     modifier: Modifier,
+    contentScale: ContentScale = ContentScale.Fit,
     fallback: @Composable () -> Unit
 ) {
     val resources = LocalContext.current.resources
@@ -56,7 +57,7 @@ internal fun MysticFigureAsset(
         Image(
             bitmap = bitmap.asImageBitmap(),
             contentDescription = contentDescription,
-            contentScale = ContentScale.Fit,
+            contentScale = contentScale,
             modifier = modifier.semantics { this.contentDescription = contentDescription }
         )
     }

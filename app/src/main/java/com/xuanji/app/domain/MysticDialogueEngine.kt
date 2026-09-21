@@ -53,7 +53,8 @@ data class DialogueContext(
     val lifeProfile: LifeProfile? = null,
     val divinationSummary: String? = null,
     val weatherSummary: String? = null,
-    val personalitySource: PersonalitySource = PersonalitySource.Unknown
+    val personalitySource: PersonalitySource = PersonalitySource.Unknown,
+    val characterName: String? = null
 )
 
 /** Minimal, UI-independent turn record used when the dialogue engine is called off-screen. */
@@ -113,7 +114,8 @@ class DefaultMysticDialogueEngine : MysticDialogueEngine {
             context.lifeProfile,
             context.divinationSummary,
             context.weatherSummary,
-            context.personalitySource
+            context.personalitySource,
+            characterName = context.characterName
         )
         val groundedFacts = when (intent) {
             MysticIntent.TodayMeal -> context.dailyActionPlan?.meals?.firstOrNull()?.evidence?.map { it.label }.orEmpty()

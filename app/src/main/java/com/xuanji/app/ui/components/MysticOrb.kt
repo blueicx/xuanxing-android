@@ -16,6 +16,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -55,6 +57,7 @@ internal fun rememberReducedMotion(): Boolean {
 @Composable
 internal fun MysticOrb(
     roleName: String,
+    characterInitial: String,
     half: Boolean,
     color: Color,
     trimColor: Color,
@@ -108,6 +111,12 @@ internal fun MysticOrb(
             ) {
                 drawMysticOrb(color = color, trimColor = trimColor, phase = wave)
             }
+            Text(
+                text = characterInitial,
+                color = Color(0xFFF8E7B0),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
+            )
         }
     }
 }

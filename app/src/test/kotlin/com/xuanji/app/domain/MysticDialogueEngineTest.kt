@@ -91,6 +91,18 @@ class MysticDialogueEngineTest {
     }
 
     @Test
+    fun identity_reply_uses_the_selected_character_name_without_replacing_the_fact_source() {
+        val reply = DefaultMysticDialogueEngine().reply(
+            contextFor("你是谁").copy(characterName = "沈砚舟"),
+            "你是谁"
+        )
+
+        assertEquals(MysticIntent.Identity, reply.intent)
+        assertEquals(true, reply.text.contains("沈砚舟"))
+        assertEquals(false, reply.text.contains("玄学家"))
+    }
+
+    @Test
     fun reply_is_deterministic_for_same_input() {
         val engine = DefaultMysticDialogueEngine()
         val context = DialogueContext(

@@ -59,6 +59,7 @@ import com.xuanji.app.domain.game.SmartBoardEngine
 import com.xuanji.app.domain.game.Square
 import com.xuanji.app.domain.game.XiangqiRules
 import com.xuanji.app.ui.components.rememberReducedMotion
+import com.xuanji.app.ui.components.MysticGameThemePalette
 import kotlin.math.roundToInt
 
 /**
@@ -170,7 +171,8 @@ fun GameBoardCard(
     onRestart: (() -> Unit)? = null,
     onDifficultyChange: ((String) -> Unit)? = null,
     onStep: ((Int) -> Unit)? = null,
-    footer: (@Composable () -> Unit)? = null
+    footer: (@Composable () -> Unit)? = null,
+    gameTheme: MysticGameThemePalette? = null
 ) {
     var selected by remember(position) { mutableStateOf<Square?>(null) }
     val totalPly = history.size
@@ -188,10 +190,16 @@ fun GameBoardCard(
     // last move read from real history only
     val lastMove = shownHistory.lastOrNull()
 
+    val effectivePanelColor = gameTheme?.panelColor ?: panelColor
+    val effectiveBoardColor = gameTheme?.boardColor ?: boardColor
+    val effectiveLineColor = gameTheme?.lineColor ?: lineColor
+    val effectiveRedPieceColor = gameTheme?.redPieceColor ?: redPieceColor
+    val effectiveBlackPieceColor = gameTheme?.blackPieceColor ?: blackPieceColor
+
     Surface(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
-        color = panelColor,
+        color = effectivePanelColor,
         tonalElevation = 2.dp
     ) {
         Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -219,6 +227,14 @@ fun GameBoardCard(
                     },
                     modifier = Modifier.semantics { contentDescription = moverText }
                 )
+                gameTheme?.let { theme ->
+                    Text(
+                        text = theme.label,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color(0xFFD9C58B),
+                        modifier = Modifier.semantics { contentDescription = "棋盘主题：${theme.label}" }
+                    )
+                }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                     if (uiModel.capturedByRed.isNotEmpty() || uiModel.capturedByBlack.isNotEmpty()) {
                         Text(
@@ -251,10 +267,10 @@ fun GameBoardCard(
                 ply = ply,
                 animateLastMove = !isReviewing && !thinking,
                 sideInCheck = uiModel.sideInCheck,
-                lineColor = lineColor,
-                boardColor = boardColor,
-                redPieceColor = redPieceColor,
-                blackPieceColor = blackPieceColor,
+                lineColor = effectiveLineColor,
+                boardColor = effectiveBoardColor,
+                redPieceColor = effectiveRedPieceColor,
+                blackPieceColor = effectiveBlackPieceColor,
                 pieceFont = pieceFont,
                 onSquareTap = { square ->
                     if (isReviewing || thinking) {
