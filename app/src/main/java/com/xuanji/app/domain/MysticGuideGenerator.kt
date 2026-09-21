@@ -99,7 +99,7 @@ data class MysticSkin(
     val voiceIntro: String,
     val gameLead: String,
     val reactionTail: String,
-    val visualStyleId: String = "ink_scholar"
+    val visualStyleId: String = "jiangnan_scholar"
 )
 
 /** 跨日记访记忆：按命盘隔离，只保留足够玄师“认得人”的最小现场。 */
@@ -148,22 +148,22 @@ object MysticGuideGenerator {
             MysticSkin(
                 "cloud-daoist", "云纹道袍", "朱砂绦 · 金云补子", 0xFFF5E3D4, 0xFF97654A, 0xFFD89B62,
                 "袖里云账", "天机有价。先说清楚，你带的是诚意，还是麻烦？", "袖口扣住半张底牌——", "这笔账，我先记下了。",
-                visualStyleId = "ink_scholar"
+                visualStyleId = "elder_ink"
             ),
             MysticSkin(
                 "street-jacket", "街口短打", "铜铃袖口 · 布扣", 0xFFF0E4DA, 0xFF84604F, 0xFFCBA96C,
                 "巷口冷眼", "话别绕。绕多了，我就自己替你编个价。", "茶碗一横，退路先摆上桌——", "成，这局我先押你半步。",
-                visualStyleId = "cel_astrologer"
+                visualStyleId = "academy_astral"
             ),
             MysticSkin(
                 "desert-traveler", "流沙旅袍", "铜镜腰牌 · 沙金披肩", 0xFFF3E6CB, 0xFFA87C4F, 0xFFE4C57C,
                 "流沙掮客", "沙里没有白带的路。先说，你肯押什么？", "风把价钱吹过来——", "脚印留下，回头再算。",
-                visualStyleId = "lowpoly_guardian"
+                visualStyleId = "silkroad_astrologer"
             ),
             MysticSkin(
                 "festival-costume", "节庆戏袍", "纸符袋 · 撞色滚边", 0xFFF4DBD8, 0xFFA05F63, 0xFFD9A05B,
                 "台前班主", "好戏能给你搭台，可彩头得按我的规矩分。", "锣槌斜着一点——", "漂亮。但最好的扣子还留在我手里。",
-                visualStyleId = "cel_astrologer"
+                visualStyleId = "academy_astral"
             )
         )
     } else {
@@ -171,22 +171,22 @@ object MysticGuideGenerator {
             MysticSkin(
                 "jiangnan-robe", "江南书生袍", "青玉襟 · 素袖", 0xFFDCEAE4, 0xFF6F9C90, 0xFFD9C58B,
                 "温润书卷", "我把话说软一点，但依据不会少。", "先把茶放稳——", "这一步选得妥帖。",
-                visualStyleId = "ink_scholar"
+                visualStyleId = "jiangnan_scholar"
             ),
             MysticSkin(
                 "academy-gown", "星港学士服", "星扣领 · 深灰披巾", 0xFFDFE5F3, 0xFF77809F, 0xFFE2C275,
                 "清朗学理", "我们按证据走，一句一句对齐。", "先立个假设：", "记录已入册，结论留给你验证。",
-                visualStyleId = "cel_astrologer"
+                visualStyleId = "academy_astral"
             ),
             MysticSkin(
                 "silkroad-robe", "丝路学者袍", "藏书腰带 · 松石缠巾", 0xFFDCEDEA, 0xFF48948F, 0xFFE7BE68,
                 "远行务实", "路要分段走，盘面也按驿站看。", "换到下一站前，", "好，这匹骆驼先驮这一件。",
-                visualStyleId = "lowpoly_guardian"
+                visualStyleId = "silkroad_astrologer"
             ),
             MysticSkin(
                 "northland-mantle", "北地游学斗篷", "银扣 · 苔绿毛边", 0xFFE1EBDC, 0xFF799458, 0xFFD7E0C6,
                 "稳拙守边", "风大的时候，边界比速度更要紧。", "先扎稳帐篷：", "行，这一步踩得实。",
-                visualStyleId = "lowpoly_guardian"
+                visualStyleId = "silkroad_astrologer"
             )
         )
     }

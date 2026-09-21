@@ -70,7 +70,20 @@ fun MysticStageLayout(
                     Modifier.fillMaxWidth().fillMaxHeight(.60f).padding(top = 40.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    MysticFigureCanvas(mode, skinId, garment, trimColor, moodLevel, phase, reducedMotion, Modifier.fillMaxSize(.72f))
+                    val visualStyleId = remember(mode, skinId) {
+                        MysticGuideGenerator.mysticSkinVoice(mode, skinId)?.visualStyleId ?: "jiangnan_scholar"
+                    }
+                    MysticFigureCanvas(
+                        mode = mode,
+                        skinId = skinId,
+                        styleId = visualStyleId,
+                        garment = garment,
+                        trimColor = trimColor,
+                        moodLevel = moodLevel,
+                        phase = phase,
+                        reducedMotion = reducedMotion,
+                        modifier = Modifier.fillMaxSize(.82f)
+                    )
                 }
                 Column(
                     Modifier.fillMaxWidth().weight(1f)

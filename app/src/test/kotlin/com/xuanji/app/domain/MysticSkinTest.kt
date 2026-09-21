@@ -7,14 +7,15 @@ import kotlin.test.assertTrue
 class MysticSkinTest {
     @Test
     fun visual_styles_are_bounded_and_mapped() {
-        val allowed = setOf("ink_scholar", "cel_astrologer", "lowpoly_guardian")
+        val allowed = setOf("jiangnan_scholar", "elder_ink", "academy_astral", "silkroad_astrologer")
         val all = listOf("scholar", "half").flatMap(MysticGuideGenerator::mysticSkins)
 
         assertEquals(8, all.size)
         assertTrue(all.all { it.visualStyleId in allowed })
-        assertEquals("ink_scholar", all.first { it.id == "jiangnan-robe" }.visualStyleId)
-        assertEquals("cel_astrologer", all.first { it.id == "academy-gown" }.visualStyleId)
-        assertEquals("lowpoly_guardian", all.first { it.id == "desert-traveler" }.visualStyleId)
-        assertEquals(3, all.map { it.visualStyleId }.toSet().size)
+        assertEquals("jiangnan_scholar", all.first { it.id == "jiangnan-robe" }.visualStyleId)
+        assertEquals("elder_ink", all.first { it.id == "cloud-daoist" }.visualStyleId)
+        assertEquals("academy_astral", all.first { it.id == "academy-gown" }.visualStyleId)
+        assertEquals("silkroad_astrologer", all.first { it.id == "desert-traveler" }.visualStyleId)
+        assertEquals(4, all.map { it.visualStyleId }.toSet().size)
     }
 }

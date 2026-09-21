@@ -18,6 +18,7 @@ import kotlin.math.sin
 fun MysticFigureCanvas(
     mode: String,
     skinId: String,
+    styleId: String,
     garment: Color,
     trimColor: Color,
     moodLevel: Float,
@@ -25,19 +26,22 @@ fun MysticFigureCanvas(
     reducedMotion: Boolean,
     modifier: Modifier = Modifier
 ) {
-    Canvas(
-        modifier
-            .fillMaxSize()
-            .semantics { contentDescription = "${MysticGuideGenerator.personaName(mode)}人物形象" }
+    val description = "${MysticGuideGenerator.personaName(mode)}人物形象"
+    MysticFigureAsset(
+        styleId = styleId,
+        contentDescription = description,
+        modifier = modifier.fillMaxSize()
     ) {
-        drawRestrainedFigure(
-            half = mode == "half",
-            skinId = skinId,
-            garment = garment,
-            trim = trimColor,
-            moodLevel = moodLevel,
-            phase = if (reducedMotion) 0f else phase
-        )
+        Canvas(modifier.fillMaxSize().semantics { contentDescription = description }) {
+            drawRestrainedFigure(
+                half = mode == "half",
+                skinId = skinId,
+                garment = garment,
+                trim = trimColor,
+                moodLevel = moodLevel,
+                phase = if (reducedMotion) 0f else phase
+            )
+        }
     }
 }
 

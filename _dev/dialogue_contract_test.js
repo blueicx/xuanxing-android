@@ -322,7 +322,7 @@ assert(stageSource.includes('navigationBarsPadding') && stageSource.includes('im
 
 // ---- 文化皮肤：人物不能再只是同一张 Canvas 换色 -------------------------------------
 const visual = contract.visual_companion;
-assert(Array.isArray(visual.style_ids) && visual.style_ids.length === 3, 'visual companion must keep exactly three style ids');
+assert(Array.isArray(visual.style_ids) && visual.style_ids.length === 4, 'visual companion must keep exactly four selected culture figures');
 const visualAssetSource = fs.readFileSync(path.join(UI_SRC, 'components', 'MysticFigureAsset.kt'), 'utf8');
 visual.style_ids.forEach((styleId) => {
   assert(visualAssetSource.includes(`"${styleId}"`), `figure asset renderer lost ${styleId}`);

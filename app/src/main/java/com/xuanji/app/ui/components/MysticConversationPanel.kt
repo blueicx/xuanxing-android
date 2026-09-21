@@ -22,7 +22,7 @@ import com.xuanji.app.domain.MysticSessionState
 import com.xuanji.app.domain.SoftMemoryTag
 
 private val QUICK_PROMPTS = listOf(
-    "今日运势", "继续说", "换个话题", "解释刚才", "我只是想聊聊"
+    "今日运势", "来一盘象棋", "继续说", "换个话题", "解释刚才", "我只是想聊聊"
 )
 
 @OptIn(ExperimentalLayoutApi::class)

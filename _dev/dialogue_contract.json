@@ -233,22 +233,24 @@
   "stage_title": "persona-only",
   "visual_companion": {
     "style_ids": [
-      "ink_scholar",
-      "cel_astrologer",
-      "lowpoly_guardian"
+      "jiangnan_scholar",
+      "elder_ink",
+      "academy_astral",
+      "silkroad_astrologer"
     ],
     "skin_style_map": {
-      "jiangnan-robe": "ink_scholar",
-      "cloud-daoist": "ink_scholar",
-      "academy-gown": "cel_astrologer",
-      "street-jacket": "cel_astrologer",
-      "festival-costume": "cel_astrologer",
-      "silkroad-robe": "lowpoly_guardian",
-      "northland-mantle": "lowpoly_guardian",
-      "desert-traveler": "lowpoly_guardian"
+      "jiangnan-robe": "jiangnan_scholar",
+      "cloud-daoist": "elder_ink",
+      "academy-gown": "academy_astral",
+      "street-jacket": "academy_astral",
+      "festival-costume": "academy_astral",
+      "silkroad-robe": "silkroad_astrologer",
+      "northland-mantle": "silkroad_astrologer",
+      "desert-traveler": "silkroad_astrologer"
     },
     "resource_names": [
       "mystic_figure_ink",
+      "mystic_figure_elder",
       "mystic_figure_cel",
       "mystic_figure_lowpoly"
     ],
