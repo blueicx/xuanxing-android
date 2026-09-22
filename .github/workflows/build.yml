@@ -43,6 +43,9 @@ jobs:
       - name: Verify dialogue contract
         run: node _dev/dialogue_contract_test.js
 
+      - name: Verify unified stage contract
+        run: node _dev/unified_stage_contract_test.js
+
       - name: Build debug APK
         run: ./gradlew testDebugUnitTest lintDebug assembleDebug assembleDebugAndroidTest --no-daemon
 
