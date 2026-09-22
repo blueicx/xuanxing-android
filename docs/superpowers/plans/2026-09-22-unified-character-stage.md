@@ -133,3 +133,11 @@
 - 不修改角色算法、出生资料、盘面事实、对话 seed、DataStore schema、棋局规则或网络权限。
 - 不下载新图片、不加入在线模型、不改变默认离线行为；已有 PNG 仅作为人物层，缺失时用本地 Canvas 回退。
 - 任何设备、TalkBack、Logcat、真实触控和截图结论都必须有当次命令或设备输出证据。
+
+## 执行记录（2026-09-22）
+
+- [x] 场景规格、四角色映射、统一五层舞台、文化背景绘制、人物资源回退和旧舞台 helper 清理已实现。
+- [x] 舞台标题、文化语义、关闭入口、动作栏、窄屏存在性和四角色场景映射测试已加入；AndroidTest 已编译并打包。
+- [x] `node _dev/authentic_systems_contract_test.js`、`node _dev/dialogue_contract_test.js`、`node _dev/unified_stage_contract_test.js` 全部通过。
+- [x] `:app:testDebugUnitTest --rerun`：367 项通过，0 失败，0 跳过；`:app:lintDebug`：0 error / 81 warning；`:app:assembleDebug` 与 `:app:assembleDebugAndroidTest` 通过。
+- [ ] 真机安装、四角色截图、TalkBack、Logcat、旋转/返回、reduced-motion 和实际滑动仍等待用户通知后执行，不能用本地编译证据替代。
