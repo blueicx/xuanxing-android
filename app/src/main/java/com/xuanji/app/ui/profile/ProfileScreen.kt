@@ -2,6 +2,8 @@ package com.xuanji.app.ui.profile
 
 import android.app.DatePickerDialog
 import android.app.TimePickerDialog
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.widget.DatePicker
 import android.widget.TimePicker
 import android.widget.Toast
@@ -47,6 +49,11 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.xuanji.app.R
 import com.xuanji.app.daily.ReminderScheduler
 import com.xuanji.app.data.local.externalContextConsentStore
+import com.xuanji.app.data.local.ConversationMemoryStore
+import com.xuanji.app.data.local.DataStorePreferenceBridge
+import com.xuanji.app.data.local.MysticCharacterSessionStore
+import com.xuanji.app.data.local.ActionFeedbackDataStore
+import com.xuanji.app.data.local.softMemoryTagStore
 import com.xuanji.app.di.AppModule
 import com.xuanji.app.domain.ChinaLocations
 import com.xuanji.app.domain.SelectedLocation
@@ -59,6 +66,10 @@ import com.xuanji.app.ui.viewmodel.ProfileViewModel
 import com.xuanji.app.ui.viewmodel.ActionViewModel
 import com.xuanji.app.ui.xuanjiViewModel
 import com.xuanji.app.domain.external.ExternalContextConsent
+import com.xuanji.app.domain.MysticPrivacyExport
+import com.xuanji.app.domain.MysticPrivacyExportCodec
+import com.xuanji.app.domain.privacyFingerprint
+import java.time.LocalDate
 import kotlinx.coroutines.launch
 
 @Composable
@@ -70,6 +81,11 @@ fun ProfileScreen() {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val externalConsentStore = remember { context.externalContextConsentStore() }
+    val localBridge = remember { DataStorePreferenceBridge(context) }
+    val characterSessionStore = remember { MysticCharacterSessionStore(localBridge) }
+    val conversationMemoryStore = remember { ConversationMemoryStore(localBridge) }
+    val softMemoryStore = remember { context.softMemoryTagStore() }
+    val actionFeedbackStore = remember { ActionFeedbackDataStore(localBridge) }
     val locations = remember { ChinaLocations.load(context) }
 
     // 出生信息默认空白（由用户自行填写），避免预填他人/作者生日
@@ -461,6 +477,39 @@ fun ProfileScreen() {
                     }
                     Spacer(Modifier.height(12.dp))
                     ExternalContextCard(networkEnabled = networkContextEnabled)
+                    Spacer(Modifier.height(12.dp))
+                    OutlinedButton(
+                        enabled = !actionState.profileKey.isNullOrBlank(),
+                        onClick = {
+                            val key = actionState.profileKey ?: return@OutlinedButton
+                            scope.launch {
+                                val memory = runCatching { conversationMemoryStore.load(key) }.getOrNull()
+                                val tags = runCatching { softMemoryStore.read(key).tags }.getOrDefault(emptyList())
+                                val feedbackCount = runCatching { actionFeedbackStore.list(key, 100).size }.getOrDefault(0)
+                                val exported = MysticPrivacyExportCodec.encode(
+                                    MysticPrivacyExport(
+                                        profileFingerprint = privacyFingerprint(key),
+                                        exportedDateKey = LocalDate.now().toString(),
+                                        characterSessionSnapshot = runCatching { characterSessionStore.raw(key) }.getOrNull(),
+                                        longTermMemory = memory?.entries.orEmpty().map { "${it.dateKey}|${it.kind.wire}|${it.text}" },
+                                        softMemoryLabels = tags.map { "${it.key}|${it.value}|${it.source.name}" },
+                                        actionFeedbackCount = feedbackCount
+                                    )
+                                )
+                                val clipboard = context.getSystemService(ClipboardManager::class.java)
+                                clipboard?.setPrimaryClip(ClipData.newPlainText("玄星本地数据导出", exported))
+                                Toast.makeText(context, "本地数据摘要已复制，可粘贴保存", Toast.LENGTH_SHORT).show()
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("复制本地数据摘要")
+                    }
+                    Text(
+                        "导出只读取本机已有记录；不会上传，也不会把角色生成内容当作长期记忆。",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                     Row(
                         Modifier
                             .fillMaxWidth()

@@ -18,12 +18,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.xuanji.app.data.model.BaziFull
 import com.xuanji.app.data.model.CompositeDailyFortune
+import com.xuanji.app.data.local.actionFeedbackStore
 import com.xuanji.app.di.AppModule
 import com.xuanji.app.ui.components.CardLayouts
 import com.xuanji.app.ui.components.CardMeta
@@ -47,6 +49,10 @@ import com.xuanji.app.ui.viewmodel.CompositeFortuneViewModel
 import com.xuanji.app.ui.viewmodel.CompositeUiState
 import com.xuanji.app.ui.viewmodel.ActionViewModel
 import com.xuanji.app.ui.xuanjiViewModel
+import com.xuanji.app.domain.action.ActionFeedback
+import kotlinx.coroutines.launch
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 
 /**
  * 综合运势页：把八字与星盘合参为一份可执行的结论。
@@ -96,6 +102,9 @@ private fun CompositeContent(
 ) {
     val controller = rememberCardLayoutController("composite", bazi.chart.display)
     val cards = fortuneCards(fortune, period)
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val feedbackStore = remember(context) { context.actionFeedbackStore() }
 
     CompositionLocalProvider(LocalCardLayout provides controller) {
         MysticFloatingGuide(bazi, fortune) { scrollState ->
@@ -121,7 +130,25 @@ private fun CompositeContent(
                         ) {
                             SummaryBlock(fortune)
                             if (shouldShowDailyAction(period)) {
-                                DailyActionSection(dailyAction)
+                                DailyActionSection(
+                                    plan = dailyAction,
+                                    onFeedback = { category, candidateKey, kind ->
+                                        dailyAction?.let { plan ->
+                                            scope.launch {
+                                                feedbackStore.append(
+                                                    plan.profileKey,
+                                                    ActionFeedback(
+                                                        id = "${plan.dateKey}|$category|$candidateKey|${kind.name}",
+                                                        dateKey = plan.dateKey,
+                                                        category = category,
+                                                        candidateKey = candidateKey,
+                                                        kind = kind
+                                                    )
+                                                )
+                                            }
+                                        }
+                                    }
+                                )
                             }
                             CardLayouts.ordered(cards, controller.state).forEach { card ->
                                 when (card.id) {

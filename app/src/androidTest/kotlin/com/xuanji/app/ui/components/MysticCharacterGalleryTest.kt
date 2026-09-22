@@ -8,6 +8,7 @@ import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.xuanji.app.domain.MysticCharacterCatalog
 import com.xuanji.app.domain.MysticCharacterId
+import com.xuanji.app.domain.game.CompanionGameCatalog
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -36,7 +37,7 @@ class MysticCharacterGalleryTest {
     }
 
     @Test
-    fun action_bar_exposes_conversation_specialty_and_xiangqi_actions() {
+    fun action_bar_exposes_conversation_specialty_and_character_game_action() {
         val character = MysticCharacterCatalog.byId(MysticCharacterId.EvelynNova)
         compose.setContent {
             MysticCharacterActionBar(
@@ -49,10 +50,11 @@ class MysticCharacterGalleryTest {
 
         compose.onNodeWithText("进入对话").assertExists()
         compose.onNodeWithText("查看专长").assertExists()
-        compose.onNodeWithText("来一盘象棋").assertExists()
+        val game = CompanionGameCatalog.forCharacter(character.id)
+        compose.onNodeWithText("进入${game.title}").assertExists()
         compose.onNodeWithContentDescription("与${character.displayName}进入对话").assertExists()
         compose.onNodeWithContentDescription("查看${character.displayName}的专长").assertExists()
-        compose.onNodeWithContentDescription("与${character.displayName}来一盘象棋")
+        compose.onNodeWithContentDescription("与${character.displayName}进入${game.title}")
             .performClick()
     }
 }

@@ -44,7 +44,7 @@ jobs:
         run: node _dev/dialogue_contract_test.js
 
       - name: Build debug APK
-        run: ./gradlew testDebugUnitTest lintDebug assembleDebug --no-daemon
+        run: ./gradlew testDebugUnitTest lintDebug assembleDebug assembleDebugAndroidTest --no-daemon
 
       - name: Upload APK artifact
         if: success()

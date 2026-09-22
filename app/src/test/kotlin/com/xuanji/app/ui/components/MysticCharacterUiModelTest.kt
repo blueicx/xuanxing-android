@@ -2,6 +2,7 @@ package com.xuanji.app.ui.components
 
 import com.xuanji.app.domain.MysticCharacterCatalog
 import com.xuanji.app.domain.MysticCharacterId
+import com.xuanji.app.domain.game.CompanionGameCatalog
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -14,11 +15,19 @@ class MysticCharacterUiModelTest {
             MysticCharacterCatalog.byId(MysticCharacterId.ShenYanzhou)
         )
 
-        assertEquals(listOf("进入对话", "查看专长", "来一盘象棋"), model.actions)
+        assertEquals(listOf("进入对话", "查看专长", "进入诗句接龙"), model.actions)
         assertEquals("沈砚舟", model.title)
         assertTrue(model.cultureLabel.contains("江南"))
         assertEquals("八字与五行", model.primarySpecialty)
         assertTrue(model.specialties.isNotEmpty())
+    }
+
+    @Test
+    fun each_character_action_names_its_own_game() {
+        MysticCharacterCatalog.all.forEach { profile ->
+            val game = CompanionGameCatalog.forCharacter(profile.id)
+            assertEquals("进入${game.title}", MysticCharacterUiModel.from(profile).actions.last())
+        }
     }
 
     @Test

@@ -21,8 +21,8 @@ import com.xuanji.app.domain.MysticRequestState
 import com.xuanji.app.domain.MysticSessionState
 import com.xuanji.app.domain.SoftMemoryTag
 
-private val QUICK_PROMPTS = listOf(
-    "今日运势", "来一盘象棋", "继续说", "换个话题", "解释刚才", "我只是想聊聊"
+private fun quickPrompts(gamePrompt: String): List<String> = listOf(
+    "今日运势", gamePrompt, "继续说", "换个话题", "解释刚才", "我只是想聊聊"
 )
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -40,7 +40,8 @@ fun MysticConversationPanel(
     modifier: Modifier = Modifier,
     accent: androidx.compose.ui.graphics.Color = MaterialTheme.colorScheme.primary,
     placeholder: String = "说点什么，我接得住",
-    showMessages: Boolean = true
+    showMessages: Boolean = true,
+    gamePrompt: String = "来一盘象棋"
 ) {
     val pending = state.requestState as? MysticRequestState.Pending
     val failed = state.requestState as? MysticRequestState.Failed
@@ -66,7 +67,7 @@ fun MysticConversationPanel(
         )
 
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            QUICK_PROMPTS.forEach { prompt ->
+            quickPrompts(gamePrompt).forEach { prompt ->
                 OutlinedButton(
                     onClick = { onQuickPrompt(prompt) },
                     enabled = !busy,

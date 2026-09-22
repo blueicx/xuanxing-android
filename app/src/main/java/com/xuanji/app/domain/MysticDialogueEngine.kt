@@ -54,7 +54,11 @@ data class DialogueContext(
     val divinationSummary: String? = null,
     val weatherSummary: String? = null,
     val personalitySource: PersonalitySource = PersonalitySource.Unknown,
-    val characterName: String? = null
+    val characterName: String? = null,
+    /** Stable identity used by the voice/specialty adapter; null keeps legacy callers on Shen's default. */
+    val characterId: MysticCharacterId? = null,
+    /** Optional explicit specialty chosen by the UI; the adapter still validates it against the catalog. */
+    val characterSpecialtyKey: String? = null
 )
 
 /** Minimal, UI-independent turn record used when the dialogue engine is called off-screen. */
@@ -76,7 +80,9 @@ data class DialogueReply(
     val text: String,
     val clarifiers: List<String> = emptyList(),
     val source: ReplySource = ReplySource.Offline,
-    val groundedFacts: List<String> = emptyList()
+    val groundedFacts: List<String> = emptyList(),
+    val specialtyKey: String? = null,
+    val evidence: MysticEvidenceTrace? = null
 )
 
 enum class ReplySource { Offline, OnlineFallback, OnlineValidated }
@@ -103,7 +109,7 @@ class DefaultMysticDialogueEngine : MysticDialogueEngine {
         val intent = analysis.intent
         val topicKey = analysis.topicKey ?: continuity.intent.topicKeyOrNull() ?: context.topicKey
         val prefix = MysticGuideGenerator.customAnswerPrefix(normalizedInput)
-        val text = MysticGuideGenerator.customAnswer(
+        val draft = MysticGuideGenerator.customAnswer(
             context.mode,
             topicKey,
             continuity.generationInput,
@@ -117,6 +123,25 @@ class DefaultMysticDialogueEngine : MysticDialogueEngine {
             context.personalitySource,
             characterName = context.characterName
         )
+        val voice = MysticCharacterVoiceAdapter.adapt(
+            context = context,
+            analysis = analysis.copy(topicKey = topicKey),
+            draft = draft
+        )
+        // The adapter is an explanation layer, never a way around the single
+        // health/finance/personality guard. Re-check after framing so a role
+        // intro cannot be attached to a whole-reply refusal.
+        val guardedText = SafetyResponseGuard.guard(
+            normalizedInput,
+            prefix + voice.text,
+            context.copy(question = normalizedInput),
+            context.personalitySource
+        ).text
+        val evidence = MysticEvidenceBuilder.forDialogue(
+            context = context,
+            analysis = analysis.copy(topicKey = topicKey),
+            specialty = voice.selection
+        )
         val groundedFacts = when (intent) {
             MysticIntent.TodayMeal -> context.dailyActionPlan?.meals?.firstOrNull()?.evidence?.map { it.label }.orEmpty()
             MysticIntent.TodayActivity -> context.dailyActionPlan?.activities?.firstOrNull()?.evidence?.map { it.label }.orEmpty()
@@ -127,9 +152,11 @@ class DefaultMysticDialogueEngine : MysticDialogueEngine {
         return DialogueReply(
             intent = intent,
             prefix = prefix,
-            text = prefix + text,
+            text = guardedText,
             clarifiers = clarifiersFor(analysis),
-            groundedFacts = groundedFacts
+            groundedFacts = groundedFacts,
+            specialtyKey = voice.selection.specialtyKey,
+            evidence = evidence
         )
     }
 

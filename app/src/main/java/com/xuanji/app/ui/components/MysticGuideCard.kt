@@ -65,6 +65,7 @@ import com.xuanji.app.data.model.CompositeDailyFortune
 import com.xuanji.app.data.local.ConversationMemoryStore
 import com.xuanji.app.data.local.DataStorePreferenceBridge
 import com.xuanji.app.data.local.dataStore
+import com.xuanji.app.data.local.MysticCharacterSessionStore
 import com.xuanji.app.data.local.softMemoryTagStore
 import com.xuanji.app.di.AppModule
 import com.xuanji.app.domain.MysticClarifierOption
@@ -72,7 +73,9 @@ import com.xuanji.app.domain.MysticInteraction
 import com.xuanji.app.domain.MysticInteractionOption
 import com.xuanji.app.domain.MysticGuideGenerator
 import com.xuanji.app.domain.MysticCharacterCatalog
+import com.xuanji.app.domain.MysticCharacterEvent
 import com.xuanji.app.domain.MysticCharacterId
+import com.xuanji.app.domain.MysticCharacterSessionState
 import com.xuanji.app.domain.DefaultMysticDialogueEngine
 import com.xuanji.app.domain.DialogueContext
 import com.xuanji.app.domain.DialogueProvider
@@ -82,6 +85,7 @@ import com.xuanji.app.domain.ProviderResult
 import com.xuanji.app.domain.MysticEvent
 import com.xuanji.app.domain.MysticSessionState
 import com.xuanji.app.domain.reduce
+import com.xuanji.app.domain.reduceCharacterSession
 import com.xuanji.app.domain.MysticOpeningCheckin
 import com.xuanji.app.domain.MysticOpeningOption
 import com.xuanji.app.domain.MysticGuestCameo
@@ -98,6 +102,8 @@ import com.xuanji.app.domain.SoftMemorySource
 import com.xuanji.app.domain.SoftMemoryTag
 import com.xuanji.app.domain.DefaultMysticDialogueAnalyzer
 import com.xuanji.app.domain.MysticMemoryNote as DomainMysticMemoryNote
+import com.xuanji.app.domain.MysticMessage
+import com.xuanji.app.domain.MysticMessageRole
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -121,6 +127,54 @@ private data class MysticMemoryNote(
     val id: String,
     val text: String
 )
+
+/** Rehydrates the rich transcript from the persisted, provider-agnostic message log. */
+private fun restoreCharacterThread(messages: List<MysticMessage>): List<MysticTurn> {
+    val restored = mutableListOf<MysticTurn>()
+    var pendingUser: MysticMessage? = null
+    messages.takeLast(20).forEach { message ->
+        when (message.role) {
+            MysticMessageRole.User -> {
+                if (pendingUser != null) {
+                    restored += MysticTurn(
+                        key = "restored-user-${pendingUser!!.turnId}",
+                        question = pendingUser!!.text,
+                        answer = "这句已记下；上一轮回复没有完整保存。",
+                        kind = "restored"
+                    )
+                }
+                pendingUser = message
+            }
+            MysticMessageRole.Mystic -> {
+                val user = pendingUser
+                restored += MysticTurn(
+                    key = "restored-${message.turnId}",
+                    question = user?.text ?: "角色回复",
+                    answer = message.text,
+                    kind = "restored"
+                )
+                pendingUser = null
+            }
+            MysticMessageRole.System -> {
+                restored += MysticTurn(
+                    key = "restored-system-${message.turnId}",
+                    question = "角色交接",
+                    answer = message.text,
+                    kind = "handoff"
+                )
+            }
+        }
+    }
+    pendingUser?.let { user ->
+        restored += MysticTurn(
+            key = "restored-user-${user.turnId}",
+            question = user.text,
+            answer = "这句已记下；回复仍可重新提问。",
+            kind = "restored"
+        )
+    }
+    return restored.takeLast(5)
+}
 
 /** 记忆列表里那条是哪个动作；穷举写，新增种类时编译期就得补。 */
 private fun recollectionKindLabel(kind: RecollectionKind): String = when (kind) {
@@ -200,6 +254,7 @@ private class MysticCompanionState(initialMode: String, initialTopic: String) {
     var memorySequence by mutableStateOf(0)
     var memoryExpanded by mutableStateOf(false)
     var skinId by mutableStateOf("")
+    var activeCharacterId by mutableStateOf<MysticCharacterId?>(null)
     val characterThreads = mutableMapOf<MysticCharacterId, SnapshotStateList<MysticTurn>>()
     val characterSessionStates = mutableStateMapOf<MysticCharacterId, MysticSessionState>()
 
@@ -240,6 +295,7 @@ fun MysticGuideCard(
     val context = LocalContext.current
     val visitStore = remember(context) { MysticVisitStore(context) }
     val memoryStore = remember(context) { ConversationMemoryStore(DataStorePreferenceBridge(context)) }
+    val characterSessionStore = remember(context) { MysticCharacterSessionStore(DataStorePreferenceBridge(context)) }
     val softMemoryStore = remember(context) { context.softMemoryTagStore() }
     val coroutineScope = rememberCoroutineScope()
     val visitProfile = remember(bazi) { "bazi|${bazi.chart.display}" }
@@ -285,18 +341,71 @@ fun MysticGuideCard(
     val dialogueEngine = remember { DefaultMysticDialogueEngine() }
     val dialogueProvider: DialogueProvider = remember { OfflineDialogueProvider(dialogueEngine) }
     var sessionState by remember(characterId) { mutableStateOf(companion.sessionFor(characterId)) }
+    var characterSessionsLoaded by remember(visitProfile) { mutableStateOf(false) }
+    LaunchedEffect(visitProfile) {
+        val restored = runCatching { characterSessionStore.load(visitProfile) }.getOrNull()
+        if (restored != null) {
+            restored.sessions.forEach { (id, state) ->
+                companion.characterSessionStates[id] = state
+                val thread = companion.threadFor(id)
+                if (thread.isEmpty()) thread.addAll(restoreCharacterThread(state.messages))
+            }
+            companion.sharedMemoryNotes = restored.sharedMemoryNotes
+            sessionState = restored.session(characterId)
+        }
+        characterSessionsLoaded = true
+    }
     LaunchedEffect(sessionState, characterId) {
         companion.characterSessionStates[characterId] = sessionState
+    }
+    LaunchedEffect(sessionState, characterId, companion.sharedMemoryNotes, characterSessionsLoaded) {
+        if (!characterSessionsLoaded) return@LaunchedEffect
+        val snapshot = com.xuanji.app.domain.MysticCharacterSessionState(
+            activeCharacterId = characterId,
+            sessions = MysticCharacterId.entries.associateWith { companion.sessionFor(it) },
+            sharedMemoryNotes = companion.sharedMemoryNotes
+        )
+        runCatching { characterSessionStore.save(visitProfile, snapshot) }
     }
     LaunchedEffect(characterId) {
         companion.mode = characterProfile.dialogueMode
         companion.skinId = characterProfile.legacySkinId
+    }
+    LaunchedEffect(characterId, characterSessionsLoaded) {
+        if (!characterSessionsLoaded) return@LaunchedEffect
+        val previous = companion.activeCharacterId
+        if (previous != null && previous != characterId) {
+            val base = MysticCharacterSessionState(
+                activeCharacterId = previous,
+                sessions = MysticCharacterId.entries.associateWith { companion.sessionFor(it) },
+                sharedMemoryNotes = companion.sharedMemoryNotes
+            )
+            val switched = reduceCharacterSession(base, MysticCharacterEvent.Switch(characterId))
+            switched.sessions.forEach { (id, state) -> companion.characterSessionStates[id] = state }
+            companion.sharedMemoryNotes = switched.sharedMemoryNotes
+            sessionState = switched.session(characterId)
+            val handoffKey = "character-handoff-${previous.key}-${characterId.key}"
+            val targetThread = companion.threadFor(characterId)
+            if (targetThread.none { it.key == handoffKey }) {
+                targetThread.add(
+                    MysticTurn(
+                        key = handoffKey,
+                        question = "角色交接",
+                        answer = MysticCharacterCatalog.byId(characterId).handoffLine,
+                        kind = "handoff"
+                    )
+                )
+                while (targetThread.size > 5) targetThread.removeAt(0)
+            }
+        }
+        companion.activeCharacterId = characterId
     }
     var gameSession by remember { mutableStateOf(com.xuanji.app.domain.game.GameSessionState()) }
     var gameReply by remember { mutableStateOf("") }
     var gameInputEcho by remember { mutableStateOf<String?>(null) }
     var gameThinking by remember { mutableStateOf(false) }
     var gameViewPly by remember { mutableStateOf<Int?>(null) }
+    var companionGameId by remember(characterId) { mutableStateOf<String?>(null) }
     val gameArchiveStore = remember(context) { com.xuanji.app.data.local.GameArchiveStore(context) }
     var gameRecord by remember { mutableStateOf(com.xuanji.app.domain.game.GameRecord()) }
     var gameArchive by remember { mutableStateOf<com.xuanji.app.domain.game.GameSave?>(null) }
@@ -504,7 +613,8 @@ fun MysticGuideCard(
                 memoryNotes = companion.sharedMemoryNotes,
                 skinId = companion.skinId,
                 question = text,
-                characterName = characterProfile.displayName
+                characterName = characterProfile.displayName,
+                characterId = characterProfile.id
             )
         )
         val topicKey = analysis.topicKey ?: return
@@ -625,6 +735,13 @@ fun MysticGuideCard(
         // Game path first: board-game intents bypass the generic pendingCustom reply so
         // character game commentary never mixes with fortune template wording.
         val cleanText = text.trim().take(200)
+        val companionGameIdFromInput = com.xuanji.app.domain.game.CompanionGameCatalog
+            .gameIdForInput(cleanText)
+        if (companionGameIdFromInput != null && companionGameIdFromInput != "xiangqi") {
+            rememberLongTerm(RecollectionKind.USER_INPUT, cleanText, intent = "")
+            companionGameId = companionGameIdFromInput
+            return
+        }
         val gameIntent = com.xuanji.app.domain.MysticIntentClassifier.classify(cleanText) ==
             com.xuanji.app.domain.MysticIntent.Game ||
             gameBridge.activeGame(gameSession)
@@ -640,7 +757,11 @@ fun MysticGuideCard(
 
     LaunchedEffect(stageActionRequest, characterId) {
         val action = stageActionRequest ?: return@LaunchedEffect
-        submitPanelInput(action)
+        if (action.startsWith("__companion_game__:")) {
+            companionGameId = action.substringAfter(":").takeIf { it.isNotBlank() }
+        } else {
+            submitPanelInput(action)
+        }
         onStageActionConsumed()
     }
 
@@ -1155,7 +1276,7 @@ fun MysticGuideCard(
         rememberLongTerm(RecollectionKind.USER_CHOICE, choice.label)
     }
 
-    LaunchedEffect(pendingCustom, guide) {
+    LaunchedEffect(pendingCustom, guide, characterId) {
         val question = pendingCustom ?: return@LaunchedEffect
         val requestToken = sessionState.sessionToken
         val requestTurnId = (sessionState.requestState as? com.xuanji.app.domain.MysticRequestState.Pending)?.turnId
@@ -1174,7 +1295,8 @@ fun MysticGuideCard(
             memoryNotes = companion.sharedMemoryNotes,
             skinId = companion.skinId,
             question = question,
-            characterName = characterProfile.displayName
+            characterName = characterProfile.displayName,
+            characterId = characterProfile.id
         )
         val providerResult = dialogueProvider.complete(
             DialogueRequest(dialogueContext, question, requestToken)
@@ -1509,6 +1631,14 @@ fun MysticGuideCard(
                 color = Color.Transparent
             ) {
                 Column {
+                    companionGameId?.let { gameId ->
+                        CompanionGameCard(
+                            gameId = gameId,
+                            characterId = characterProfile.id,
+                            onClose = { companionGameId = null },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
                     if (gameBridge.activeGame(gameSession)) {
                         com.xuanji.app.ui.components.game.GameBoardCard(
                             position = gameSession.positionAt(gameViewPly ?: gameSession.history.size),
@@ -1601,7 +1731,8 @@ fun MysticGuideCard(
                         onRevokeSoftTag = ::revokeSoftTag,
                         onClearSoftMemory = ::clearSoftMemory,
                         accent = accent,
-                        showMessages = false
+                        showMessages = false,
+                        gamePrompt = "开始${com.xuanji.app.domain.game.CompanionGameCatalog.forCharacter(characterProfile.id).title}"
                     )
                 }
             }
@@ -2039,6 +2170,24 @@ fun MysticGuideCard(
                                     color = MaterialTheme.colorScheme.error
                                 )
                             }
+                            OutlinedButton(
+                                onClick = {
+                                    sessionState = MysticSessionState()
+                                    companion.characterSessionStates[characterId] = sessionState
+                                    companion.threadFor(characterId).clear()
+                                    memoryNotes = emptyList()
+                                    coroutineScope.launch {
+                                        runCatching { characterSessionStore.clearCharacter(visitProfile, characterId) }
+                                    }
+                                },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .heightIn(min = 48.dp)
+                                    .semantics { contentDescription = "清除${characterProfile.displayName}当前线程" },
+                                shape = RoundedCornerShape(10.dp)
+                            ) {
+                                Text("清除${characterProfile.displayName}当前线程", style = MaterialTheme.typography.labelMedium, color = accent)
+                            }
                         }
                     }
                 }
@@ -2334,7 +2483,8 @@ fun MysticGuideCard(
                             onRevokeSoftTag = ::revokeSoftTag,
                             onClearSoftMemory = ::clearSoftMemory,
                             accent = accent,
-                            showMessages = false
+                            showMessages = false,
+                            gamePrompt = "开始${com.xuanji.app.domain.game.CompanionGameCatalog.forCharacter(characterProfile.id).title}"
                         )
 
                         if (conversation.isNotEmpty()) {

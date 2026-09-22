@@ -120,6 +120,13 @@ object MysticCharacterCatalog {
                     systemIds = listOf("conversation_memory"),
                     sourceLabel = "用户主动记忆",
                     ritual = "只记录你主动说过或选择过的内容，随时可以撤回。"
+                ),
+                MysticCharacterSpecialty(
+                    key = "xiangqi",
+                    label = "中国象棋",
+                    systemIds = listOf("xiangqi_rules", "xiangqi_engine"),
+                    sourceLabel = "本地真实象棋规则与棋谱",
+                    ritual = "每一步先过规则校验，再交给棋局引擎。"
                 )
             ),
             gameTheme = "ink_paper"
@@ -164,6 +171,14 @@ object MysticCharacterCatalog {
                     systemIds = listOf("big_five", "mbti"),
                     sourceLabel = "自我探索测验",
                     ritual = "先说明不是临床诊断，再把结果变成可讨论的倾向。",
+                    availability = MysticCharacterAvailability.CulturalReference
+                ),
+                MysticCharacterSpecialty(
+                    key = "star_map",
+                    label = "星图观测游戏",
+                    systemIds = listOf("local_logic_game"),
+                    sourceLabel = "本地连线逻辑题",
+                    ritual = "只检查连线和路径，不把游戏结果当作占星或心理结论。",
                     availability = MysticCharacterAvailability.CulturalReference
                 )
             ),
@@ -210,6 +225,14 @@ object MysticCharacterCatalog {
                     systemIds = listOf("place", "weather"),
                     sourceLabel = "地点/天气扩展入口",
                     ritual = "联网能力未启用时只给离线建议，并明确提示数据边界。"
+                ),
+                MysticCharacterSpecialty(
+                    key = "silkroad_route",
+                    label = "丝路路线规划",
+                    systemIds = listOf("offline_route_game"),
+                    sourceLabel = "离线城市图与资源规则",
+                    ritual = "在时间和预算内规划路径，不代表现实旅行安全。",
+                    availability = MysticCharacterAvailability.CulturalReference
                 )
             ),
             gameTheme = "silkroad_copper"

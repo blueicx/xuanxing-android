@@ -244,7 +244,7 @@
       "伊芙琳·诺瓦",
       "纳迪尔·拉希德"
     ],
-    "gallery_actions": ["进入对话", "查看专长", "来一盘象棋"],
+    "gallery_actions": ["进入对话", "查看专长"],
     "game_theme_keys": ["jiangnan_wood", "ink_paper", "academy_star", "silkroad_copper"],
     "style_ids": [
       "jiangnan_scholar",
@@ -272,7 +272,26 @@
     "verify": "MysticSkinTest.visual_styles_are_bounded_and_mapped",
     "character_verify": "MysticCharacterCatalogTest.catalog_exposes_the_four_reference_characters",
     "session_verify": "MysticCharacterSessionStateTest.switching_character_preserves_threads_and_invalidates_old_pending_reply",
-    "ui_verify": "MysticCharacterUiModelTest.gallery_model_exposes_the_three_stage_actions"
+    "ui_verify": "MysticCharacterUiModelTest.gallery_model_exposes_the_three_stage_actions",
+    "game_verify": "MysticCharacterUiModelTest.each_character_action_names_its_own_game"
+  },
+  "companion_games": {
+    "ids": ["poetry_chain", "xiangqi", "star_map_observation", "silkroad_route"],
+    "availability": {"poetry_chain": "CulturalReference", "xiangqi": "Enabled", "star_map_observation": "CulturalReference", "silkroad_route": "CulturalReference"},
+    "shortcut_inputs": {"poetry_chain": "开始诗句接龙", "xiangqi": "来一盘象棋", "star_map_observation": "开始星图观测", "silkroad_route": "开始丝路路线规划"},
+    "shortcut_verify": "MysticDialogueGameIntentTest.each_character_game_shortcut_reaches_game_without_opening_fortune_chat",
+    "verify": "CompanionGameEngineTest.catalog_maps_one_game_to_each_character_and_keeps_unenabled_games_explicit",
+    "engine_verify": "CompanionGameEngineTest.poetry_chain_is_deterministic_restartable_and_requires_the_local_rule"
+  },
+  "session_persistence": {
+    "key_prefix": "mystic_character_sessions_",
+    "codec_version": 1,
+    "verify": "MysticSessionSnapshotCodecTest.round_trip_keeps_threads_shared_notes_and_drops_pending_work",
+    "store_verify": "MysticSessionSnapshotCodecTest.store_supports_reload_per_character_clear_and_clear_all"
+  },
+  "evidence_trace": {
+    "algorithm_version": "x3-offline-2026.09",
+    "verify": "MysticEvidenceBuilderTest.trace_is_deterministic_and_marks_missing_realtime_weather"
   },
   "golden_wording": [
     {"input": "来一盘象棋", "expect": "starts xiangqi, grounded=true", "verify": "GameAutoReplyTest.player_move_marks_engine_turn_pending"},
