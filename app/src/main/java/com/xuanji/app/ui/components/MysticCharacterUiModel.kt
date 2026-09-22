@@ -43,7 +43,7 @@ data class MysticCharacterUiModel(
     val primarySpecialty: String,
     val specialtySources: List<String>,
     val actions: List<String>,
-    val usesScenePlate: Boolean
+    val sceneSpec: MysticSceneSpec
 ) {
     companion object {
         fun from(profile: MysticCharacterProfile): MysticCharacterUiModel = MysticCharacterUiModel(
@@ -56,7 +56,7 @@ data class MysticCharacterUiModel(
             primarySpecialty = profile.specialties.firstOrNull()?.label ?: "综合合参",
             specialtySources = profile.specialties.map { it.sourceLabel },
             actions = listOf("进入对话", "查看专长", "进入${CompanionGameCatalog.forCharacter(profile.id).title}"),
-            usesScenePlate = profile.visualStyleId != "elder_ink"
+            sceneSpec = MysticSceneCatalog.forCharacter(profile)
         )
     }
 }
