@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -45,9 +46,8 @@ import com.xuanji.app.domain.MysticCharacterId
 import com.xuanji.app.domain.MysticCharacterProfile
 
 /**
- * Full-screen character stage. The scene plate owns the background for the
- * three reference triptychs; the elder ink figure remains a transparent
- * foreground over the generated ink backdrop.
+ * Unified full-screen stage. Every role goes through the same five layers:
+ * scene plate, scrim, figure, stage header/gallery and companion drawer.
  */
 @Composable
 fun MysticStageLayout(
@@ -73,8 +73,9 @@ fun MysticStageLayout(
             label = "stagePhase"
         )
     }
-    val gold = Color(0xFFD9C58B)
     val characterUi = MysticCharacterUiModel.from(character)
+    val scene = characterUi.sceneSpec
+    val gold = Color(scene.accentColorArgb)
     var specialtiesOpen by remember(character.id) { mutableStateOf(false) }
 
     Surface(
@@ -83,63 +84,56 @@ fun MysticStageLayout(
         contentColor = Color(0xFFF4EEE5)
     ) {
         Box(Modifier.fillMaxSize()) {
-            if (characterUi.usesScenePlate) {
-                MysticFigureAsset(
-                    styleId = character.visualStyleId,
-                    contentDescription = "${character.displayName}人物场景",
-                    modifier = Modifier.fillMaxSize().alpha(.96f),
-                    contentScale = ContentScale.Crop
-                ) {
-                    MysticCultureBackdrop(skinId, gold, moodLevel)
-                    MysticFigureCanvas(
-                        mode = "scholar",
-                        skinId = skinId,
-                        styleId = character.visualStyleId,
-                        garment = garment,
-                        trimColor = trimColor,
-                        moodLevel = moodLevel,
-                        phase = phase,
-                        reducedMotion = reducedMotion,
-                        modifier = Modifier.fillMaxSize(.82f)
-                    )
-                }
-                Box(
-                    Modifier.fillMaxSize().background(
-                        Brush.verticalGradient(
-                            listOf(
-                                Color(0x330D0817),
-                                Color.Transparent,
-                                Color(0xF20D0817)
-                            )
+            // Layer 1: every role has a complete cultural setting, including Mo Heng.
+            MysticCultureBackdrop(
+                scene = scene,
+                gold = gold,
+                moodLevel = moodLevel,
+                modifier = Modifier.fillMaxSize()
+            )
+
+            // Layer 2: one consistent scrim keeps text and controls readable.
+            Box(
+                Modifier.fillMaxSize().background(
+                    Brush.verticalGradient(
+                        listOf(
+                            Color(0x330D0817),
+                            Color.Transparent,
+                            Color(0xF20D0817)
                         )
                     )
                 )
-            } else {
-                MysticCultureBackdrop(skinId, gold, moodLevel)
-                Box(
-                    Modifier.fillMaxWidth().fillMaxHeight(.60f).padding(top = 40.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    MysticFigureCanvas(
-                        mode = "scholar",
-                        skinId = skinId,
-                        styleId = character.visualStyleId,
-                        garment = garment,
-                        trimColor = trimColor,
-                        moodLevel = moodLevel,
-                        phase = phase,
-                        reducedMotion = reducedMotion,
-                        modifier = Modifier.fillMaxSize(.82f)
-                    )
-                }
+            )
+
+            // Layer 3: the local character artwork or deterministic Canvas fallback.
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .fillMaxHeight(.72f)
+                    .align(Alignment.TopCenter)
+                    .padding(top = 48.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                MysticFigureCanvas(
+                    mode = "scholar",
+                    skinId = skinId,
+                    styleId = character.visualStyleId,
+                    garment = garment,
+                    trimColor = trimColor,
+                    moodLevel = moodLevel,
+                    phase = phase,
+                    reducedMotion = reducedMotion,
+                    modifier = Modifier.fillMaxSize(.94f)
+                )
             }
 
+            // Layer 4 + 5: one information header and one bottom companion drawer.
             Column(Modifier.fillMaxSize()) {
-                if (characterUi.usesScenePlate) {
-                    Box(Modifier.fillMaxWidth().fillMaxHeight(.57f))
-                }
+                Box(Modifier.fillMaxWidth().fillMaxHeight(.50f))
                 Column(
-                    Modifier.fillMaxWidth().weight(1f)
+                    Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
                         .background(
                             Brush.verticalGradient(
                                 listOf(Color.Transparent, Color(0xE60D0817), Color(0xFF0D0817))
@@ -159,7 +153,7 @@ fun MysticStageLayout(
                         }
                     )
                     Text(
-                        "${character.title} · ${character.cultureLabel}",
+                        "${character.title} · ${scene.title}",
                         style = MaterialTheme.typography.labelMedium,
                         color = Color(0xFFE7D9EE)
                     )
@@ -179,7 +173,9 @@ fun MysticStageLayout(
                     )
                     if (specialtiesOpen) {
                         Surface(
-                            Modifier.fillMaxWidth(),
+                            Modifier
+                                .fillMaxWidth()
+                                .semantics { contentDescription = "${character.displayName}的专长列表" },
                             shape = RoundedCornerShape(14.dp),
                             color = Color(0xAA211433),
                             border = BorderStroke(1.dp, gold.copy(alpha = .24f))
@@ -238,12 +234,13 @@ fun MysticStageLayout(
                     .align(Alignment.TopEnd)
                     .statusBarsPadding()
                     .padding(top = 12.dp, end = 14.dp)
+                    .size(48.dp)
                     .semantics { contentDescription = "关闭玄师台" }
             ) {
                 Icon(
                     Icons.Filled.Close,
                     contentDescription = "关闭玄师台",
-                    modifier = Modifier.padding(10.dp)
+                    modifier = Modifier.padding(12.dp)
                 )
             }
         }
