@@ -24,6 +24,10 @@ const stageLower = stage.toLowerCase();
 ['scene plate', 'character artwork', 'companion drawer', 'mysticculturebackdrop', 'mysticfigurecanvas'].forEach((marker) => {
   assert(stageLower.includes(marker), `stage layer marker missing: ${marker}`);
 });
+assert(stage.includes('MysticDrawerState.Peek'), 'stage must have a collapsed drawer state');
+assert(stage.includes('stage-drawer-expanded'), 'stage must expose the expanded drawer semantics');
+assert(stage.includes('MysticVisualAssetCatalog'), 'stage must use explicit visual asset modes');
+assert(stage.includes('MysticAssetRenderMode.CompleteScene'), 'stage must branch complete-scene assets');
 assert(uiModel.includes('sceneSpec = MysticSceneCatalog.forCharacter(profile)'), 'UI model must expose sceneSpec');
 assert(!stage.includes('usesScenePlate'), 'stage must not branch on usesScenePlate');
 assert(scene.includes('InkFallback'), 'scene fallback must remain available');

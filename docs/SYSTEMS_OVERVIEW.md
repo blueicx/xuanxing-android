@@ -24,7 +24,9 @@
 
 文化人物视觉现在由 `MysticCharacterCatalog` 与 `MysticSceneCatalog` 管理四位独立来客，而不是把角色当成服饰皮肤：沈砚舟（江南书生）、墨衡（灰发水墨老法师）、伊芙琳·诺瓦（学院星象师）和纳迪尔·拉希德（丝路占星师）。`MysticStageLayout` 固定使用场景底板、统一遮罩、人物层、顶部信息和底部陪伴抽屉五层结构；江南水榭、水墨案头、学院观测台、丝路驿站分别绘制月桥/灯笼、宣纸/墨砚、星图/档案桌、拱门/铜盘等文化道具，墨衡不再是透明背景例外。`MysticFigureAsset` 仍优先读取本地 `drawable-nodpi` WebP，`MysticFigureCanvas` 在资源缺失时回退到本地人物与水墨静室；未知场景 ID 也回退到非空水墨场景。它是文化视觉演绎，不宣称还原真实服饰、仪式或族群身份。
 
-角色舞台由 `MysticStageLayout` 承载全屏 Horizontal Pager 画廊，`MysticCharacterGallery` 提供左右拖拽与 TalkBack 角色目标，统一的动作栏提供「进入对话 / 查看专长 / 进入当前角色游戏」。角色专长只做已有计算体系的策展入口：`MysticCharacterSpecialty.systemIds` 指向实际系统，`sourceLabel` 与 `availability` 明示文化参考或未启用边界，不生成伪造经文、叶脉文本或心理测验常模。浮球显示当前角色首字与剪影，推荐由 `topicKey + dateKey + fortune` 稳定派生，用户手动选择后当天沿用。
+角色舞台由 `MysticStageLayout` 承载全屏 Horizontal Pager 画廊，`MysticCharacterGallery` 提供左右拖拽与 TalkBack 角色目标，统一的动作栏提供「进入对话 / 查看专长 / 进入当前角色游戏」。舞台有明确的 `Peek/Expanded` 抽屉状态：打开时只显示角色摘要和动作栏，明确操作后才显示消息、行动卡、依据和游戏；每位角色在当前舞台中保留自己的抽屉状态，旧 token 不能重新打开已切换的角色。角色专长只做已有计算体系的策展入口：`MysticCharacterSpecialty.systemIds` 指向实际系统，`sourceLabel` 与 `availability` 明示文化参考或未启用边界，不生成伪造经文、叶脉文本或心理测验常模。浮球显示当前角色首字与剪影，推荐由 `topicKey + dateKey + fortune` 稳定派生，用户手动选择后当天沿用。
+
+视觉资源有显式 `MysticAssetRenderMode` 契约：沈砚舟、伊芙琳·诺瓦和纳迪尔·拉希德的 WebP 是完整场景图，直接铺满场景；墨衡的 WebP 是透明前景，只叠加水墨背景。`MysticVisualAssetCatalog` 负责声明这一区别，完整场景不会再收到第二层文化底板；资源缺失时统一回到 Canvas 场景与人物回退。
 
 角色状态由 `MysticCharacterSessionState` 按角色保存独立消息线程，共享盘面事实与用户主动记忆；切换时追加交接语，并递增旧线程 token，使迟到的异步回复丢弃。`MysticDialogueEngine` 现在把 `characterId` 交给 `MysticCharacterVoiceAdapter`：它按意图选择角色专长、加入可辨识的解释语气，再回到本地安全校验，不改变盘面计算。「玄学家 / 半仙」只保留为内部语气模式，界面身份统一显示四位来客。
 
@@ -34,7 +36,9 @@
 
 ## 四角色游戏与依据
 
-`CompanionGameCatalog` 是角色与游戏的单一映射，`CompanionGameEngine<S,E,R>` 约束每个游戏使用独立 reducer、结果和重开路径。诗句、星图和路线都明确标为文化参考/逻辑游戏；中国象棋标为已启用并复用既有规则。`gameIdForInput` 与对话分类器共用一组窄词快捷入口，输入「开始诗句接龙」「开始星图观测」或「开始丝路路线规划」会打开当前角色游戏；普通提问不会被误开。`CompanionGameCard` 只在当前角色的动作栏、快捷气泡或舞台按钮召回，不把游戏结果写成占卜结论。
+`CompanionGameCatalog` 是角色与游戏的单一映射，`CompanionGameEngine<S,E,R>` 约束每个游戏使用独立 reducer、结果和重开路径。诗句、星图和路线都明确标为文化参考/逻辑游戏；中国象棋标为已启用并复用既有规则。`gameIdForInput` 与 `MysticCompanionActionRouter` 共用一组窄词快捷入口，输入「开始诗句接龙」「开始星图观测」或「开始丝路路线规划」会打开当前角色游戏；普通提问不会被误开。`CompanionGameCard` 只在当前角色的动作栏、快捷气泡或舞台按钮召回，不把游戏结果写成占卜结论。
+
+`CompanionGameProgressStore` 使用 `companion_game_progress_<sha256(profileKey)>_<character>_<game>` 独立键保存三个逻辑小游戏的版本化状态；`CompanionGameProgressCodec` 对损坏、未知版本和错误角色安全降级。中国象棋继续由 `GameArchiveStore` 保存局面和棋谱，两套存档互不混用。对话输入经 `MysticCompanionActionRouter` 直接打开真实的今日饮食/行动/出游、人生画像、依据抽屉或游戏；缺少计算数据时保持对话回退，不生成空的具体结论。
 
 `MysticEvidenceBuilder` 为对话和综合盘面生成依据 trace：输入摘要、体系、权重、算法版本、确定性 seed、计算/用户输入/文化参考/未启用标签、置信度和缺失输入。天气没有用户授权时会明确记录“未启用能力”，不会从盘面猜实时天气。依据层和 `MysticPrivacyExportCodec` 均可离线运行。
 

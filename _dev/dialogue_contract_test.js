@@ -171,6 +171,9 @@ const memoryStoreSource = fs.readFileSync(path.join(APP_SRC, 'data', 'local', 'C
 const generatorSource = fs.readFileSync(path.join(APP_SRC, 'domain', 'MysticGuideGenerator.kt'), 'utf8');
 const dialogueTemplatesSource = fs.readFileSync(path.join(APP_SRC, 'domain', 'MysticDialogueTemplates.kt'), 'utf8');
 const mysticCardSource = fs.readFileSync(path.join(APP_SRC, 'ui', 'components', 'MysticGuideCard.kt'), 'utf8');
+const actionRouterSource = fs.readFileSync(path.join(APP_SRC, 'domain', 'MysticCompanionActionRouter.kt'), 'utf8');
+const progressSource = fs.readFileSync(path.join(APP_SRC, 'domain', 'game', 'CompanionGameProgress.kt'), 'utf8');
+const progressStoreSource = fs.readFileSync(path.join(APP_SRC, 'data', 'local', 'CompanionGameProgressStore.kt'), 'utf8');
 const cm = contract.conversation_memory;
 
 // the kinds are the red line: a fourth wire means generated copy has found a place to hide
@@ -297,6 +300,11 @@ assert(analysis.low_confidence_threshold === 60, 'low-confidence threshold chang
   assert(analyzerSource.includes(symbol), `dialogue analyzer lost ${symbol}`);
 });
 assert(analyzerSource.includes('Normalizer.Form.NFKC'), 'input normalization must use Unicode NFKC');
+assert(actionRouterSource.includes('ShowTodayMeal') && actionRouterSource.includes('ShowTodayActivity') && actionRouterSource.includes('ShowTodayOuting'), 'dialogue action router lost grounded daily actions');
+assert(actionRouterSource.includes('ShowLifeProfile') && actionRouterSource.includes('ShowEvidence'), 'dialogue action router lost life profile/evidence actions');
+assert(mysticCardSource.includes('dailyActionPlan = dailyActionPlan') && mysticCardSource.includes('lifeProfile = lifeProfile'), 'dialogue context must receive grounded action/profile data');
+assert(progressSource.includes('CompanionGameProgressEnvelope') && progressSource.includes('VERSION = 1'), 'companion game progress needs a versioned envelope');
+assert(progressStoreSource.includes('KEY_PREFIX = "companion_game_progress_"') && progressStoreSource.includes('clear('), 'companion game progress must be profile-scoped and clearable');
 
 const soft = contract.soft_memory;
 const softTagSource = fs.readFileSync(path.join(APP_SRC, 'domain', 'SoftMemoryTag.kt'), 'utf8');

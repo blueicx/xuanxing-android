@@ -41,9 +41,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import com.xuanji.app.domain.MysticCharacterId
 import com.xuanji.app.domain.MysticCharacterProfile
+import com.xuanji.app.domain.MysticDrawerState
+import androidx.compose.runtime.mutableStateMapOf
 
 /**
  * Unified full-screen stage. Every role goes through the same five layers:
@@ -75,8 +78,14 @@ fun MysticStageLayout(
     }
     val characterUi = MysticCharacterUiModel.from(character)
     val scene = characterUi.sceneSpec
+    val assetSpec = MysticVisualAssetCatalog.forCharacter(character)
     val gold = Color(scene.accentColorArgb)
     var specialtiesOpen by remember(character.id) { mutableStateOf(false) }
+    val drawerStates = remember { mutableStateMapOf<MysticCharacterId, MysticDrawerState>() }
+    val drawerState = drawerStates[character.id] ?: MysticDrawerState.Peek
+
+    fun expandDrawer() { drawerStates[character.id] = MysticDrawerState.Expanded }
+    fun collapseDrawer() { drawerStates[character.id] = MysticDrawerState.Peek }
 
     Surface(
         Modifier.fillMaxSize(),
@@ -84,13 +93,19 @@ fun MysticStageLayout(
         contentColor = Color(0xFFF4EEE5)
     ) {
         Box(Modifier.fillMaxSize()) {
-            // Layer 1: every role has a complete cultural setting, including Mo Heng.
-            MysticCultureBackdrop(
-                scene = scene,
-                gold = gold,
-                moodLevel = moodLevel,
-                modifier = Modifier.fillMaxSize()
-            )
+            // Complete-scene artwork owns its background; only transparent artwork gets a backdrop.
+            if (assetSpec.renderMode == MysticAssetRenderMode.CompleteScene) {
+                MysticCompleteSceneAsset(
+                    styleId = character.visualStyleId,
+                    contentDescription = "${character.displayName}完整文化场景",
+                    modifier = Modifier.fillMaxSize(),
+                    fallback = {
+                        MysticCultureBackdrop(scene, gold, moodLevel, Modifier.fillMaxSize())
+                    }
+                )
+            } else {
+                MysticCultureBackdrop(scene, gold, moodLevel, Modifier.fillMaxSize())
+            }
 
             // Layer 2: one consistent scrim keeps text and controls readable.
             Box(
@@ -106,30 +121,32 @@ fun MysticStageLayout(
             )
 
             // Layer 3: the local character artwork or deterministic Canvas fallback.
-            Box(
-                Modifier
-                    .fillMaxWidth()
-                    .fillMaxHeight(.72f)
-                    .align(Alignment.TopCenter)
-                    .padding(top = 48.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                MysticFigureCanvas(
-                    mode = "scholar",
-                    skinId = skinId,
-                    styleId = character.visualStyleId,
-                    garment = garment,
-                    trimColor = trimColor,
-                    moodLevel = moodLevel,
-                    phase = phase,
-                    reducedMotion = reducedMotion,
-                    modifier = Modifier.fillMaxSize(.94f)
-                )
+            if (assetSpec.renderMode == MysticAssetRenderMode.ForegroundOnScene) {
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .fillMaxHeight(.72f)
+                        .align(Alignment.TopCenter)
+                        .padding(top = 48.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    MysticFigureCanvas(
+                        mode = "scholar",
+                        skinId = skinId,
+                        styleId = character.visualStyleId,
+                        garment = garment,
+                        trimColor = trimColor,
+                        moodLevel = moodLevel,
+                        phase = phase,
+                        reducedMotion = reducedMotion,
+                        modifier = Modifier.fillMaxSize(.94f)
+                    )
+                }
             }
 
             // Layer 4 + 5: one information header and one bottom companion drawer.
             Column(Modifier.fillMaxSize()) {
-                Box(Modifier.fillMaxWidth().fillMaxHeight(.50f))
+                Box(Modifier.fillMaxWidth().fillMaxHeight(if (drawerState == MysticDrawerState.Peek) .68f else .50f))
                 Column(
                     Modifier
                         .fillMaxWidth()
@@ -167,10 +184,26 @@ fun MysticStageLayout(
                     )
                     MysticCharacterActionBar(
                         character = character,
-                        onConversation = onConversation,
-                        onSpecialties = { specialtiesOpen = !specialtiesOpen },
-                        onGame = onStartGame
+                        onConversation = { expandDrawer(); onConversation() },
+                        onSpecialties = { specialtiesOpen = !specialtiesOpen; expandDrawer() },
+                        onGame = { expandDrawer(); onStartGame() }
                     )
+                    if (drawerState == MysticDrawerState.Peek) {
+                        Surface(
+                            onClick = { expandDrawer() },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("stage-drawer-peek")
+                                .semantics { contentDescription = "对话抽屉，已收起；向上展开" },
+                            color = Color(0x661A1029),
+                            shape = RoundedCornerShape(16.dp)
+                        ) {
+                            Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                                Text("对话抽屉 · 已收起", style = MaterialTheme.typography.labelMedium, color = gold)
+                                Text("点击展开消息、今日行动、依据和游戏", style = MaterialTheme.typography.labelSmall, color = Color(0xFFD2C4DE))
+                            }
+                        }
+                    }
                     if (specialtiesOpen) {
                         Surface(
                             Modifier
@@ -211,8 +244,30 @@ fun MysticStageLayout(
                             }
                         }
                     }
-                    MaterialTheme(colorScheme = darkColorScheme(primary = gold, tertiary = Color(0xFFE3A579))) {
-                        content()
+                    if (drawerState == MysticDrawerState.Expanded) {
+                        Surface(
+                            Modifier
+                                .fillMaxWidth()
+                                .weight(1f)
+                                .testTag("stage-drawer-expanded")
+                                .semantics { contentDescription = "对话抽屉，已展开；向下收起" },
+                            color = Color(0xDD0D0817),
+                            shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
+                            border = BorderStroke(1.dp, gold.copy(alpha = .24f))
+                        ) {
+                            Column(Modifier.fillMaxSize()) {
+                                Surface(
+                                    onClick = { collapseDrawer() },
+                                    color = Color.Transparent,
+                                    modifier = Modifier.fillMaxWidth().semantics { contentDescription = "收起对话抽屉" }
+                                ) {
+                                    Text("收起对话", Modifier.padding(horizontal = 14.dp, vertical = 7.dp), style = MaterialTheme.typography.labelMedium, color = gold)
+                                }
+                                MaterialTheme(colorScheme = darkColorScheme(primary = gold, tertiary = Color(0xFFE3A579))) {
+                                    Box(Modifier.fillMaxSize()) { content() }
+                                }
+                            }
+                        }
                     }
                 }
             }

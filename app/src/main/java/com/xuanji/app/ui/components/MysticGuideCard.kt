@@ -104,6 +104,10 @@ import com.xuanji.app.domain.DefaultMysticDialogueAnalyzer
 import com.xuanji.app.domain.MysticMemoryNote as DomainMysticMemoryNote
 import com.xuanji.app.domain.MysticMessage
 import com.xuanji.app.domain.MysticMessageRole
+import com.xuanji.app.domain.MysticCompanionAction
+import com.xuanji.app.domain.MysticCompanionActionRouter
+import com.xuanji.app.domain.action.DailyActionPlan
+import com.xuanji.app.domain.action.LifeProfile
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -335,6 +339,13 @@ fun MysticGuideCard(
         memoryExpanded = false
     }
     val latestTest = records.maxByOrNull { it.date }
+    var dailyActionPlan by remember(visitProfile, fortune.dateKey) { mutableStateOf<DailyActionPlan?>(null) }
+    var lifeProfile by remember(visitProfile) { mutableStateOf<LifeProfile?>(null) }
+    var routedAction by remember(characterId) { mutableStateOf<MysticCompanionAction?>(null) }
+    LaunchedEffect(visitProfile, fortune.dateKey) {
+        dailyActionPlan = runCatching { AppModule.actionRepository.loadToday() }.getOrNull()
+        lifeProfile = runCatching { AppModule.actionRepository.loadLifeProfile() }.getOrNull()
+    }
     val guide = remember(mode, topic, bazi, fortune, latestTest, companion.skinId) {
         MysticGuideGenerator.generate(mode, topic, bazi, fortune, latestTest, skinId = companion.skinId)
     }
@@ -735,6 +746,31 @@ fun MysticGuideCard(
         // Game path first: board-game intents bypass the generic pendingCustom reply so
         // character game commentary never mixes with fortune template wording.
         val cleanText = text.trim().take(200)
+        val action = MysticCompanionActionRouter.route(
+            cleanText,
+            dailyActionPlan,
+            lifeProfile,
+            gameArchive != null
+        )
+        if (action != null) {
+            routedAction = action
+            when (action) {
+                MysticCompanionAction.ShowEvidence -> evidenceOpen = true
+                MysticCompanionAction.ResumeXiangqi -> runGameText("继续棋局")
+                is MysticCompanionAction.OpenGame -> companionGameId = action.gameId
+                MysticCompanionAction.OpenConversation -> Unit
+                is MysticCompanionAction.ShowTodayMeal,
+                is MysticCompanionAction.ShowTodayActivity,
+                is MysticCompanionAction.ShowTodayOuting,
+                is MysticCompanionAction.ShowLifeProfile -> Unit
+            }
+            if (action !is MysticCompanionAction.OpenGame && action != MysticCompanionAction.ResumeXiangqi) {
+                // Keep the natural-language answer in the thread while the card renders the same data.
+                customQuestion = cleanText
+                submitCustom()
+            }
+            return
+        }
         val companionGameIdFromInput = com.xuanji.app.domain.game.CompanionGameCatalog
             .gameIdForInput(cleanText)
         if (companionGameIdFromInput != null && companionGameIdFromInput != "xiangqi") {
@@ -1296,7 +1332,9 @@ fun MysticGuideCard(
             skinId = companion.skinId,
             question = question,
             characterName = characterProfile.displayName,
-            characterId = characterProfile.id
+            characterId = characterProfile.id,
+            dailyActionPlan = dailyActionPlan,
+            lifeProfile = lifeProfile
         )
         val providerResult = dialogueProvider.complete(
             DialogueRequest(dialogueContext, question, requestToken)
@@ -1635,6 +1673,7 @@ fun MysticGuideCard(
                         CompanionGameCard(
                             gameId = gameId,
                             characterId = characterProfile.id,
+                            profileKey = visitProfile,
                             onClose = { companionGameId = null },
                             modifier = Modifier.fillMaxWidth()
                         )
@@ -1719,6 +1758,14 @@ fun MysticGuideCard(
                                 }
                             }
                         }
+                    }
+                    routedAction?.let { action ->
+                        MysticCompanionActionCard(
+                            action = action,
+                            evidenceLines = guide.evidence,
+                            onDismiss = { routedAction = null },
+                            modifier = Modifier.fillMaxWidth()
+                        )
                     }
                     MysticConversationPanel(
                         state = sessionState,

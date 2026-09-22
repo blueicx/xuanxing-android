@@ -62,3 +62,20 @@ internal fun MysticFigureAsset(
         )
     }
 }
+
+/** A complete scene asset already contains its own cultural background. */
+@Composable
+internal fun MysticCompleteSceneAsset(
+    styleId: String,
+    contentDescription: String,
+    modifier: Modifier,
+    fallback: @Composable () -> Unit
+) {
+    MysticFigureAsset(
+        styleId = styleId,
+        contentDescription = contentDescription,
+        modifier = modifier,
+        contentScale = ContentScale.Crop,
+        fallback = fallback
+    )
+}

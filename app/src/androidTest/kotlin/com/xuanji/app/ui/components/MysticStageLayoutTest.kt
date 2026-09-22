@@ -7,8 +7,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
+import androidx.compose.material3.Text
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.xuanji.app.domain.MysticCharacterCatalog
 import com.xuanji.app.domain.MysticCharacterId
@@ -99,6 +101,30 @@ class MysticStageLayoutTest {
         compose.onNodeWithText(character.displayName).assertExists()
         compose.onNodeWithContentDescription("关闭玄师台").assertExists()
         compose.onNodeWithText("进入对话").assertExists()
+    }
+
+    @Test
+    fun drawer_starts_collapsed_and_expands_from_a_real_tap() {
+        val character = MysticCharacterCatalog.byId(MysticCharacterId.ShenYanzhou)
+        compose.setContent {
+            MysticStageLayout(
+                character = character,
+                skinId = character.legacySkinId,
+                garment = androidx.compose.ui.graphics.Color(0xFF30203F),
+                trimColor = androidx.compose.ui.graphics.Color(0xFFD9C58B),
+                moodLevel = 0f,
+                onCharacterSelected = {},
+                onConversation = {},
+                onStartGame = {},
+                onClose = {},
+                content = { Text("真实对话内容") }
+            )
+        }
+
+        compose.onNodeWithTag("stage-drawer-peek").assertExists().performClick()
+        compose.onNodeWithTag("stage-drawer-expanded").assertExists()
+        compose.onNodeWithContentDescription("收起对话抽屉").performClick()
+        compose.onNodeWithTag("stage-drawer-peek").assertExists()
     }
 
     private fun characterUiTitle(character: com.xuanji.app.domain.MysticCharacterProfile): String =
