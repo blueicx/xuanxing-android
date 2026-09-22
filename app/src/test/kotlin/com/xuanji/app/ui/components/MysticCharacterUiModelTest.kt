@@ -31,27 +31,13 @@ class MysticCharacterUiModelTest {
     }
 
     @Test
-    fun triptych_profiles_use_scene_plates_but_elder_uses_ink_backdrop() {
-        assertTrue(
-            MysticCharacterUiModel.from(
-                MysticCharacterCatalog.byId(MysticCharacterId.ShenYanzhou)
-            ).usesScenePlate
-        )
-        assertTrue(
-            MysticCharacterUiModel.from(
-                MysticCharacterCatalog.byId(MysticCharacterId.EvelynNova)
-            ).usesScenePlate
-        )
-        assertTrue(
-            MysticCharacterUiModel.from(
-                MysticCharacterCatalog.byId(MysticCharacterId.NadirRashid)
-            ).usesScenePlate
-        )
-        assertFalse(
-            MysticCharacterUiModel.from(
-                MysticCharacterCatalog.byId(MysticCharacterId.MoHeng)
-            ).usesScenePlate
-        )
+    fun every_character_uses_the_unified_scene_contract() {
+        MysticCharacterCatalog.all.forEach { profile ->
+            val model = MysticCharacterUiModel.from(profile)
+            assertEquals(profile.sceneId, model.sceneSpec.key)
+            assertTrue(model.sceneSpec.hasCompleteBackdrop)
+            assertTrue(model.sceneSpec.title.isNotBlank())
+        }
     }
 
     @Test

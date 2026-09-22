@@ -22,7 +22,7 @@
 
 对话承接由 `MysticDialogueContinuity` 读取最近回合的主题；“继续”“这个呢”“那怎么办”等省略式输入会继承上一主题，明确出现新主题时以当前输入为准。承接只改善表达相关性，不改变盘面算法，也不把生成内容写入长期记忆。
 
-文化人物视觉现在由 `MysticCharacterCatalog` 管理四位独立来客，而不是把角色当成服饰皮肤：沈砚舟（江南书生）、墨衡（灰发水墨老法师）、伊芙琳·诺瓦（学院星象师）和纳迪尔·拉希德（丝路占星师）。`MysticFigureAsset` 从本地 `drawable-nodpi` WebP 取图，三联图作为完整场景画面，墨衡使用透明人物叠加水墨背景；`MysticFigureCanvas` 保留资源异常时的 Canvas 回退；`MysticCultureSpec` 仍负责水榭、档案室、驿站、云台和沙海等背景。它是文化视觉演绎，不宣称还原真实服饰、仪式或族群身份。
+文化人物视觉现在由 `MysticCharacterCatalog` 与 `MysticSceneCatalog` 管理四位独立来客，而不是把角色当成服饰皮肤：沈砚舟（江南书生）、墨衡（灰发水墨老法师）、伊芙琳·诺瓦（学院星象师）和纳迪尔·拉希德（丝路占星师）。`MysticStageLayout` 固定使用场景底板、统一遮罩、人物层、顶部信息和底部陪伴抽屉五层结构；江南水榭、水墨案头、学院观测台、丝路驿站分别绘制月桥/灯笼、宣纸/墨砚、星图/档案桌、拱门/铜盘等文化道具，墨衡不再是透明背景例外。`MysticFigureAsset` 仍优先读取本地 `drawable-nodpi` WebP，`MysticFigureCanvas` 在资源缺失时回退到本地人物与水墨静室；未知场景 ID 也回退到非空水墨场景。它是文化视觉演绎，不宣称还原真实服饰、仪式或族群身份。
 
 角色舞台由 `MysticStageLayout` 承载全屏 Horizontal Pager 画廊，`MysticCharacterGallery` 提供左右拖拽与 TalkBack 角色目标，统一的动作栏提供「进入对话 / 查看专长 / 进入当前角色游戏」。角色专长只做已有计算体系的策展入口：`MysticCharacterSpecialty.systemIds` 指向实际系统，`sourceLabel` 与 `availability` 明示文化参考或未启用边界，不生成伪造经文、叶脉文本或心理测验常模。浮球显示当前角色首字与剪影，推荐由 `topicKey + dateKey + fortune` 稳定派生，用户手动选择后当天沿用。
 
