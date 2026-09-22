@@ -54,7 +54,7 @@
 | --- | ---: | --- | --- |
 | `MysticGuideGenerator.kt` | 3166 行 | 对话 seam、intent classifier、医疗/财务红线、主题回答模板和文化语气 seam 已抽离 | 继续按稳定边界拆 fortune 组合答案，保持确定性 hash 与 `customAnswer` 唯一 `enforce` 调用点不变 |
 | `MysticGuideCard.kt` | 2781 行 | provider/session 接入；消息列表、输入状态、澄清和软记忆控件已由独立组件承载 | 继续拆卡面主体渲染，先保持参数和状态提升方式不变 |
-| `MysticFloatingGuide.kt` | 2598 行 | `MysticOrb.kt`、`MysticStageLayout.kt`、`MysticCultureBackdrop.kt`、`MysticFigureCanvas.kt` 已拆出；旧绘制 helper 暂留作回滚缓冲 | 后续可删除确认无引用的旧 helper，并在设备上检查人物比例、遮挡和密度适配 |
+| `MysticFloatingGuide.kt` | 307 行 | `MysticOrb.kt`、`MysticStageLayout.kt`、`MysticCultureBackdrop.kt`、`MysticFigureCanvas.kt` 已拆出；确认无引用的旧舞台人物/背景绘制 helper 已移除 | 仍需在设备上检查人物比例、遮挡和密度适配 |
 
 拆分规则：一次只移动一个稳定边界；不改变公共 API、资源 ID、角色 seed 或默认离线行为；每次移动后必须跑编译、单测、lint 和 debug assemble。
 
