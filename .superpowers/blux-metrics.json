@@ -1,0 +1,60 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-08-29T19:34:02.806Z",
+  "totals": {
+    "events": 1,
+    "agents": 1,
+    "retries": 0,
+    "toolCalls": 0,
+    "blockedMs": 0,
+    "wallClockMs": 0
+  },
+  "slowestAgents": [
+    {
+      "round": 1,
+      "agent": "orchestrator",
+      "taskId": null,
+      "starts": 0,
+      "completions": 0,
+      "retries": 0,
+      "toolCalls": 0,
+      "durationMs": 0,
+      "blockedMs": 0,
+      "startedAt": null,
+      "completedAt": null,
+      "waitReasons": []
+    }
+  ],
+  "reworkedAgents": [
+    {
+      "round": 1,
+      "agent": "orchestrator",
+      "taskId": null,
+      "starts": 0,
+      "completions": 0,
+      "retries": 0,
+      "toolCalls": 0,
+      "durationMs": 0,
+      "blockedMs": 0,
+      "startedAt": null,
+      "completedAt": null,
+      "waitReasons": []
+    }
+  ],
+  "agents": [
+    {
+      "round": 1,
+      "agent": "orchestrator",
+      "taskId": null,
+      "starts": 0,
+      "completions": 0,
+      "retries": 0,
+      "toolCalls": 0,
+      "durationMs": 0,
+      "blockedMs": 0,
+      "startedAt": null,
+      "completedAt": null,
+      "waitReasons": []
+    }
+  ]
+}

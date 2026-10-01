@@ -1,0 +1,67 @@
+<style>
+  :root { --ink:#151025; --paper:#f4efe7; --gold:#d9bb77; --muted:#c8bdd7; }
+  body { background: radial-gradient(circle at 12% 0%, #3b255d, #130d22 58%); }
+  .intro { max-width: 980px; margin: 0 auto 22px; }
+  .intro h2 { margin-bottom: 6px; }
+  .intro p { color: var(--muted); }
+  .options { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:18px; max-width:1100px; margin:auto; }
+  .option { min-width:0; }
+  .option h3 { color:#fff8e9; margin:12px 0 4px; }
+  .option p { color:#c8bdd7; font-size:13px; line-height:1.55; }
+  .phone { height:510px; border:1px solid #6b5688; border-radius:30px; padding:10px; background:#090711; box-shadow:0 16px 34px #08050f99; overflow:hidden; }
+  .screen { height:100%; border-radius:22px; overflow:hidden; position:relative; background:#241735; color:#fff8ed; }
+  .top { position:absolute; inset:0 0 auto; padding:16px 15px; z-index:3; display:flex; justify-content:space-between; font-size:12px; color:#eadbb9; }
+  .scene { position:absolute; inset:0; }
+  .scene::after { content:""; position:absolute; inset:0; background:linear-gradient(180deg,#0d081c18 0%,#10091e25 45%,#10091edd 75%,#10091ef7 100%); }
+  .jiangnan { background:radial-gradient(circle at 70% 22%,#f6c78599 0 4%,transparent 5%),linear-gradient(135deg,#263f53,#6b7890 37%,#2c5360 38%,#152b35 100%); }
+  .ink { background:radial-gradient(ellipse at 30% 32%,#d8d1c222 0 18%,transparent 19%),linear-gradient(145deg,#b5b1a7,#4a4b4e 45%,#20252b 46%,#0e1116); }
+  .academy { background:radial-gradient(circle at 75% 27%,#f5d37d 0 2%,transparent 3%),radial-gradient(circle at 35% 18%,#b28aff 0 1%,transparent 2%),linear-gradient(140deg,#111a46,#343269 48%,#0e102b); }
+  .silk { background:radial-gradient(circle at 72% 18%,#f4d492 0 5%,transparent 6%),linear-gradient(140deg,#6b3c2c,#d0834e 43%,#3d1f28 44%,#151325); }
+  .character { position:absolute; left:50%; top:78px; transform:translateX(-50%); width:125px; height:235px; z-index:2; }
+  .head { width:56px; height:56px; border-radius:50%; margin:auto; background:#d7a27b; box-shadow:0 0 0 7px #160f25aa; }
+  .body { width:114px; height:156px; margin:-3px auto 0; border-radius:42px 42px 18px 18px; background:linear-gradient(90deg,#252044,#927253,#2c244a); clip-path:polygon(30% 0,70% 0,100% 100%,0 100%); }
+  .orb { width:21px; height:21px; border:2px solid var(--gold); border-radius:50%; position:absolute; left:-5px; top:70px; background:#5f4ca9; box-shadow:0 0 22px #d8bbff; }
+  .label { position:absolute; left:15px; right:15px; top:315px; z-index:3; }
+  .label strong { font-size:19px; }
+  .label span { display:block; margin-top:5px; color:#d4c4df; font-size:12px; }
+  .sheet { position:absolute; z-index:4; left:10px; right:10px; bottom:10px; border-radius:19px; padding:13px; background:#171027ed; border:1px solid #6b5688; }
+  .sheet .line { height:9px; border-radius:8px; background:#8d769f66; margin:7px 0; }
+  .sheet .line.short { width:58%; }
+  .actions { display:flex; gap:6px; margin-top:11px; }
+  .pill { flex:1; border:1px solid #856f9d; color:#e8d7a5; border-radius:999px; padding:7px 4px; text-align:center; font-size:10px; }
+  .neutral .scene { background:linear-gradient(150deg,#292138,#141121 62%,#261c3c); }
+  .neutral .scene::after { background:radial-gradient(circle at 50% 33%,#d9bb7733,transparent 28%),linear-gradient(180deg,#0c081500 0%,#10091e40 52%,#10091ef5 76%); }
+  .texture { position:absolute; inset:0; z-index:1; opacity:.5; background:repeating-linear-gradient(135deg,transparent 0 22px,#d9bb7712 23px 24px); }
+  .dense .sheet { bottom:10px; padding:10px; }
+  .dense .label { top:292px; }
+  .dense .character { top:64px; transform:translateX(-50%) scale(.84); }
+  @media (max-width: 900px) { .options { grid-template-columns:1fr; } .phone { height:440px; } }
+</style>
+
+<div class="intro">
+  <h2>玄师舞台：统一背景与信息层级</h2>
+  <p>现在的问题是：沈砚舟/伊芙琳/纳迪尔显示场景板，墨衡走透明人物叠加；人物、标题、对话和动作栏没有固定层级，导致“有的像海报、有的像浮层”。下面比较三种统一方式。</p>
+</div>
+
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="phone">
+      <div class="screen"><div class="scene jiangnan"></div><div class="top"><span>玄师 · 角色 1/4</span><span>×</span></div><div class="character"><div class="head"></div><div class="body"></div><div class="orb"></div></div><div class="label"><strong>沈砚舟</strong><span>江南书生 · 八字与诗歌</span></div><div class="sheet"><div style="color:#e8d7a5;font-size:12px">今日先看一小步</div><div class="line"></div><div class="line short"></div><div class="actions"><div class="pill">进入对话</div><div class="pill">查看专长</div><div class="pill">诗句接龙</div></div></div></div>
+    </div>
+    <h3>A · 全屏场景统一</h3><p>四位角色都使用完整场景画面，人物固定在中央，所有内容统一放入底部抽屉。沉浸感最强，但需要给墨衡补一张水墨场景底图。</p>
+  </div>
+
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="phone">
+      <div class="screen neutral"><div class="scene"></div><div class="texture"></div><div class="top"><span>玄师 · 角色 1/4</span><span>×</span></div><div class="character"><div class="head"></div><div class="body"></div><div class="orb"></div></div><div class="label"><strong>沈砚舟</strong><span>江南书生 · 八字与诗歌</span></div><div class="sheet"><div style="color:#e8d7a5;font-size:12px">今日先看一小步</div><div class="line"></div><div class="line short"></div><div class="actions"><div class="pill">进入对话</div><div class="pill">查看专长</div><div class="pill">诗句接龙</div></div></div></div>
+    </div>
+    <h3>B · 统一暗场 + 文化纹理（推荐）</h3><p>所有角色共享同一暗场、人物位置、标题和底部抽屉；文化只进入纹理、色温、道具和微光，不再决定有没有背景。最稳，能直接修复当前不一致。</p>
+  </div>
+
+  <div class="option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="phone">
+      <div class="screen dense"><div class="scene academy"></div><div class="top"><span>玄师 · 角色 1/4</span><span>×</span></div><div class="character"><div class="head"></div><div class="body"></div><div class="orb"></div></div><div class="label"><strong>沈砚舟</strong><span>江南书生 · 八字与诗歌</span></div><div class="sheet"><div style="color:#e8d7a5;font-size:12px">沈砚舟的专长</div><div class="line"></div><div class="line short"></div><div class="line"></div><div class="actions"><div class="pill">对话</div><div class="pill">专长</div><div class="pill">游戏</div></div></div></div>
+    </div>
+    <h3>C · 信息优先卡片化</h3><p>彻底弱化背景，把人物放进统一卡片，专长、对话、游戏都更清楚。最易维护，但会牺牲目前已经做好的文化场景氛围。</p>
+  </div>
+</div>

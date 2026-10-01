@@ -59,6 +59,7 @@ import com.xuanji.app.di.AppModule
 import com.xuanji.app.domain.BaziCalculator
 import com.xuanji.app.domain.HourGuide
 import com.xuanji.app.domain.elementName
+import com.xuanji.app.domain.calendar.formatEasternLunarDate
 import com.xuanji.app.ui.components.ElementBalance
 import com.xuanji.app.ui.components.CardLayouts
 import com.xuanji.app.ui.components.CardMeta
@@ -68,6 +69,8 @@ import com.xuanji.app.ui.components.FortuneInsightList
 import com.xuanji.app.ui.components.FortunePageWidth
 import com.xuanji.app.ui.components.FortuneProse
 import com.xuanji.app.ui.components.FortuneStickyHeader
+import com.xuanji.app.ui.components.FortunePageIntro
+import com.xuanji.app.ui.components.TodayFortuneMode
 import com.xuanji.app.ui.components.HealthBodyAtlas
 import com.xuanji.app.ui.components.InfoRow
 import com.xuanji.app.ui.components.LocalCardLayout
@@ -92,7 +95,10 @@ import kotlin.math.cos
 import kotlin.math.sin
 
 @Composable
-fun EasternScreen() {
+fun EasternScreen(
+    chartOnly: Boolean = false,
+    onTodayModeChange: ((TodayFortuneMode) -> Unit)? = null
+) {
     val viewModel = xuanjiViewModel { EasternViewModel(AppModule.repository) }
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val readyState = uiState as? EasternUiState.Ready
@@ -114,19 +120,23 @@ fun EasternScreen() {
         }
         is EasternUiState.Ready -> {
             { scrollState ->
-                val cards = easternCards(
+                val allCards = easternCards(
                     full = s.full,
                     hourGuides = s.hourGuides,
                     fortune = s.fortune,
                     period = s.period
                 )
+                val cards = if (chartOnly) allCards.filterNot { it.id == "hours" } else allCards
                 Column(Modifier.fillMaxSize()) {
-                    FortuneStickyHeader(
-                        period = s.period,
-                        onPeriodChange = viewModel::setPeriod,
-                        headline = "${periodTitle(s.period)}八字 ${s.fortune.overallScore} 分",
-                        subtitle = "${s.fortune.dateKey} · 论断干支 ${s.fortune.periodPillarText.ifBlank { s.fortune.dayPillarText }}"
-                    )
+                    if (!chartOnly) {
+                        FortuneStickyHeader(
+                            period = s.period,
+                            onPeriodChange = viewModel::setPeriod,
+                            dateLabel = formatEasternLunarDate(s.fortune.dateKey),
+                            todayMode = onTodayModeChange?.let { TodayFortuneMode.Eastern },
+                            onTodayModeChange = onTodayModeChange
+                        )
+                    }
                     Column(
                         Modifier
                             .weight(1f)
@@ -139,18 +149,25 @@ fun EasternScreen() {
                                 Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
                                 verticalArrangement = Arrangement.spacedBy(16.dp)
                             ) {
-                                TodayFortuneSection(
-                                    fortune = s.fortune,
-                                    favorable = s.full.chart.favorableElements,
-                                    period = s.period,
-                                    shareCard = ResultShareCards.eastern(
-                                        "fortune",
-                                        s.period,
-                                        s.full,
-                                        s.fortune,
-                                        s.hourGuides.firstOrNull()?.timeText
+                                if (!chartOnly) {
+                                    FortunePageIntro(
+                                        title = if (s.period == "day") "东方今日运势" else "${periodTitle(s.period)}东方运势",
+                                        subtitle = "论断干支 ${s.fortune.periodPillarText.ifBlank { s.fortune.dayPillarText }} · 八字与五行",
+                                        modeLabel = "东方"
                                     )
-                                )
+                                    TodayFortuneSection(
+                                        fortune = s.fortune,
+                                        favorable = s.full.chart.favorableElements,
+                                        period = s.period,
+                                        shareCard = ResultShareCards.eastern(
+                                            "fortune",
+                                            s.period,
+                                            s.full,
+                                            s.fortune,
+                                            s.hourGuides.firstOrNull()?.timeText
+                                        )
+                                    )
+                                }
                                 CardLayouts.ordered(cards, controller.state).forEach { card -> card.content() }
                                 if (controller.state.hiddenCount > 0) {
                                     RestoreCardsBar(controller)
@@ -603,7 +620,27 @@ private fun TodayFortuneSection(
     shareCard: com.xuanji.app.ui.components.ShareCard
 ) {
     val label = periodTitle(period)
-    FortuneCard(cardId = "fortune", title = "${label}命理解说", shareCard = shareCard) {
+    FortuneCard(
+        cardId = "fortune",
+        title = "${label}命理解说",
+        shareCard = shareCard,
+        previewContent = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                ScoreRing(fortune.overallScore, diameter = 64.dp, caption = "${label}总分")
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    InfoRow("论断干支", fortune.periodPillarText.ifBlank { fortune.dayPillarText })
+                    InfoRow("喜用神", favorable.joinToString("、") { elementName(it) })
+                    Text(
+                        fortune.summary,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 3
+                    )
+                }
+            }
+        }
+    ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             ScoreRing(fortune.overallScore, caption = "${label}总分")
             Spacer(Modifier.width(14.dp))

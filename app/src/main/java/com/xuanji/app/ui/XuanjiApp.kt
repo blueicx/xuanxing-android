@@ -9,9 +9,15 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.AutoStories
@@ -26,7 +32,11 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -37,9 +47,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -107,13 +119,20 @@ import com.xuanji.app.ui.composite.CompositeFortuneScreen
 import com.xuanji.app.ui.test.TestHubScreen
 import com.xuanji.app.ui.components.LocalImmersiveStageOpen
 import com.xuanji.app.ui.components.LocalMysticGuideVisible
+import com.xuanji.app.ui.components.TodayFortuneMode
+import com.xuanji.app.ui.components.CompanionGameCard
 import com.xuanji.app.di.AppModule
+import com.xuanji.app.domain.MysticCharacterId
+import com.xuanji.app.domain.game.CompanionGameCatalog
 
 sealed class Screen(val route: String, val label: String, val icon: androidx.compose.ui.graphics.vector.ImageVector) {
+    data object Today : Screen("today", "今日", Icons.Filled.AutoAwesome)
+    data object Charts : Screen("charts", "排盘", Icons.Filled.AutoStories)
+    data object Explore : Screen("explore", "探索", Icons.Filled.Explore)
     data object Eastern : Screen("eastern", "东方", Icons.Filled.AutoStories)
     data object Western : Screen("western", "西方", Icons.Filled.Star)
     data object Divination : Screen("divination", "占卜", Icons.Filled.Casino)
-    data object History : Screen("history", "历史", Icons.Filled.History)
+    data object History : Screen("history", "记录", Icons.Filled.History)
     data object Profile : Screen("profile", "我的", Icons.Filled.Person)
     data object Composite : Screen("composite", "综合", Icons.Filled.AutoAwesome)
     data object Test : Screen("test", "测试", Icons.Filled.Quiz)
@@ -171,17 +190,16 @@ sealed class Screen(val route: String, val label: String, val icon: androidx.com
 }
 
 /**
- * 底部 6 个主 tab 用「常驻 + 透明度交叉淡入」实现，而不是 NavHost 的销毁/重建跳转。
+ * 底部 5 个主 tab 用「常驻 + 透明度交叉淡入」实现，而不是 NavHost 的销毁/重建跳转。
  * 这样切 tab 时屏幕早已 compose 完毕，只做 alpha 动画（纯 GPU，不触发布局/重算），
  * 彻底消除「切回东方/西方时整屏重新构建导致的卡顿」。占卜 tab 内部保留独立的 NavHost 处理子页跳转。
  */
 @Composable
 fun XuanjiApp() {
-    // 综合作为首页（第一个 tab），其余按序排列
-    var selectedTab by rememberSaveable { mutableStateOf(Screen.Composite.route) }
+    // 今日、排盘、探索、记录、我的；运势体系切换收在「今日」页内。
+    var selectedTab by rememberSaveable { mutableStateOf(Screen.Today.route) }
     val items = listOf(
-        Screen.Composite, Screen.Eastern, Screen.Western,
-        Screen.Divination, Screen.Test, Screen.History, Screen.Profile
+        Screen.Today, Screen.Charts, Screen.Explore, Screen.History, Screen.Profile
     )
     val immersiveStageOpen = remember { mutableStateOf(false) }
     val mysticGuideVisible = remember { mutableStateOf(true) }
@@ -211,7 +229,14 @@ fun XuanjiApp() {
                                 icon = { Icon(screen.icon, contentDescription = screen.label) },
                                 label = { Text(screen.label) },
                                 selected = selectedTab == screen.route,
-                                onClick = { selectedTab = screen.route }
+                                onClick = { selectedTab = screen.route },
+                                colors = NavigationBarItemDefaults.colors(
+                                    selectedIconColor = Color(0xFFD9C27E),
+                                    selectedTextColor = Color(0xFFD9C27E),
+                                    indicatorColor = Color.Transparent,
+                                    unselectedIconColor = Color(0xFFB7ABC8),
+                                    unselectedTextColor = Color(0xFFB7ABC8)
+                                )
                             )
                         }
                     }
@@ -223,13 +248,153 @@ fun XuanjiApp() {
                     if (immersiveStageOpen.value) PaddingValues(0.dp) else innerPadding
                 )
             ) {
-                KeepAliveTab(active = selectedTab == Screen.Composite.route) { CompositeFortuneScreen() }
-                KeepAliveTab(active = selectedTab == Screen.Eastern.route) { EasternScreen() }
-                KeepAliveTab(active = selectedTab == Screen.Western.route) { WesternScreen() }
-                KeepAliveTab(active = selectedTab == Screen.Divination.route) { DivinationRoot() }
-                KeepAliveTab(active = selectedTab == Screen.Test.route) { TestHubScreen() }
+                KeepAliveTab(active = selectedTab == Screen.Today.route) { TodayFortuneHub() }
+                KeepAliveTab(active = selectedTab == Screen.Charts.route) { LifetimeChartHub() }
+                KeepAliveTab(active = selectedTab == Screen.Explore.route) {
+                    ExploreHub(onOpenToday = { selectedTab = Screen.Today.route })
+                }
                 KeepAliveTab(active = selectedTab == Screen.History.route) { HistoryScreen() }
                 KeepAliveTab(active = selectedTab == Screen.Profile.route) { ProfileScreen() }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TodayFortuneHub() {
+    var selectedModeName by rememberSaveable { mutableStateOf(TodayFortuneMode.Composite.name) }
+    val selectedMode = TodayFortuneMode.entries.firstOrNull { it.name == selectedModeName }
+        ?: TodayFortuneMode.Composite
+    val onSelectMode: (TodayFortuneMode) -> Unit = { selectedModeName = it.name }
+
+    when (selectedMode) {
+        TodayFortuneMode.Composite -> CompositeFortuneScreen(onTodayModeChange = onSelectMode)
+        TodayFortuneMode.Eastern -> EasternScreen(onTodayModeChange = onSelectMode)
+        TodayFortuneMode.Western -> WesternScreen(onTodayModeChange = onSelectMode)
+    }
+}
+
+@Composable
+private fun LifetimeChartHub() {
+    var selectedChart by rememberSaveable { mutableStateOf("eastern") }
+    Column(Modifier.fillMaxSize()) {
+        Column(
+            Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Text("一生命盘", style = MaterialTheme.typography.headlineSmall)
+            Text(
+                "出生盘与长期结构；今日、周、月、年运势请在「今日」查看。",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FilterChip(
+                    selected = selectedChart == "eastern",
+                    onClick = { selectedChart = "eastern" },
+                    label = { Text("东方本命") }
+                )
+                FilterChip(
+                    selected = selectedChart == "western",
+                    onClick = { selectedChart = "western" },
+                    label = { Text("西方本命") }
+                )
+            }
+        }
+        Box(Modifier.weight(1f)) {
+            if (selectedChart == "eastern") EasternScreen(chartOnly = true)
+            else WesternScreen(chartOnly = true)
+        }
+    }
+}
+
+@Composable
+private fun ExploreHub(onOpenToday: () -> Unit) {
+    var selectedSection by rememberSaveable { mutableStateOf("divination") }
+    Column(Modifier.fillMaxSize()) {
+        Column(
+            Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Text("探索", style = MaterialTheme.typography.headlineSmall)
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                listOf("divination" to "占卜体系", "tests" to "心理测试", "games" to "角色游戏")
+                    .forEach { (key, label) ->
+                        FilterChip(
+                            selected = selectedSection == key,
+                            onClick = { selectedSection = key },
+                            label = { Text(label) }
+                        )
+                    }
+            }
+        }
+        Box(Modifier.weight(1f)) {
+            when (selectedSection) {
+                "divination" -> DivinationRoot()
+                "tests" -> TestHubScreen()
+                else -> ExploreGamesHub(onOpenToday = onOpenToday)
+            }
+        }
+    }
+}
+
+@Composable
+private fun ExploreGamesHub(onOpenToday: () -> Unit) {
+    val profile by AppModule.repository.userProfileFlow.collectAsStateWithLifecycle(initialValue = null)
+    val profileKey = profile?.let(AppModule.actionRepository::profileKey).orEmpty()
+    var activeGameId by rememberSaveable { mutableStateOf("") }
+
+    Column(
+        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Text("四位来客各有一款互动玩法。进度在本机按角色保存。", style = MaterialTheme.typography.bodyMedium)
+        if (activeGameId.isNotBlank() && activeGameId != "xiangqi") {
+            val game = CompanionGameCatalog.byId(activeGameId)
+            game?.let {
+                CompanionGameCard(
+                    gameId = it.id,
+                    characterId = it.characterId,
+                    profileKey = profileKey,
+                    onClose = { activeGameId = "" }
+                )
+            }
+        } else if (activeGameId == "xiangqi") {
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                color = MaterialTheme.colorScheme.surfaceVariant,
+                shape = MaterialTheme.shapes.large
+            ) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("中国象棋 · 墨衡", style = MaterialTheme.typography.titleMedium)
+                    Text("棋局使用真实象棋规则与存档。请先进入「今日」页，唤起人物舞台并切换到墨衡，再选择「来一盘象棋」。", style = MaterialTheme.typography.bodyMedium)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(onClick = onOpenToday) { Text("前往今日") }
+                        OutlinedButton(onClick = { activeGameId = "" }) { Text("返回游戏列表") }
+                    }
+                }
+            }
+        }
+
+        CompanionGameCatalog.all.forEach { game ->
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
+                shape = MaterialTheme.shapes.large
+            ) {
+                Column(
+                    Modifier.fillMaxWidth().padding(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(5.dp)
+                ) {
+                    Text(game.title, style = MaterialTheme.typography.titleMedium)
+                    Text(game.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    OutlinedButton(
+                        onClick = { activeGameId = game.id },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(if (game.id == "xiangqi") "查看象棋入口" else "开始 / 继续")
+                    }
+                }
             }
         }
     }

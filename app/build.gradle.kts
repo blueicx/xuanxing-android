@@ -79,12 +79,15 @@ dependencies {
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit:1.9.22")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.3")
 
-    // Instrumented UI tests. ui-test-manifest stays in the test APK so the app's own
-    // debug manifest is not changed.
+    // Instrumented UI tests. The test-only ComponentActivity is injected only into the
+    // debug variant below and does not enter the main source manifest or release APK.
     androidTestImplementation(platform("androidx.compose:compose-bom:2024.02.00"))
     androidTestImplementation("androidx.compose.ui:ui-test-junit4")
-    androidTestImplementation("androidx.compose.ui:ui-test-manifest")
     androidTestImplementation("androidx.test.ext:junit:1.1.5")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.5.1")
     androidTestImplementation("androidx.test:runner:1.5.2")
+
+    // Compose's test-only ComponentActivity must live in the target app process.
+    // debugImplementation keeps it out of release while making createComposeRule launch correctly.
+    debugImplementation("androidx.compose.ui:ui-test-manifest")
 }

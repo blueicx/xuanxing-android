@@ -1,0 +1,212 @@
+{
+  "schemaVersion": 1,
+  "goalId": "goal-mtes420e",
+  "originalRequest": "X3 玄机项目全量审计与渐进优化计划",
+  "createdAt": "2026-08-29T19:34:02.798Z",
+  "updatedAt": "2026-08-30T09:30:00.000Z",
+  "currentRound": 1,
+  "maxRounds": 5,
+  "status": "completed",
+  "requirements": [
+    {
+      "id": "r1",
+      "title": "修复 Android lint 与补测试门禁",
+      "status": "passed",
+      "evidence": [
+        "testDebugUnitTest passed",
+        "lintDebug passed with 0 errors",
+        "assembleDebug passed",
+        "CI updated"
+      ]
+    },
+    {
+      "id": "r2",
+      "title": "拆分并增强离线自然对话与会话状态",
+      "status": "passed",
+      "evidence": [
+        "MysticIntentClassifier shared by generator and engine",
+        "MysticGuideCard routes custom replies through DialogueProvider",
+        "10 deterministic dialogue/session/provider tests passed"
+      ]
+    },
+    {
+      "id": "r3",
+      "title": "默认隐藏完整角色但保留微光浮球并重绘形象",
+      "status": "passed",
+      "evidence": [
+        "OrbVisible/FullyHidden state",
+        "default orb-only rendering",
+        "safe-area and reduced-motion handling",
+        "MysticOrb extracted into an independently auditable composable",
+        "AVD screenshots for composite/eastern/western and stage recall/close"
+      ]
+    },
+    {
+      "id": "r4",
+      "title": "同步小程序契约并修复组件注册 lint",
+      "status": "passed",
+      "evidence": [
+        "miniprogram route-based structure lint: 0 issues",
+        "_dev/dialogue_contract.json and casual intent parity",
+        "7/7 miniprogram suites passed"
+      ]
+    },
+    {
+      "id": "r5",
+      "title": "定义可选联网 DialogueProvider seam",
+      "status": "passed",
+      "evidence": [
+        "DialogueProvider and OfflineDialogueProvider seam",
+        "docs/SYSTEMS_OVERVIEW.md documents offline default"
+      ]
+    }
+  ],
+  "tasks": [
+    {
+      "id": "task-quality",
+      "title": "Android lint 与测试门禁",
+      "status": "done",
+      "files": [
+        "app/build.gradle.kts",
+        ".github/workflows/build.yml",
+        "app/src/main/res/values/themes.xml",
+        "app/src/main/res/values-night/themes.xml",
+        "app/src/main/java/com/xuanji/app/ui/divination/ArabicAstrologyScreen.kt",
+        "app/src/main/java/com/xuanji/app/ui/divination/PersianAstrologyScreen.kt",
+        "app/src/test"
+      ],
+      "impactSurfaces": [
+        {
+          "scope": "CI",
+          "kind": "gate",
+          "name": "test/lint/assemble"
+        }
+      ],
+      "provides": [
+        "android-quality-gate"
+      ],
+      "requires": [],
+      "blockedBy": []
+    },
+    {
+      "id": "task-mini-structure",
+      "title": "小程序组件注册与测试报告",
+      "status": "done",
+      "files": [
+        "F:/huny/xuanji-miniprogram/composite.json",
+        "F:/huny/xuanji-miniprogram/eastern.json",
+        "F:/huny/xuanji-miniprogram/western.json",
+        "F:/huny/xuanji-miniprogram/_dev/run_all_tests.js"
+      ],
+      "impactSurfaces": [
+        {
+          "scope": "miniprogram pages",
+          "kind": "registration",
+          "name": "usingComponents"
+        }
+      ],
+      "provides": [
+        "mini-structure-gate"
+      ],
+      "requires": [],
+      "blockedBy": []
+    },
+    {
+      "id": "task-dialogue-engine",
+      "title": "离线对话 engine seam",
+      "status": "done",
+      "files": [
+        "app/src/main/java/com/xuanji/app/domain/MysticDialogueEngine.kt",
+        "app/src/test"
+      ],
+      "impactSurfaces": [
+        {
+          "scope": "MysticDialogueEngine",
+          "kind": "export",
+          "name": "DefaultMysticDialogueEngine"
+        }
+      ],
+      "provides": [
+        "dialogue-engine"
+      ],
+      "requires": [],
+      "blockedBy": [
+        "task-quality"
+      ]
+    },
+    {
+      "id": "task-visual-session",
+      "title": "默认隐藏浮球与会话 reducer",
+      "status": "done",
+      "files": [
+        "app/src/main/java/com/xuanji/app/ui/components/MysticFloatingGuide.kt",
+        "app/src/main/java/com/xuanji/app/ui/components/MysticGuideCard.kt",
+        "app/src/main/java/com/xuanji/app/ui/XuanjiApp.kt",
+        "app/src/main/java/com/xuanji/app/ui/profile/ProfileScreen.kt"
+      ],
+      "impactSurfaces": [
+        {
+          "scope": "companion visibility",
+          "kind": "state",
+          "name": "CompanionUiState"
+        },
+        {
+          "scope": "MysticGuideCard",
+          "kind": "interaction",
+          "name": "session reducer"
+        }
+      ],
+      "provides": [
+        "orb-presence",
+        "session-state"
+      ],
+      "requires": [
+        "dialogue-engine"
+      ],
+      "blockedBy": [
+        "task-quality",
+        "task-dialogue-engine"
+      ]
+    },
+    {
+      "id": "task-tech-debt-split",
+      "title": "技术债台账与微光浮球物理拆分",
+      "status": "done",
+      "files": [
+        "app/src/main/java/com/xuanji/app/ui/components/MysticOrb.kt",
+        "app/src/main/java/com/xuanji/app/ui/components/MysticFloatingGuide.kt",
+        "docs/TECHNICAL_DEBT.md"
+      ],
+      "impactSurfaces": [
+        {
+          "scope": "companion rendering",
+          "kind": "refactor",
+          "name": "MysticOrb"
+        }
+      ],
+      "provides": [
+        "auditable-orb-composable",
+        "technical-debt-ledger"
+      ],
+      "requires": [
+        "task-visual-session"
+      ],
+      "blockedBy": []
+    }
+  ],
+  "impactSurfaces": [],
+  "failures": [],
+  "rounds": [],
+  "cleanupManifest": [],
+  "gates": {},
+  "metrics": {
+    "events": 0,
+    "agents": 0,
+    "retries": 0,
+    "toolCalls": 0,
+    "blockedMs": 0,
+    "wallClockMs": 0
+  },
+  "nextRoundProposal": null,
+  "stopReason": "completed"
+}

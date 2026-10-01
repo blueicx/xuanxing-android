@@ -167,12 +167,13 @@ fun MysticStageLayout(
                         color = gold,
                         modifier = Modifier.semantics {
                             contentDescription = "当前角色：${character.displayName}，${character.title}"
-                        }
+                        }.testTag("stage-current-character-name")
                     )
                     Text(
                         "${character.title} · ${scene.title}",
                         style = MaterialTheme.typography.labelMedium,
-                        color = Color(0xFFE7D9EE)
+                        color = Color(0xFFE7D9EE),
+                        modifier = Modifier.testTag("stage-current-character-title")
                     )
                     Text(
                         "当前专长 · ${characterUi.primarySpecialty}",

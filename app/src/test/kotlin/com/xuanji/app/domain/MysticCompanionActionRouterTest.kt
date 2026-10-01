@@ -34,6 +34,11 @@ class MysticCompanionActionRouterTest {
     }
 
     @Test
+    fun routes_why_question_to_the_actual_evidence_drawer() {
+        assertEquals(MysticCompanionAction.ShowEvidence, MysticCompanionActionRouter.route("为什么", plan, profile, false))
+    }
+
+    @Test
     fun routes_character_games_and_only_resumes_a_real_archive() {
         assertEquals(MysticCompanionAction.OpenGame("poetry_chain"), MysticCompanionActionRouter.route("开始诗句接龙", plan, profile, false))
         assertNull(MysticCompanionActionRouter.route("继续棋局", plan, profile, false))

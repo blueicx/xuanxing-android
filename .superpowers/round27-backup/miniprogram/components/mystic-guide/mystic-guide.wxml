@@ -1,0 +1,180 @@
+<view class="mystic-card {{mode === 'half' ? 'mystic-half' : ''}}">
+  <view class="persona-header">
+    <view class="persona-avatar">{{mode === 'half' ? '半' : '玄'}}</view>
+    <view class="persona-meta">
+      <text class="persona-name">{{mode === 'half' ? '半仙' : '玄学家'}}</text>
+      <text wx:if="{{guide}}" class="persona-status">{{guide.styleName}} · {{guide.styleIntro}}</text>
+      <text wx:if="{{guide}}" class="persona-status">现场 · {{presenceState}}</text>
+      <text wx:else class="persona-status">{{mode === 'half' ? '浮夸演绎 · 仅供娱乐' : '只讲盘面 · 慢慢说'}}</text>
+    </view>
+  </view>
+
+  <view wx:if="{{guide}}" class="arrival-bubble">
+    <text class="arrival-mark">✦</text>
+    <view class="arrival-body">
+      <text class="arrival-name">{{guide.roleName}}今天陪你看盘</text>
+      <text class="arrival-line">{{guide.arrival}}</text>
+    </view>
+  </view>
+
+  <view wx:if="{{guestCameo}}" class="guest-cameo">
+    <view class="guest-head">
+      <text class="guest-role">{{guestCameo.roleName}}</text>
+      <text class="guest-mark">路过 · 客串一句</text>
+    </view>
+    <text class="guest-line">{{guestCameo.line}}</text>
+    <view wx:if="{{!guestReply}}" class="guest-choice-row">
+      <view
+        wx:for="{{guestChoices}}"
+        wx:key="key"
+        class="guest-choice {{selectedGuestChoice === item.key ? 'active' : ''}} {{pendingGuest ? 'pending' : ''}}"
+        data-key="{{item.key}}"
+        bindtap="onSelectGuestReply"
+      >{{item.label}}</view>
+    </view>
+    <text wx:if="{{pendingGuest}}" class="guest-pending">客串正在接话···</text>
+    <text wx:if="{{guestReply}}" class="guest-question">{{guestQuestion}}</text>
+    <text wx:if="{{guestReply}}" class="guest-reply">{{guestReply}}</text>
+  </view>
+
+  <view wx:if="{{memoryNotes.length}}" class="memory-notes">
+    <view class="memory-head">
+      <text class="memory-title">现场手记</text>
+      <text
+        wx:if="{{memoryNotes.length > 1}}"
+        class="memory-toggle"
+        bindtap="onToggleMemory"
+      >{{memoryExpanded ? '收起手记' : '展开手记'}}</text>
+    </view>
+    <block wx:for="{{memoryNotes}}" wx:key="id" wx:for-item="note" wx:for-index="noteIndex">
+      <text wx:if="{{noteIndex === 0 || memoryExpanded}}" class="memory-line">{{note.text}}</text>
+    </block>
+  </view>
+
+  <view class="persona-switch">
+    <view class="persona-option {{mode === 'scholar' ? 'active scholar' : ''}}" data-mode="scholar" bindtap="onSwitchPersona">
+      <text class="persona-title">玄学家</text>
+      <text class="persona-sub">心理按摩</text>
+    </view>
+    <view class="persona-option {{mode === 'half' ? 'active half' : ''}}" data-mode="half" bindtap="onSwitchPersona">
+      <text class="persona-title">半仙</text>
+      <text class="persona-sub">浮夸吐槽</text>
+    </view>
+  </view>
+
+  <scroll-view scroll-x enhanced show-scrollbar="{{false}}" class="topic-scroll">
+    <view class="topic-row">
+      <view
+        wx:for="{{topics}}"
+        wx:key="key"
+        class="topic-chip {{topic === item.key ? 'active' : ''}}"
+        data-topic="{{item.key}}"
+        bindtap="onSwitchTopic"
+      >{{item.label}}</view>
+    </view>
+  </scroll-view>
+
+  <view wx:if="{{guide}}" class="mystic-reading">
+    <view class="reading-head">
+      <text class="reading-mark">✦</text>
+      <text class="reading-title">{{guide.roleName}} · {{guide.headline}}</text>
+    </view>
+    <text class="reading-body">{{guide.body}}</text>
+    <button class="evidence-toggle" bindtap="onToggleEvidence">
+      <text>{{evidenceOpen ? '收起盘面依据' : '展开盘面依据'}}</text>
+    </button>
+    <view wx:if="{{evidenceOpen}}" class="evidence-box">
+      <text wx:for="{{guide.evidence}}" wx:key="*this" class="evidence-line">{{item}}</text>
+    </view>
+
+    <view wx:if="{{opening && !openingAnswered}}" class="interaction-body">
+      <text class="interaction-title">{{opening.prompt}}</text>
+      <view class="followup-row">
+        <view
+          wx:for="{{opening.options}}"
+          wx:key="key"
+          class="followup-chip {{selectedOpening === item.key ? 'active' : ''}}"
+          data-key="{{item.key}}"
+          bindtap="onSelectOpening"
+        >{{item.label}}</view>
+      </view>
+    </view>
+
+    <view wx:if="{{guide && openingAnswered && !rhythmAnswered && rhythm}}" class="interaction-body">
+      <text class="interaction-title">{{rhythm.prompt}}</text>
+      <view class="followup-row">
+        <view
+          wx:for="{{rhythm.options}}"
+          wx:key="key"
+          class="followup-chip {{selectedRhythm === item.key ? 'active' : ''}}"
+          data-key="{{item.key}}"
+          bindtap="onSelectRhythm"
+        >{{item.label}}</view>
+      </view>
+    </view>
+
+    <view class="suggestion-head">
+      <text>继续问</text>
+      <text wx:if="{{turns.length || pendingKey || pendingInteraction || pendingHandoff || pendingCustom || pendingOpening || pendingRhythm || pendingGuest}}" class="reset-link" bindtap="onResetConversation">重开对话</text>
+    </view>
+    <view class="followup-row">
+      <view
+        wx:for="{{guide.followUps}}"
+        wx:key="key"
+        class="followup-chip {{activeFollowUp === item.key ? 'active' : ''}}"
+        data-key="{{item.key}}"
+        bindtap="onSelectFollowUp"
+      >{{item.question}}</view>
+    </view>
+
+    <view class="custom-row">
+      <input
+        class="custom-input"
+        value="{{customQuestion}}"
+        maxlength="60"
+        placeholder="输入一句话，问当前盘面"
+        bindinput="onCustomInput"
+      />
+      <button
+        class="custom-btn"
+        disabled="{{!customReady || pendingKey || pendingInteraction || pendingHandoff || pendingCustom || pendingOpening || pendingRhythm || pendingGuest}}"
+        bindtap="onSubmitCustom"
+      >问</button>
+    </view>
+    <view wx:if="{{turns.length}}" class="chat-thread">
+      <block wx:for="{{turns}}" wx:key="key" wx:for-item="turn">
+        <view class="user-bubble">{{turn.question}}</view>
+        <view wx:if="{{turn.reaction}}" class="reaction-line">{{turn.reaction}}</view>
+        <view class="mystic-bubble">{{turn.answer}}</view>
+      </block>
+    </view>
+
+    <view wx:if="{{pendingKey || pendingInteraction || pendingHandoff || pendingCustom || pendingOpening || pendingRhythm}}" class="typing-row">
+      <text class="typing-label">{{thinkingText}}</text>
+      <view class="typing-dots">
+        <view class="typing-dot"></view>
+        <view class="typing-dot"></view>
+        <view class="typing-dot"></view>
+      </view>
+    </view>
+
+    <view class="interaction-head">
+      <text>互动小游戏</text>
+      <text class="reset-link" bindtap="onNextInteraction">再来一局</text>
+    </view>
+    <view wx:if="{{interaction}}" class="interaction-body">
+      <text class="interaction-title">{{interaction.title}} · {{interaction.description}}</text>
+      <view class="followup-row">
+        <view
+          wx:for="{{interaction.options}}"
+          wx:key="label"
+          class="followup-chip {{selectedInteraction.label === item.label ? 'active' : ''}}"
+          data-label="{{item.label}}"
+          bindtap="onSelectInteraction"
+        >{{item.label}}</view>
+      </view>
+    </view>
+
+    <text class="reading-signature">{{guide.signature}}</text>
+  </view>
+</view>

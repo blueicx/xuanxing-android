@@ -1,5 +1,6 @@
 package com.xuanji.app.ui.components
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.Canvas
@@ -25,6 +26,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -47,6 +52,9 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.size
 
+val V14_GOLD = Color(0xFFD9C27E)
+private val V14_MUTED = Color(0xFFB7ABC8)
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun FortuneCard(
@@ -54,11 +62,13 @@ fun FortuneCard(
     cardId: String? = null,
     title: String? = null,
     shareCard: ShareCard? = null,
+    previewContent: (@Composable ColumnScope.() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit
 ) {
     val layout = LocalCardLayout.current
     val editable = layout != null && cardId != null && title != null
     val editing = editable && layout?.editingCardId == cardId
+    var detailOpen by rememberSaveable(cardId, title) { mutableStateOf(false) }
     val cardModifier = if (editable) {
         modifier
             .fillMaxWidth()
@@ -68,28 +78,33 @@ fun FortuneCard(
                 controller = layout!!
             )
             .combinedClickable(
-                onClickLabel = "查看卡片",
+                onClickLabel = "查看详细解说：$title",
                 onLongClickLabel = "编辑卡片",
-                onClick = {},
+                onClick = { if (!editing) detailOpen = true },
                 onLongClick = { layout.startEdit(cardId) }
             )
+    } else if (title != null) {
+        modifier
+            .fillMaxWidth()
+            .clickable(onClickLabel = "查看详细解说：$title") { detailOpen = true }
     } else {
         modifier.fillMaxWidth()
     }
 
     Card(
         modifier = cardModifier,
-        shape = RoundedCornerShape(16.dp),
+        shape = FortuneSurfaceTokens.CARD_SHAPE,
+        border = BorderStroke(FortuneSurfaceTokens.CARD_STROKE_WIDTH, FortuneSurfaceTokens.CARD_STROKE),
         colors = CardDefaults.cardColors(
             containerColor = if (editing) {
                 MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.82f)
             } else {
-                MaterialTheme.colorScheme.surface
+                FortuneSurfaceTokens.CARD_SURFACE
             }
         ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
-        Column(Modifier.padding(16.dp)) {
+        Column(Modifier.padding(FortuneSurfaceTokens.CARD_CONTENT_PADDING)) {
             if (layout != null && cardId != null && title != null) {
                 CardControls(
                     title = title,
@@ -104,8 +119,26 @@ fun FortuneCard(
                 }
                 Spacer(Modifier.height(4.dp))
             }
-            content()
+            if (!detailOpen) {
+                if (previewContent != null) previewContent() else content()
+                if (title != null && !editing) {
+                    Text(
+                        text = "点开看详细解说 ›",
+                        modifier = Modifier.align(Alignment.End),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.secondary
+                    )
+                }
+            }
         }
+    }
+
+    if (detailOpen && title != null) {
+        FortuneDetailPage(
+            title = title,
+            onDismiss = { detailOpen = false },
+            content = content
+        )
     }
 }
 
@@ -141,34 +174,66 @@ fun PeriodToggleRow(
     currentPeriod: String,
     onSelect: (String) -> Unit
 ) {
-    val options = listOf("day" to "日", "week" to "周", "month" to "月", "year" to "年")
+    val options = listOf("day" to "今日", "week" to "本周", "month" to "本月", "year" to "本年")
     Row(
-        Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .background(MaterialTheme.colorScheme.surfaceVariant),
-        horizontalArrangement = Arrangement.spacedBy(3.dp)
+        horizontalArrangement = Arrangement.spacedBy(7.dp)
     ) {
         options.forEach { (period, label) ->
             val selected = period == currentPeriod
-            Box(
-                Modifier
-                    .weight(1f)
-                    .clip(RoundedCornerShape(9.dp))
-                    .background(
-                        if (selected) MaterialTheme.colorScheme.primary
-                        else Color.Transparent
-                    )
-                    .clickable { onSelect(period) }
-                    .padding(vertical = 8.dp),
-                contentAlignment = Alignment.Center
+            Surface(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(50))
+                    .clickable { onSelect(period) },
+                color = if (selected) V14_GOLD
+                else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f),
+                contentColor = if (selected) Color(0xFF281E35)
+                else V14_MUTED,
+                shape = RoundedCornerShape(50)
             ) {
                 Text(
                     label,
-                    style = MaterialTheme.typography.labelMedium,
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp),
+                    style = MaterialTheme.typography.labelSmall,
                     fontWeight = FontWeight.Bold,
-                    color = if (selected) MaterialTheme.colorScheme.onPrimary
-                    else MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
+
+enum class TodayFortuneMode(val label: String) {
+    Composite("综合"),
+    Eastern("东方"),
+    Western("西方")
+}
+
+@Composable
+fun TodayModeSelector(
+    selected: TodayFortuneMode,
+    onSelect: (TodayFortuneMode) -> Unit
+) {
+    Row(
+        Modifier
+            .clip(RoundedCornerShape(50))
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.78f))
+            .padding(3.dp),
+        horizontalArrangement = Arrangement.spacedBy(2.dp)
+    ) {
+        TodayFortuneMode.entries.forEach { mode ->
+            val active = mode == selected
+            Surface(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(50))
+                    .clickable { onSelect(mode) },
+                color = if (active) V14_GOLD else Color.Transparent,
+                contentColor = if (active) Color(0xFF281E35) else V14_MUTED,
+                shape = RoundedCornerShape(50)
+            ) {
+                Text(
+                    mode.label,
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = if (active) FontWeight.Bold else FontWeight.Medium
                 )
             }
         }
@@ -315,9 +380,10 @@ fun FortunePageWidth(content: @Composable () -> Unit) {
 fun FortuneStickyHeader(
     period: String,
     onPeriodChange: (String) -> Unit,
-    headline: String,
-    subtitle: String,
-    trailing: @Composable RowScope.() -> Unit = {}
+    dateLabel: String,
+    trailing: @Composable RowScope.() -> Unit = {},
+    todayMode: TodayFortuneMode? = null,
+    onTodayModeChange: ((TodayFortuneMode) -> Unit)? = null
 ) {
     Column(
         Modifier
@@ -328,35 +394,32 @@ fun FortuneStickyHeader(
             Row(
                 Modifier
                     .fillMaxWidth()
-                    .padding(start = 16.dp, end = 16.dp, top = 10.dp),
-                verticalAlignment = Alignment.Bottom
-            ) {
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        headline,
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onBackground
-                    )
-                    Text(
-                        subtitle,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 2
-                    )
-                }
-                Spacer(Modifier.width(8.dp))
-                trailing()
-            }
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                    .padding(start = 16.dp, end = 16.dp, top = 9.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Box(Modifier.weight(1f)) {
-                    PeriodToggleRow(period, onPeriodChange)
+                FortuneBrandMark()
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    "玄星",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onBackground
+                )
+                Spacer(Modifier.weight(1f))
+                if (todayMode != null && onTodayModeChange != null) {
+                    TodayModeSelector(todayMode, onTodayModeChange)
+                } else {
+                    trailing()
                 }
+            }
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(start = 16.dp, end = 16.dp, top = 7.dp, bottom = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(7.dp)
+            ) {
+                DateProfileRow(dateLabel)
+                PeriodToggleRow(period, onPeriodChange)
             }
         }
         Box(
@@ -365,6 +428,71 @@ fun FortuneStickyHeader(
                 .height(1.dp)
                 .background(MaterialTheme.colorScheme.outlineVariant)
         )
+    }
+}
+
+@Composable
+private fun FortuneBrandMark() {
+    Surface(
+        modifier = Modifier.size(30.dp),
+        shape = RoundedCornerShape(9.dp),
+        color = Color(0xFF382756)
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Text("✦", color = V14_GOLD, fontSize = 17.sp, fontWeight = FontWeight.Bold)
+        }
+    }
+}
+
+@Composable
+private fun DateProfileRow(dateLabel: String) {
+    Row(
+        Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        Text("今天", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+        Text(dateLabel, style = MaterialTheme.typography.labelMedium, color = V14_MUTED)
+        Spacer(Modifier.weight(1f))
+        Surface(shape = RoundedCornerShape(50), color = Color(0xFF302344)) {
+            Text(
+                "档",
+                modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp),
+                style = MaterialTheme.typography.labelSmall,
+                color = V14_GOLD
+            )
+        }
+    }
+}
+
+@Composable
+fun FortunePageIntro(
+    title: String,
+    subtitle: String,
+    modeLabel: String
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            Surface(shape = RoundedCornerShape(50), color = Color(0xFF34264C)) {
+                Text(
+                    modeLabel,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = V14_GOLD,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+        }
+        Text(subtitle, style = MaterialTheme.typography.bodySmall, color = V14_MUTED)
+        Surface(shape = RoundedCornerShape(9.dp), color = Color(0xFF211A30)) {
+            Text(
+                "每个板块都可单独点开，查看完整解说与依据",
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 7.dp),
+                style = MaterialTheme.typography.labelSmall,
+                color = V14_MUTED
+            )
+        }
     }
 }
 

@@ -35,6 +35,8 @@ import com.xuanji.app.ui.components.FortuneInsightList
 import com.xuanji.app.ui.components.FortunePageWidth
 import com.xuanji.app.ui.components.FortuneProse
 import com.xuanji.app.ui.components.FortuneStickyHeader
+import com.xuanji.app.ui.components.FortunePageIntro
+import com.xuanji.app.ui.components.TodayFortuneMode
 import com.xuanji.app.ui.components.InfoRow
 import com.xuanji.app.ui.components.CardLayouts
 import com.xuanji.app.ui.components.CardMeta
@@ -57,7 +59,10 @@ import com.xuanji.app.ui.viewmodel.WesternViewModel
 import com.xuanji.app.ui.xuanjiViewModel
 
 @Composable
-fun WesternScreen() {
+fun WesternScreen(
+    chartOnly: Boolean = false,
+    onTodayModeChange: ((TodayFortuneMode) -> Unit)? = null
+) {
     val viewModel = xuanjiViewModel { WesternViewModel(AppModule.repository) }
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val readyState = uiState as? WesternUiState.Ready
@@ -78,7 +83,9 @@ fun WesternScreen() {
                 composite = s.composite,
                 period = s.period,
                 onPeriodChange = viewModel::setPeriod,
-                controller = controller
+                controller = controller,
+                chartOnly = chartOnly,
+                onTodayModeChange = onTodayModeChange
             )
         }
     }
@@ -130,7 +137,9 @@ private fun WesternContent(
     composite: com.xuanji.app.data.model.CompositeDailyFortune?,
     period: String,
     onPeriodChange: (String) -> Unit,
-    controller: com.xuanji.app.ui.components.CardLayoutController
+    controller: com.xuanji.app.ui.components.CardLayoutController,
+    chartOnly: Boolean,
+    onTodayModeChange: ((TodayFortuneMode) -> Unit)?
 ) {
     val interp = ZodiacCalculator.interpretChart(chart)
     val cards = westernCards(detail, fortune, chart, interp, period)
@@ -138,12 +147,15 @@ private fun WesternContent(
     CompositionLocalProvider(LocalCardLayout provides controller) {
         MysticFloatingGuide(bazi, composite) { scrollState ->
             Column(Modifier.fillMaxSize()) {
-                FortuneStickyHeader(
-                    period = period,
-                    onPeriodChange = onPeriodChange,
-                    headline = "${periodTitle(period)}星盘 ${fortune.overallScore} 分",
-                    subtitle = "${fortune.dateKey} · ${fortune.sign}当值行运"
-                )
+                if (!chartOnly) {
+                    FortuneStickyHeader(
+                        period = period,
+                        onPeriodChange = onPeriodChange,
+                        dateLabel = "公历 · ${fortune.dateKey}",
+                        todayMode = onTodayModeChange?.let { TodayFortuneMode.Western },
+                        onTodayModeChange = onTodayModeChange
+                    )
+                }
                 Column(
                     Modifier
                         .weight(1f)
@@ -156,11 +168,18 @@ private fun WesternContent(
                             Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
                             verticalArrangement = Arrangement.spacedBy(16.dp)
                         ) {
-                            WesternFortuneSection(
-                                fortune,
-                                period,
-                                ResultShareCards.western("fortune", period, fortune, detail, chart, interp)
-                            )
+                            if (!chartOnly) {
+                                FortunePageIntro(
+                                    title = if (period == "day") "西方今日运势" else "${periodTitle(period)}西方运势",
+                                    subtitle = "${fortune.sign}当值行运 · 西方占星",
+                                    modeLabel = "西方"
+                                )
+                                WesternFortuneSection(
+                                    fortune,
+                                    period,
+                                    ResultShareCards.western("fortune", period, fortune, detail, chart, interp)
+                                )
+                            }
                             CardLayouts.ordered(cards, controller.state).forEach { card -> card.content() }
                             if (controller.state.hiddenCount > 0) {
                                 RestoreCardsBar(controller)
@@ -321,7 +340,27 @@ private fun WesternFortuneSection(
     shareCard: ShareCard
 ) {
     val label = periodTitle(period)
-    FortuneCard(cardId = "fortune", title = "${label}行运解说", shareCard = shareCard) {
+    FortuneCard(
+        cardId = "fortune",
+        title = "${label}行运解说",
+        shareCard = shareCard,
+        previewContent = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                ScoreRing(fortune.overallScore, diameter = 64.dp, caption = "${label}总分")
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    InfoRow("太阳星座", fortune.sign)
+                    InfoRow("幸运色", fortune.luckyColor)
+                    Text(
+                        fortune.summary,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 3
+                    )
+                }
+            }
+        }
+    ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             ScoreRing(fortune.overallScore, caption = "${label}总分")
             Spacer(Modifier.width(14.dp))

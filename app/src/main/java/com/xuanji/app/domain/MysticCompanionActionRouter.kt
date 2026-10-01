@@ -36,6 +36,7 @@ object MysticCompanionActionRouter {
             return MysticCompanionAction.ShowEvidence
         }
         return when (MysticIntentClassifier.classify(clean)) {
+            MysticIntent.Why -> MysticCompanionAction.ShowEvidence
             MysticIntent.TodayMeal -> dailyActionPlan?.let(MysticCompanionAction::ShowTodayMeal)
             MysticIntent.TodayActivity -> dailyActionPlan?.let(MysticCompanionAction::ShowTodayActivity)
             MysticIntent.TodayOuting -> dailyActionPlan?.let(MysticCompanionAction::ShowTodayOuting)

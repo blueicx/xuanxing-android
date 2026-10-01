@@ -5,12 +5,14 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
 import androidx.compose.material3.Text
+import androidx.compose.runtime.mutableStateOf
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.xuanji.app.domain.MysticCharacterCatalog
 import com.xuanji.app.domain.MysticCharacterId
@@ -26,27 +28,35 @@ class MysticStageLayoutTest {
 
     @Test
     fun every_character_uses_the_same_accessible_stage_layers() {
-        MysticCharacterCatalog.all.forEach { character ->
-            compose.setContent {
-                MysticStageLayout(
-                    character = character,
-                    skinId = character.legacySkinId,
-                    garment = androidx.compose.ui.graphics.Color(0xFF30203F),
-                    trimColor = androidx.compose.ui.graphics.Color(0xFFD9C58B),
-                    moodLevel = 0f,
-                    onCharacterSelected = {},
-                    onConversation = {},
-                    onStartGame = {},
-                    onClose = {},
-                    content = {}
-                )
-            }
+        val selectedCharacter = mutableStateOf(MysticCharacterCatalog.all.first())
+        compose.setContent {
+            val character = selectedCharacter.value
+            MysticStageLayout(
+                character = character,
+                skinId = character.legacySkinId,
+                garment = androidx.compose.ui.graphics.Color(0xFF30203F),
+                trimColor = androidx.compose.ui.graphics.Color(0xFFD9C58B),
+                moodLevel = 0f,
+                onCharacterSelected = { id ->
+                    selectedCharacter.value = MysticCharacterCatalog.byId(id)
+                },
+                onConversation = {},
+                onStartGame = {},
+                onClose = {},
+                content = {}
+            )
+        }
 
-            compose.onNodeWithText(character.displayName).assertExists()
-            compose.onNodeWithText(characterUiTitle(character)).assertExists()
-            compose.onNodeWithContentDescription(
-                MysticSceneCatalog.forCharacter(character).accessibilityDescription
-            ).assertExists()
+        MysticCharacterCatalog.all.forEach { character ->
+            compose.runOnIdle { selectedCharacter.value = character }
+            compose.onNodeWithTag("stage-current-character-name").assertTextEquals(character.displayName)
+            compose.onNodeWithTag("stage-current-character-title").assertTextEquals(characterUiTitle(character))
+            val visualDescription = when (MysticVisualAssetCatalog.forCharacter(character).renderMode) {
+                MysticAssetRenderMode.CompleteScene -> "${character.displayName}完整文化场景"
+                MysticAssetRenderMode.ForegroundOnScene,
+                MysticAssetRenderMode.CanvasFallback -> MysticSceneCatalog.forCharacter(character).accessibilityDescription
+            }
+            compose.onNodeWithContentDescription(visualDescription).assertExists()
             compose.onNodeWithContentDescription("关闭玄师台").assertExists()
             compose.onNodeWithText("进入对话").assertExists()
             compose.onNodeWithText("查看专长").assertExists()
@@ -98,7 +108,7 @@ class MysticStageLayoutTest {
             }
         }
 
-        compose.onNodeWithText(character.displayName).assertExists()
+        compose.onNodeWithTag("stage-current-character-name").assertTextEquals(character.displayName)
         compose.onNodeWithContentDescription("关闭玄师台").assertExists()
         compose.onNodeWithText("进入对话").assertExists()
     }

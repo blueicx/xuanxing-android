@@ -1,0 +1,80 @@
+ M app/src/main/AndroidManifest.xml
+ M app/src/main/java/com/xuanji/app/MainActivity.kt
+ M app/src/main/java/com/xuanji/app/data/model/CompositeFortune.kt
+ M app/src/main/java/com/xuanji/app/data/model/Fortune.kt
+ M app/src/main/java/com/xuanji/app/data/repository/FortuneRepository.kt
+ M app/src/main/java/com/xuanji/app/domain/BaziCalculator.kt
+ M app/src/main/java/com/xuanji/app/domain/CompositeFortuneGenerator.kt
+ M app/src/main/java/com/xuanji/app/domain/EasternFortuneGenerator.kt
+ M app/src/main/java/com/xuanji/app/domain/MysticGuideGenerator.kt
+ M app/src/main/java/com/xuanji/app/domain/WesternFortuneGenerator.kt
+ M app/src/main/java/com/xuanji/app/domain/ZodiacCalculator.kt
+ M app/src/main/java/com/xuanji/app/ui/XuanjiApp.kt
+ M app/src/main/java/com/xuanji/app/ui/components/FortuneComponents.kt
+ M app/src/main/java/com/xuanji/app/ui/components/FortuneShareCards.kt
+ M app/src/main/java/com/xuanji/app/ui/components/MysticFloatingGuide.kt
+ M app/src/main/java/com/xuanji/app/ui/components/MysticGuideCard.kt
+ M app/src/main/java/com/xuanji/app/ui/components/ResultShare.kt
+ M app/src/main/java/com/xuanji/app/ui/composite/CompositeFortuneScreen.kt
+ M app/src/main/java/com/xuanji/app/ui/eastern/EasternScreen.kt
+ M app/src/main/java/com/xuanji/app/ui/guide/GuideScreen.kt
+ M app/src/main/java/com/xuanji/app/ui/profile/ProfileScreen.kt
+ M app/src/main/java/com/xuanji/app/ui/viewmodel/ProfileViewModel.kt
+ M app/src/main/java/com/xuanji/app/ui/western/WesternScreen.kt
+?? .superpowers/MysticGuideCard.round25.kt
+?? .superpowers/MysticGuideGenerator.round25.kt
+?? .superpowers/brainstorm/.last-port
+?? .superpowers/brainstorm/.last-token
+?? .superpowers/brainstorm/988-1788025880/content/hidden-recall-options.html
+?? .superpowers/brainstorm/988-1788025880/content/waiting.html
+?? .superpowers/brainstorm/988-1788025880/state/server-info
+?? .superpowers/brainstorm/988-1788025880/state/server-instance-id
+?? .superpowers/brainstorm/988-1788025880/state/server.log
+?? .superpowers/brainstorm/988-1788025880/state/server.pid
+?? .superpowers/dispatch-progress-round38.md
+?? .superpowers/dispatch-progress-round39.md
+?? .superpowers/dispatch-progress-round43.md
+?? .superpowers/dispatch-progress-round44.md
+?? .superpowers/round17-backup/mystic-guide.js
+?? .superpowers/round17-backup/mysticGuide.js
+?? .superpowers/round17-progress.md
+?? .superpowers/round21-progress.md
+?? .superpowers/round22-progress.md
+?? .superpowers/round23-progress.md
+?? .superpowers/round24-progress.md
+?? .superpowers/round25-progress.md
+?? .superpowers/round26-progress.md
+?? .superpowers/round27-backup/android/MysticGuideCard.kt
+?? .superpowers/round27-backup/android/MysticGuideGenerator.kt
+?? .superpowers/round27-backup/miniprogram/components/mystic-guide/mystic-guide.js
+?? .superpowers/round27-backup/miniprogram/components/mystic-guide/mystic-guide.wxml
+?? .superpowers/round27-backup/miniprogram/services/mysticGuide.js
+?? .superpowers/round27-progress.md
+?? .superpowers/round28-backup/android/MysticGuideCard.kt
+?? .superpowers/round28-backup/android/MysticGuideGenerator.kt
+?? .superpowers/round28-backup/miniprogram/components/mystic-guide/mystic-guide.js
+?? .superpowers/round28-backup/miniprogram/services/mysticGuide.js
+?? .superpowers/round28-progress.md
+?? .superpowers/round44-backup/mysticGuide.js
+?? app/src/main/java/com/xuanji/app/domain/EasternPeriodReader.kt
+?? app/src/main/java/com/xuanji/app/domain/WesternTransitReader.kt
+?? build_apk.log
+?? ln.ps1
+?? ui1.xml
+?? ui10.xml
+?? ui11.xml
+?? ui12.xml
+?? ui13.xml
+?? ui14.xml
+?? ui15.xml
+?? ui2.xml
+?? ui3.xml
+?? ui4.xml
+?? ui5.xml
+?? ui6.xml
+?? ui7.xml
+?? ui8.xml
+?? ui9.xml
+?? uiE.xml
+?? uiW.xml
+?? uiW2.xml
