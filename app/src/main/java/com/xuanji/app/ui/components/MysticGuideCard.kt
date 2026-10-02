@@ -66,6 +66,7 @@ import com.xuanji.app.data.local.ConversationMemoryStore
 import com.xuanji.app.data.local.DataStorePreferenceBridge
 import com.xuanji.app.data.local.dataStore
 import com.xuanji.app.data.local.MysticCharacterSessionStore
+import com.xuanji.app.data.local.CompanionGameProgressStore
 import com.xuanji.app.data.local.softMemoryTagStore
 import com.xuanji.app.di.AppModule
 import com.xuanji.app.domain.MysticClarifierOption
@@ -107,6 +108,11 @@ import com.xuanji.app.domain.MysticMessage
 import com.xuanji.app.domain.MysticMessageRole
 import com.xuanji.app.domain.MysticCompanionAction
 import com.xuanji.app.domain.MysticCompanionActionRouter
+import com.xuanji.app.domain.MysticGameContextFactory
+import com.xuanji.app.domain.MysticGameContext
+import com.xuanji.app.domain.MysticGameProgressQuestion
+import com.xuanji.app.domain.CompanionGameFavoriteFactory
+import com.xuanji.app.domain.ReadingFavoriteDataState
 import com.xuanji.app.domain.action.DailyActionPlan
 import com.xuanji.app.domain.action.LifeProfile
 import kotlinx.coroutines.flow.first
@@ -305,6 +311,9 @@ fun MysticGuideCard(
     val softMemoryStore = remember(context) { context.softMemoryTagStore() }
     val coroutineScope = rememberCoroutineScope()
     val visitProfile = remember(bazi) { "bazi|${bazi.chart.display}" }
+    val readingFavoriteStore = LocalReadingFavoriteStore.current
+    val readingFavoriteProfileKey = LocalReadingFavoriteProfileKey.current ?: visitProfile
+    val readingMetadata = LocalMysticReadingMetadata.current
     val companionKey = "${bazi.hashCode()}|${fortune.hashCode()}"
     val companion = remember(companionKey) { mysticCompanionState(companionKey, fortune) }
     val characterProfile = remember(characterId) { MysticCharacterCatalog.byId(characterId) }
@@ -420,12 +429,29 @@ fun MysticGuideCard(
     var gameViewPly by remember { mutableStateOf<Int?>(null) }
     var companionGameId by remember(characterId) { mutableStateOf<String?>(null) }
     val gameArchiveStore = remember(context) { com.xuanji.app.data.local.GameArchiveStore(context) }
+    val companionGameProgressStore = remember(context) {
+        CompanionGameProgressStore(DataStorePreferenceBridge(context))
+    }
     var gameRecord by remember { mutableStateOf(com.xuanji.app.domain.game.GameRecord()) }
     var gameArchive by remember { mutableStateOf<com.xuanji.app.domain.game.GameSave?>(null) }
     var gameRecordedToken by remember { mutableStateOf<Long?>(null) }
+    var xiangqiFavoriteNotice by remember(visitProfile, characterId) { mutableStateOf("") }
     val gameBridge = remember {
         com.xuanji.app.domain.game.GameDialogueBridge(recordOf = { gameRecord })
     }
+
+    suspend fun readCurrentGameContext(forCharacterId: MysticCharacterId): MysticGameContext? = runCatching {
+        val game = com.xuanji.app.domain.game.CompanionGameCatalog.forCharacter(forCharacterId)
+        val xiangqiSave = if (forCharacterId == MysticCharacterId.MoHeng) {
+            gameArchiveStore.load(visitProfile)
+        } else null
+        val companionProgress = if (forCharacterId == MysticCharacterId.MoHeng) {
+            null
+        } else {
+            companionGameProgressStore.load(visitProfile, forCharacterId, game.id)
+        }
+        MysticGameContextFactory.fromSaved(forCharacterId, companionProgress, xiangqiSave)
+    }.getOrNull()
     var pendingCustom by remember(guide) { mutableStateOf<String?>(null) }
     var pendingCustomDetailContext by remember(guide) { mutableStateOf<MysticDetailContext?>(null) }
     LaunchedEffect(visitProfile) {
@@ -750,6 +776,29 @@ fun MysticGuideCard(
         // Game path first: board-game intents bypass the generic pendingCustom reply so
         // character game commentary never mixes with fortune template wording.
         val cleanText = text.trim().take(200)
+        if (MysticGameProgressQuestion.isResumeRequest(cleanText)) {
+            val requestedCharacterId = characterId
+            val requestToken = sessionState.sessionToken
+            coroutineScope.launch {
+                val saved = readCurrentGameContext(requestedCharacterId)
+                if (requestToken != sessionState.sessionToken || requestedCharacterId != characterId) return@launch
+                if (saved?.isResumableFor(requestedCharacterId) == true) {
+                    val game = com.xuanji.app.domain.game.CompanionGameCatalog.forCharacter(requestedCharacterId)
+                    if (game.id == "xiangqi") runGameText("继续棋局") else companionGameId = game.id
+                } else {
+                    // Let the offline engine explain the missing/ended save; never open a fresh game
+                    // under a command that explicitly asked to resume.
+                    customQuestion = cleanText
+                    submitCustom()
+                }
+            }
+            return
+        }
+        if (MysticGameProgressQuestion.isProgressQuestion(cleanText)) {
+            customQuestion = cleanText
+            submitCustom()
+            return
+        }
         val action = MysticCompanionActionRouter.route(
             cleanText,
             dailyActionPlan,
@@ -1327,6 +1376,13 @@ fun MysticGuideCard(
             ?: return@LaunchedEffect
         kotlinx.coroutines.delay(430)
         if (requestToken != sessionState.sessionToken) return@LaunchedEffect
+        val gameContext = if (
+            MysticGameProgressQuestion.isProgressQuestion(question) ||
+            MysticGameProgressQuestion.isResumeRequest(question)
+        ) {
+            readCurrentGameContext(characterId)
+        } else null
+        if (requestToken != sessionState.sessionToken) return@LaunchedEffect
         val dialogueContext = DialogueContext(
             profileKey = visitProfile,
             dateKey = fortune.dateKey,
@@ -1343,7 +1399,8 @@ fun MysticGuideCard(
             characterId = characterProfile.id,
             dailyActionPlan = dailyActionPlan,
             lifeProfile = lifeProfile,
-            detailContext = pendingCustomDetailContext
+            detailContext = pendingCustomDetailContext,
+            gameContext = gameContext
         )
         val providerResult = dialogueProvider.complete(
             DialogueRequest(dialogueContext, question, requestToken)
@@ -1731,6 +1788,51 @@ fun MysticGuideCard(
                                 null
                             }
                         )
+                    }
+                    val xiangqiSummary = CompanionGameFavoriteFactory.xiangqiSummary(
+                        outcome = gameSession.outcome,
+                        halfMoves = gameSession.history.size,
+                        title = gameSession.title
+                    )
+                    if (xiangqiSummary != null) {
+                        Row(
+                            Modifier.fillMaxWidth().padding(horizontal = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            OutlinedButton(
+                                onClick = {
+                                    val store = readingFavoriteStore
+                                    val favorite = CompanionGameFavoriteFactory.fromResult(
+                                        id = "game-summary-${System.currentTimeMillis()}",
+                                        characterId = characterProfile.id,
+                                        gameId = "xiangqi",
+                                        dateKey = readingMetadata.dateKey,
+                                        summary = xiangqiSummary,
+                                        sourceNote = "来自本机已复核的象棋棋谱；用户主动收藏。这里只记录棋局结果，不保存对话内容。"
+                                    )
+                                    if (store == null || readingFavoriteProfileKey.isBlank() || favorite == null) {
+                                        xiangqiFavoriteNotice = "收藏暂不可用；棋谱存档不受影响。"
+                                    } else {
+                                        coroutineScope.launch {
+                                            val saved = runCatching {
+                                                store.upsert(readingFavoriteProfileKey, favorite)
+                                            }.getOrNull()
+                                            xiangqiFavoriteNotice = if (saved?.state == ReadingFavoriteDataState.Ready) {
+                                                "本局摘要已收藏到「我的收藏」。"
+                                            } else {
+                                                "本局摘要未能保存；棋谱存档不受影响。"
+                                            }
+                                        }
+                                    }
+                                },
+                                enabled = !gameThinking,
+                                modifier = Modifier.testTag("xiangqi-game-favorite")
+                            ) { Text("收藏本局摘要") }
+                            if (xiangqiFavoriteNotice.isNotBlank()) {
+                                Text(xiangqiFavoriteNotice, style = MaterialTheme.typography.labelSmall)
+                            }
+                        }
                     }
                     val archiveLive = gameBridge.activeGame(gameSession)
                     if (archiveLive || gameArchive != null || gameRecord.games > 0) {

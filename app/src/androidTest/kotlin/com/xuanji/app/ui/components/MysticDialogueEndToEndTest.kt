@@ -35,6 +35,9 @@ import com.xuanji.app.data.model.WesternDailyFortune
 import com.xuanji.app.domain.DialogueContext
 import com.xuanji.app.domain.DialogueReply
 import com.xuanji.app.domain.MysticDetailContext
+import com.xuanji.app.domain.MysticCharacterId
+import com.xuanji.app.domain.MysticGameContext
+import com.xuanji.app.domain.MysticGameContextFactory
 import com.xuanji.app.domain.MysticCompanionAction
 import com.xuanji.app.domain.MysticCompanionActionRouter
 import com.xuanji.app.domain.MysticDialogueCoordinator
@@ -54,6 +57,8 @@ import com.xuanji.app.domain.action.MealSlot
 import com.xuanji.app.domain.action.MealSuggestion
 import com.xuanji.app.domain.action.OutingSuggestion
 import com.xuanji.app.domain.action.RegionCandidate
+import com.xuanji.app.domain.game.CompanionGameProgressState
+import com.xuanji.app.domain.game.SilkRoadState
 import com.xuanji.app.domain.reduce
 import kotlinx.coroutines.launch
 import org.junit.Rule
@@ -219,6 +224,39 @@ class MysticDialogueEndToEndTest {
         compose.onAllNodes(hasText("推荐买", substring = true)).assertCountEquals(0)
     }
 
+    @Test
+    fun game_progress_question_replies_from_the_selected_character_saved_checkpoint() {
+        val saved = requireNotNull(
+            MysticGameContextFactory.fromSaved(
+                MysticCharacterId.NadirRashid,
+                CompanionGameProgressState.SilkRoad(
+                    SilkRoadState(current = "敦煌", daysLeft = 6, budgetLeft = 9, path = listOf("长安", "敦煌"))
+                ),
+                null
+            )
+        )
+        compose.setContent {
+            DialogueUiTestHost(characterId = MysticCharacterId.NadirRashid, gameContext = saved)
+        }
+
+        send("我还剩几天和多少补给？")
+
+        compose.onNodeWithText("敦煌", substring = true).assertExists()
+        compose.onNodeWithText("6 天", substring = true).assertExists()
+        compose.onNodeWithText("9 点资源", substring = true).assertExists()
+    }
+
+    @Test
+    fun resume_request_without_a_valid_save_does_not_start_a_new_game() {
+        compose.setContent {
+            DialogueUiTestHost(characterId = MysticCharacterId.NadirRashid)
+        }
+
+        send("继续丝路")
+
+        compose.onNodeWithText("不会替你新开一局", substring = true).assertExists()
+    }
+
     private fun send(text: String) {
         compose.onNode(hasSetTextAction()).performTextInput(text)
         compose.onNodeWithContentDescription("发送消息").performClick()
@@ -232,7 +270,9 @@ private val dialogueTestCoordinator = MysticDialogueCoordinator(OfflineDialogueP
 @Composable
 private fun DialogueUiTestHost(
     includeDailyPlan: Boolean = true,
-    includeLifeProfile: Boolean = true
+    includeLifeProfile: Boolean = true,
+    characterId: MysticCharacterId = MysticCharacterId.ShenYanzhou,
+    gameContext: MysticGameContext? = null
 ) {
     var session by remember { mutableStateOf(MysticSessionState()) }
     var routedAction by remember { mutableStateOf<MysticCompanionAction?>(null) }
@@ -242,7 +282,7 @@ private fun DialogueUiTestHost(
         syntheticContext(
             dailyActionPlan = testDailyActionPlan().takeIf { includeDailyPlan },
             lifeProfile = testLifeProfile().takeIf { includeLifeProfile }
-        )
+        ).copy(characterId = characterId, gameContext = gameContext)
     }
     MaterialTheme {
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {

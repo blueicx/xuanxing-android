@@ -60,7 +60,9 @@ data class DialogueContext(
     /** Optional explicit specialty chosen by the UI; the adapter still validates it against the catalog. */
     val characterSpecialtyKey: String? = null,
     /** Exact, already-rendered detail being discussed; not persisted as memory. */
-    val detailContext: MysticDetailContext? = null
+    val detailContext: MysticDetailContext? = null,
+    /** Minimal checkpoint for the current turn only; never copied into conversation memory. */
+    val gameContext: MysticGameContext? = null
 )
 
 /** Minimal, UI-independent turn record used when the dialogue engine is called off-screen. */
@@ -110,22 +112,35 @@ class DefaultMysticDialogueEngine : MysticDialogueEngine {
         val continuity = MysticDialogueContinuity.resolve(normalizedInput, context.recentTurns)
         val intent = analysis.intent
         val topicKey = analysis.topicKey ?: continuity.intent.topicKeyOrNull() ?: context.topicKey
-        val prefix = MysticGuideGenerator.customAnswerPrefix(normalizedInput)
-        val draft = MysticGuideGenerator.customAnswer(
-            context.mode,
-            topicKey,
-            continuity.generationInput,
-            context.fortune,
-            context.latestTest,
-            context.skinId,
-            context.dailyActionPlan,
-            context.lifeProfile,
-            context.divinationSummary,
-            context.weatherSummary,
-            context.personalitySource,
-            characterName = context.characterName,
-            detailContext = context.detailContext
-        )
+        val gameCheckpointQuestion = MysticGameProgressQuestion.isProgressQuestion(normalizedInput) ||
+            MysticGameProgressQuestion.isResumeRequest(normalizedInput)
+        val replyCharacterId = context.characterId
+            ?: MysticCharacterCatalog.all.firstOrNull { it.displayName == context.characterName }?.id
+            ?: MysticCharacterId.ShenYanzhou
+        val prefix = if (gameCheckpointQuestion) "" else MysticGuideGenerator.customAnswerPrefix(normalizedInput)
+        val draft = if (gameCheckpointQuestion) {
+            MysticGameContextAnswer.reply(
+                replyCharacterId,
+                context.gameContext,
+                normalizedInput
+            )
+        } else {
+            MysticGuideGenerator.customAnswer(
+                context.mode,
+                topicKey,
+                continuity.generationInput,
+                context.fortune,
+                context.latestTest,
+                context.skinId,
+                context.dailyActionPlan,
+                context.lifeProfile,
+                context.divinationSummary,
+                context.weatherSummary,
+                context.personalitySource,
+                characterName = context.characterName,
+                detailContext = context.detailContext
+            )
+        }
         val voice = MysticCharacterVoiceAdapter.adapt(
             context = context,
             analysis = analysis.copy(topicKey = topicKey),
@@ -136,7 +151,7 @@ class DefaultMysticDialogueEngine : MysticDialogueEngine {
         // intro cannot be attached to a whole-reply refusal.
         val guardedText = SafetyResponseGuard.guard(
             normalizedInput,
-            prefix + voice.text,
+            prefix + if (gameCheckpointQuestion) draft else voice.text,
             context.copy(question = normalizedInput),
             context.personalitySource
         ).text
@@ -157,7 +172,9 @@ class DefaultMysticDialogueEngine : MysticDialogueEngine {
             prefix = prefix,
             text = guardedText,
             clarifiers = clarifiersFor(analysis),
-            groundedFacts = groundedFacts,
+            groundedFacts = if (gameCheckpointQuestion) {
+                context.gameContext?.takeIf { it.characterId == replyCharacterId }?.let { listOf(it.checkpoint) }.orEmpty()
+            } else groundedFacts,
             specialtyKey = voice.selection.specialtyKey,
             evidence = evidence
         )

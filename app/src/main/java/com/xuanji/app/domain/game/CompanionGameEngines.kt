@@ -37,6 +37,16 @@ object PoetryChainEngine : CompanionGameEngine<PoetryChainState, PoetryChainEven
 
     fun prompt(state: PoetryChainState): PoetryPrompt = prompts[state.promptIndex.mod(prompts.size)]
 
+    fun isValidState(state: PoetryChainState): Boolean {
+        if (state.promptIndex !in 0..prompts.size ||
+            state.score !in 0..state.promptIndex.coerceAtMost(prompts.size) ||
+            state.completed != (state.promptIndex == prompts.size)
+        ) return false
+        if (state.promptIndex == 0) return state.selected == null
+        val previousPrompt = prompts[(state.promptIndex - 1).coerceAtMost(prompts.lastIndex)]
+        return state.selected in previousPrompt.options
+    }
+
     override fun reduce(state: PoetryChainState, event: PoetryChainEvent): PoetryChainState = when (event) {
         PoetryChainEvent.Restart -> PoetryChainState()
         is PoetryChainEvent.Choose -> {
@@ -101,6 +111,16 @@ object StarMapPuzzleEngine : CompanionGameEngine<StarMapState, StarMapEvent, Sta
     )
 
     fun puzzle(state: StarMapState): StarMapPuzzle = puzzles[state.puzzleIndex.mod(puzzles.size)]
+
+    fun isValidState(state: StarMapState): Boolean {
+        if (state.puzzleIndex !in puzzles.indices || state.path.isEmpty() || state.path.size > 20) return false
+        val puzzle = puzzle(state)
+        return state.current in puzzle.edges &&
+            state.path.first() == puzzle.start &&
+            state.path.last() == state.current &&
+            state.path.zipWithNext().all { (from, to) -> to in puzzle.edges[from].orEmpty() } &&
+            state.completed == (state.current == puzzle.target)
+    }
 
     override fun reduce(state: StarMapState, event: StarMapEvent): StarMapState = when (event) {
         StarMapEvent.Restart -> initial()
@@ -181,6 +201,23 @@ object SilkRoadRouteEngine : CompanionGameEngine<SilkRoadState, SilkRoadEvent, S
     )
 
     fun destinations(state: SilkRoadState): List<RouteCity> = links[state.current].orEmpty().mapNotNull(cities::get)
+
+    fun isValidState(state: SilkRoadState): Boolean {
+        if (state.path.isEmpty() || state.path.size > 10 || state.target != "撒马尔罕" || state.current !in cities) return false
+        val validPath = state.path.first() == "长安" &&
+            state.path.last() == state.current &&
+            state.path.all { it in cities } &&
+            state.path.zipWithNext().all { (from, to) -> to in links[from].orEmpty() }
+        if (!validPath) return false
+        val travelled = state.path.drop(1).map(cities::getValue)
+        val expectedDays = 8 - travelled.sumOf { it.days }
+        val expectedBudget = 12 - travelled.sumOf { it.cost }
+        return state.daysLeft == expectedDays &&
+            state.budgetLeft == expectedBudget &&
+            state.completed == (state.current == state.target) &&
+            !(state.completed && state.failed) &&
+            (!state.failed || destinations(state).any { state.daysLeft < it.days || state.budgetLeft < it.cost })
+    }
 
     override fun reduce(state: SilkRoadState, event: SilkRoadEvent): SilkRoadState = when (event) {
         SilkRoadEvent.Restart -> SilkRoadState()

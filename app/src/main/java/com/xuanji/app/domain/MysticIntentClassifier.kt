@@ -17,6 +17,7 @@ object MysticIntentClassifier {
      */
     private fun game(q: String): MysticIntent? {
         if (CompanionGameCatalog.gameIdForInput(q) != null) return MysticIntent.Game
+        if (MysticGameProgressQuestion.isProgressQuestion(q) || MysticGameProgressQuestion.isResumeRequest(q)) return MysticIntent.Game
         val isStart = setOf("来一盘", "来一局", "下一盘", "下一局", "下一把", "开一盘", "开一局", "陪我下")
             .any { q.contains(it) } && (q.contains("象棋") || q.contains("围棋") || q.contains("国际象棋"))
         val isCommand = q == "悔棋" || q.contains("悔棋") ||

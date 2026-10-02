@@ -343,6 +343,44 @@ requireVerify(visual.ui_verify, `visual ${visual.ui_verify}`);
 assert(characterUiSource.includes('CompanionGameCatalog.forCharacter(profile.id)'), 'gallery actions must be driven by the character game catalog');
 requireVerify(visual.game_verify, `visual ${visual.game_verify}`);
 assert(Array.isArray(visual.style_ids) && visual.style_ids.length === 4, 'visual companion must keep exactly four selected culture figures');
+
+// ---- 游戏进度对话与主动收藏：只读有效存档，收藏只写短摘要 -----------------------------
+const gameProgress = contract.game_progress;
+const gameContextSource = fs.readFileSync(path.join(APP_SRC, 'domain', 'MysticGameContext.kt'), 'utf8');
+const gameFavoriteSource = fs.readFileSync(path.join(APP_SRC, 'domain', 'CompanionGameFavoriteFactory.kt'), 'utf8');
+const gameEvidenceSource = fs.readFileSync(path.join(APP_SRC, 'domain', 'MysticEvidence.kt'), 'utf8');
+const gameCardSource = fs.readFileSync(path.join(UI_SRC, 'components', 'CompanionGameCard.kt'), 'utf8');
+const dialogueE2ePath = path.join(__dirname, '..', 'app', 'src', 'androidTest', 'kotlin', 'com', 'xuanji', 'app', 'ui', 'components', 'MysticDialogueEndToEndTest.kt');
+const dialogueE2eSource = fs.readFileSync(dialogueE2ePath, 'utf8');
+assert(gameContextSource.includes('data class MysticGameContext'), 'dialogue game context must be a bounded summary DTO');
+const gameContextDto = gameContextSource.split('data class MysticGameContext')[1].split('enum class MysticGameProgressStatus')[0];
+assert(!/stateJson|CompanionGameProgressState/.test(gameContextDto), 'full serialized game state must not enter the per-turn dialogue context');
+['PoetryChainEngine.isValidState', 'StarMapPuzzleEngine.isValidState', 'SilkRoadRouteEngine.isValidState', 'GameArchive.restore'].forEach((symbol) => {
+  assert(gameContextSource.includes(symbol), `game checkpoint must validate real saved state through ${symbol}`);
+});
+assert(gameContextSource.includes(gameProgress.resume_missing_fallback), 'missing resume must never silently start a new game');
+assert(gameEvidenceSource.includes('LocallySaved("本机存档")') && gameEvidenceSource.includes('MysticEvidenceStatus.LocallySaved'),
+  'game progress evidence must be labeled as a local save, distinct from typed user input');
+assert(mysticCardSource.includes('readCurrentGameContext') && mysticCardSource.includes('.isResumableFor('),
+  'dialogue resume must load and validate the selected character save before opening its game');
+assert(mysticCardSource.includes('companionGameProgressStore.load') && mysticCardSource.includes('gameArchiveStore.load'),
+  'each character game must read from its existing profile-scoped store');
+assert(gameFavoriteSource.includes('type = "game"') && gameFavoriteSource.includes('CompanionGameCatalog.byId'),
+  'game summaries must be local snapshots for the matching character and game');
+gameProgress.favorite_button_tags.forEach((tag) => {
+  assert(mysticCardSource.includes(`"${tag}"`) || gameCardSource.includes(`"${tag}"`), `finished-game favorite action missing: ${tag}`);
+});
+assert(gameCardSource.includes('if (poetry.completed)') && gameCardSource.includes('if (starMap.completed)') &&
+  gameCardSource.includes('if (route.completed || route.failed)'), 'non-Xiangqi summaries must be offered only after a game ends');
+assert(gameFavoriteSource.includes('fun xiangqiSummary') && gameFavoriteSource.includes('GameOutcome.Draw'),
+  'Xiangqi summary favorite must be derived from a real terminal rules outcome');
+gameProgress.test_suites.filter((suite) => suite !== 'MysticDialogueEndToEndTest').forEach((suite) => {
+  assert(testFiles.includes(suite), `game progress JVM regression suite missing: ${suite}`);
+});
+assert(fs.existsSync(dialogueE2ePath) && dialogueE2eSource.includes('game_progress_question_replies_from_the_selected_character_saved_checkpoint') &&
+  dialogueE2eSource.includes('resume_request_without_a_valid_save_does_not_start_a_new_game'),
+  'dialogue AndroidTest must cover a real local checkpoint and honest resume fallback');
+
 const visualAssetSource = fs.readFileSync(path.join(UI_SRC, 'components', 'MysticFigureAsset.kt'), 'utf8');
 visual.style_ids.forEach((styleId) => {
   assert(visualAssetSource.includes(`"${styleId}"`), `figure asset renderer lost ${styleId}`);

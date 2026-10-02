@@ -346,5 +346,10 @@
     {"input": "最近睡眠不好", "expectIntent": "health", "verify": "MysticDialogueGameIntentTest.everyday_phrases_are_not_misread_as_game"},
     {"input": "最近财运如何", "expectIntent": "wealth", "verify": "MysticDialogueGameIntentTest.everyday_phrases_are_not_misread_as_game"},
     {"input": "车厘子好吃吗", "expectIntent": "daily", "verify": "MysticDialogueGameIntentTest.everyday_phrases_are_not_misread_as_game"}
-  ]
+  ],
+  "game_progress": {
+    "resume_missing_fallback": "不会替你新开一局",
+    "favorite_button_tags": ["companion-game-favorite", "xiangqi-game-favorite"],
+    "test_suites": ["MysticGameContextTest", "CompanionGameFavoriteFactoryTest", "MysticDialogueEndToEndTest"]
+  }
 }

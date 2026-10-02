@@ -18,6 +18,13 @@ class MysticDialogueGameIntentTest {
     }
 
     @Test
+    fun local_game_progress_and_resume_questions_classify_to_game() {
+        assertEquals(MysticIntent.Game, MysticIntentClassifier.classify("游戏进度"))
+        assertEquals(MysticIntent.Game, MysticIntentClassifier.classify("我还剩几天和多少补给？"))
+        assertEquals(MysticIntent.Game, MysticIntentClassifier.classify("继续丝路"))
+    }
+
+    @Test
     fun each_character_game_shortcut_reaches_game_without_opening_fortune_chat() {
         val shortcuts = mapOf(
             MysticCharacterId.ShenYanzhou to "开始诗句接龙",
