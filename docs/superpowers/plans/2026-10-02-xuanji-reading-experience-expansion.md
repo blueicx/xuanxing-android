@@ -50,7 +50,7 @@
 - [x] 为综合维度、通用 ShareCard 和每日行动构造精确 context；东方/西方所有普通卡的结果文本使用其 `ShareCard` 标题、摘要、内容和已有来源，命盘详情不错误标记成每日周期结果。
 - [x] 扩展 Compose AndroidTest：打开真实详情、点“问玄师”、断言当前详情和结果被传入对话、关闭舞台后原标题和详情保持可见。
 - [x] 运行 `.\gradlew.bat :app:testDebugUnitTest :app:assembleDebugAndroidTest --console=plain`。
-- [ ] 单独提交任务 1，提交信息 `feat(详情): 把当前结果带入玄师对话`。
+- [x] 单独提交任务 1，提交信息 `feat(详情): 把当前结果带入玄师对话`（`f25b477`）。
 
 ## 任务 2：用户主动收藏的版本化快照
 
@@ -61,12 +61,12 @@
 - 创建 `app/src/test/kotlin/com/xuanji/app/data/local/ReadingFavoriteStoreTest.kt`
 - 修改 `app/src/test/kotlin/com/xuanji/app/data/local/FakePreferenceBridge.kt` 或复用现有同类测试实现
 
-- [ ] 先写 codec/store 测试：保存并恢复详情快照、类型和 profile 相互隔离、同 ID 更新、取消/删除、未知版本和坏 JSON 安全回退、旧版 envelope 迁移、排序按保存时间倒序。
-- [ ] 执行 `.\gradlew.bat :app:testDebugUnitTest --tests '*ReadingFavorite*' --console=plain`，确认新类型缺失导致预期失败。
-- [ ] 实现有版本字段的 `ReadingFavorite`（id、type、title、dateKey、period、mode、characterId、gameId、body、evidence、algorithmVersion、createdAt）；禁止持久化完整出生资料。
-- [ ] 实现 `ReadingFavoriteCodec`、`ReadingFavoriteStore(PreferenceBridge)`；键使用 `reading_favorites_<sha256(profileKey)>`，单档案上限 200 条，坏数据保留错误状态并提供显式清除方法。
-- [ ] 补充测试：清档案只删本 profile、清全部 favorites 不影响角色线程和游戏存档。
-- [ ] 运行 `.\gradlew.bat :app:testDebugUnitTest --tests '*ReadingFavorite*' --console=plain`。
+- [x] 先写 codec/store 测试：保存并恢复详情快照、类型和 profile 相互隔离、同 ID 更新、取消/删除、未知版本和坏 JSON 安全回退、旧版 envelope 迁移、排序按保存时间倒序。
+- [x] 执行 `.\gradlew.bat :app:testDebugUnitTest --tests '*ReadingFavorite*' --console=plain`，确认新类型缺失导致预期失败。
+- [x] 实现有版本字段的 `ReadingFavorite`（id、type、title、dateKey、period、mode、characterId、gameId、body、evidence、algorithmVersion、createdAt）；禁止持久化完整出生资料。
+- [x] 实现 `ReadingFavoriteCodec`、`ReadingFavoriteStore(PreferenceBridge)`；键使用 `reading_favorites_<sha256(profileKey)>`，单档案上限 200 条，坏数据保留错误状态并提供显式清除方法。
+- [x] 补充测试：清档案只删本 profile、清全部 favorites 不影响角色线程和游戏存档。
+- [x] 运行 `.\gradlew.bat :app:testDebugUnitTest --tests '*ReadingFavorite*' --console=plain`。
 - [ ] 单独提交任务 2，提交信息 `feat(收藏): 增加本地版本化阅读快照`。
 
 ## 任务 3：详情收藏入口与记录页回看
