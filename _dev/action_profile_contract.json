@@ -21,5 +21,14 @@
   ],
   "regionMax": 3,
   "tieBreak": {"allowed": true, "scope": "profileKey|dateKey|candidateKey", "changesMainScore": false},
+  "explicitFeedback": {
+    "acceptedPointsPerChoice": 1,
+    "acceptedCap": 5,
+    "notSuitablePointsPerChoice": -2,
+    "notSuitableFloor": -8,
+    "replacementScope": "profileKey|category|dateKey|candidateKey",
+    "replacementUndo": "remove-only-the-replacement-event",
+    "changesBaseScore": false
+  },
   "forbiddenText": ["保证", "命中注定", "最适合你移民", "一定要搬", "治疗", "诊断", "稳赚", "保证收益"]
 }

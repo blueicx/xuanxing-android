@@ -42,6 +42,8 @@ import com.xuanji.app.domain.MysticEvidenceBuilder
 
 data class DailyActionCardModel(
     val title: String,
+    val category: String,
+    val candidateKey: String?,
     val summary: String,
     val score: Int,
     val confidence: String,
@@ -54,7 +56,9 @@ data class DailyActionCardModel(
     companion object {
         fun from(plan: DailyActionPlan): List<DailyActionCardModel> = listOf(
             DailyActionCardModel(
-                "吃什么",
+                title = "吃什么",
+                category = "meal",
+                candidateKey = plan.meals.firstOrNull()?.candidateKey?.takeIf(String::isNotBlank),
                 plan.meals.firstOrNull()?.let { meal ->
                     buildString {
                         append(meal.title)
@@ -97,7 +101,9 @@ data class DailyActionCardModel(
                 plan.meals.firstOrNull()?.evidence.orEmpty().map(ActionEvidence::toDailyActionEvidenceDetail)
             ),
             DailyActionCardModel(
-                "做什么",
+                title = "做什么",
+                category = "activity",
+                candidateKey = plan.activities.firstOrNull()?.candidateKey?.takeIf(String::isNotBlank),
                 plan.activities.firstOrNull()?.title ?: "先做一件低压力的小事",
                 plan.activities.firstOrNull()?.score ?: 0,
                 confidenceLabel(plan.confidence),
@@ -115,7 +121,9 @@ data class DailyActionCardModel(
                 plan.activities.firstOrNull()?.evidence.orEmpty().map(ActionEvidence::toDailyActionEvidenceDetail)
             ),
             DailyActionCardModel(
-                "去哪玩",
+                title = "去哪玩",
+                category = "outing",
+                candidateKey = plan.outings.firstOrNull()?.candidateKey?.takeIf(String::isNotBlank),
                 plan.outings.firstOrNull()?.cityLabel ?: "按环境类型选择附近空间",
                 plan.outings.firstOrNull()?.score ?: 0,
                 confidenceLabel(plan.confidence),
@@ -171,6 +179,7 @@ private fun ActionSource.label(): String = when (this) {
 fun DailyActionSection(
     plan: DailyActionPlan?,
     onFeedback: (category: String, candidateKey: String, kind: ActionFeedbackKind) -> Unit = { _, _, _ -> },
+    onUndoReplacement: (category: String, candidateKey: String) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier
 ) {
     if (plan == null) return
@@ -200,11 +209,17 @@ fun DailyActionSection(
 
     selectedDetailTitle?.let { title ->
         cards.firstOrNull { it.title == title }?.let { card ->
+            val replacementToUndo = plan.appliedFeedback.firstOrNull {
+                it.dateKey == plan.dateKey &&
+                    (it.category == card.category || it.category == card.title) &&
+                    it.kind == ActionFeedbackKind.Replaced
+            }
             DailyActionDetailPage(
                 card = card,
                 dateKey = plan.dateKey,
                 relatedCards = cards.filterNot { it.title == card.title },
                 feedbackStatus = feedbackStatus,
+                undoCandidateKey = replacementToUndo?.candidateKey,
                 onDismiss = { selectedDetailTitle = null },
                 onRestore = { selectedDetailTitle = card.title },
                 onOpenRelated = { related ->
@@ -212,8 +227,18 @@ fun DailyActionSection(
                     feedbackStatus = null
                 },
                 onFeedback = { kind ->
-                    feedbackStatus = if (kind == ActionFeedbackKind.Accepted) "已采纳" else "标记为不合适"
-                    onFeedback(card.title, card.summary, kind)
+                    feedbackStatus = when (kind) {
+                        ActionFeedbackKind.Accepted -> "已记录：后续同类候选会提高排序，最多 +5 分。"
+                        ActionFeedbackKind.NotSuitable -> "已记录：后续同类候选会降低排序，最多 −8 分。"
+                        ActionFeedbackKind.Replaced -> "已换一个候选；这次排除可撤销。"
+                    }
+                    card.candidateKey?.let { onFeedback(card.category, it, kind) }
+                },
+                onUndoReplacement = {
+                    replacementToUndo?.let { previous ->
+                        feedbackStatus = "已撤销上次换选，原候选重新参与排序。"
+                        onUndoReplacement(card.category, previous.candidateKey)
+                    }
                 }
             )
         }
@@ -283,10 +308,12 @@ private fun DailyActionDetailPage(
     dateKey: String,
     relatedCards: List<DailyActionCardModel>,
     feedbackStatus: String?,
+    undoCandidateKey: String?,
     onDismiss: () -> Unit,
     onRestore: () -> Unit,
     onOpenRelated: (DailyActionCardModel) -> Unit,
-    onFeedback: (ActionFeedbackKind) -> Unit
+    onFeedback: (ActionFeedbackKind) -> Unit,
+    onUndoReplacement: () -> Unit
 ) {
     val askMystic = LocalMysticDetailQuestion.current
     val detailContext = MysticDetailContext(
@@ -374,9 +401,15 @@ private fun DailyActionDetailPage(
                 }
             }
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            TextButton(onClick = { onFeedback(ActionFeedbackKind.Accepted) }) { Text("已采纳") }
-            TextButton(onClick = { onFeedback(ActionFeedbackKind.NotSuitable) }) { Text("不合适") }
+        if (card.candidateKey != null) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                TextButton(onClick = { onFeedback(ActionFeedbackKind.Accepted) }) { Text("采纳") }
+                TextButton(onClick = { onFeedback(ActionFeedbackKind.NotSuitable) }) { Text("不合适") }
+                TextButton(onClick = { onFeedback(ActionFeedbackKind.Replaced) }) { Text("换一个") }
+            }
+        }
+        if (undoCandidateKey != null) {
+            TextButton(onClick = onUndoReplacement) { Text("撤销上次换选") }
         }
         feedbackStatus?.let {
             Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.secondary)

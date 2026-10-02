@@ -14,6 +14,8 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.xuanji.app.domain.action.ActionEvidence
+import com.xuanji.app.domain.action.ActionFeedback
+import com.xuanji.app.domain.action.ActionFeedbackKind
 import com.xuanji.app.domain.action.ActionSource
 import com.xuanji.app.domain.action.ActivitySuggestion
 import com.xuanji.app.domain.action.ConfidenceLevel
@@ -103,7 +105,8 @@ class FortuneDetailPageTest {
                         )
                     ),
                     estimatedPriceCents = 2400,
-                    prepMinutes = 20
+                    prepMinutes = 20,
+                    candidateKey = "mushroom-chicken-rice"
                 )
             ),
             activities = listOf(
@@ -113,7 +116,8 @@ class FortuneDetailPageTest {
                     bestPeriod = "午后",
                     avoid = "高温时段",
                     score = 76,
-                    evidence = emptyList()
+                    evidence = emptyList(),
+                    candidateKey = "park-walk"
                 )
             ),
             outings = listOf(
@@ -123,21 +127,30 @@ class FortuneDetailPageTest {
                     cityLabel = "杭州 · 西湖",
                     score = 71,
                     evidence = emptyList(),
-                    indoor = false
+                    indoor = false,
+                    candidateKey = "lake-walk"
                 )
             ),
             evidence = emptyList(),
             confidence = ConfidenceLevel.High,
-            disclaimer = "生活方式灵感，不是医疗建议。"
+            disclaimer = "生活方式灵感，不是医疗建议。",
+            appliedFeedback = listOf(
+                ActionFeedback("old-replacement", "2026-09-30", "meal", "older-meal", ActionFeedbackKind.Replaced)
+            )
         )
+        var recordedFeedback: Triple<String, String, ActionFeedbackKind>? = null
+        var undoneReplacement: Pair<String, String>? = null
 
         compose.setContent {
             MaterialTheme {
-                DailyActionSection(plan = plan)
+                DailyActionSection(
+                    plan = plan,
+                    onFeedback = { category, key, kind -> recordedFeedback = Triple(category, key, kind) },
+                    onUndoReplacement = { category, key -> undoneReplacement = category to key }
+                )
             }
         }
 
-        compose.onNodeWithText("换一个").assertDoesNotExist()
         compose.onNodeWithText("已采纳").assertDoesNotExist()
         compose.onNodeWithText("不合适").assertDoesNotExist()
         compose.onNodeWithText("为什么？").assertDoesNotExist()
@@ -153,8 +166,14 @@ class FortuneDetailPageTest {
         compose.onNodeWithText("用于偏好过滤，不计入评分").assertExists()
         compose.onNodeWithText("五行匹配", substring = true).assertExists()
         compose.onNodeWithText("相关行动").assertExists()
-        compose.onNodeWithText("已采纳").assertExists()
+        compose.onNodeWithText("采纳").assertExists()
         compose.onNodeWithText("不合适").assertExists()
+        compose.onNodeWithText("换一个").assertExists()
+        compose.onNodeWithText("撤销上次换选").assertExists()
+        compose.onNodeWithText("换一个").performClick()
+        assertEquals(Triple("meal", "mushroom-chicken-rice", ActionFeedbackKind.Replaced), recordedFeedback)
+        compose.onNodeWithText("撤销上次换选").performClick()
+        assertEquals("meal" to "older-meal", undoneReplacement)
 
         compose.onNodeWithText("查看做什么详情 ›").performScrollTo().performClick()
         compose.onNodeWithTag("fortune-detail-title-做什么").assertExists()

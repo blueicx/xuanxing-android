@@ -67,6 +67,8 @@ import com.xuanji.app.ui.viewmodel.CompositeUiState
 import com.xuanji.app.ui.viewmodel.ActionViewModel
 import com.xuanji.app.ui.xuanjiViewModel
 import com.xuanji.app.domain.action.ActionFeedback
+import com.xuanji.app.domain.action.ActionFeedbackKind
+import com.xuanji.app.domain.action.actionFeedbackId
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -99,6 +101,7 @@ fun CompositeFortuneScreen(
             period = s.period,
             onPeriodChange = viewModel::setPeriod,
             dailyAction = actionState.todayPlan,
+            actionViewModel = actionViewModel,
             onTodayModeChange = onTodayModeChange
         )
     }
@@ -118,6 +121,7 @@ private fun CompositeContent(
     period: String,
     onPeriodChange: (String) -> Unit,
     dailyAction: com.xuanji.app.domain.action.DailyActionPlan?,
+    actionViewModel: ActionViewModel,
     onTodayModeChange: ((TodayFortuneMode) -> Unit)?
 ) {
     val periodPresentation = compositePeriodPresentation(period, fortune.dateKey)
@@ -167,13 +171,25 @@ private fun CompositeContent(
                                                 feedbackStore.append(
                                                     plan.profileKey,
                                                     ActionFeedback(
-                                                        id = "${plan.dateKey}|$category|$candidateKey|${kind.name}",
+                                                        id = actionFeedbackId(plan.dateKey, category, candidateKey, kind),
                                                         dateKey = plan.dateKey,
                                                         category = category,
                                                         candidateKey = candidateKey,
                                                         kind = kind
                                                     )
                                                 )
+                                                actionViewModel.refresh()
+                                            }
+                                        }
+                                    },
+                                    onUndoReplacement = { category, candidateKey ->
+                                        dailyAction?.let { plan ->
+                                            scope.launch {
+                                                feedbackStore.remove(
+                                                    plan.profileKey,
+                                                    actionFeedbackId(plan.dateKey, category, candidateKey, ActionFeedbackKind.Replaced)
+                                                )
+                                                actionViewModel.refresh()
                                             }
                                         }
                                     }

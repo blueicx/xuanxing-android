@@ -12,7 +12,9 @@ data class DailyActionPlan(
     val evidence: List<ActionEvidence>,
     val confidence: ConfidenceLevel,
     val disclaimer: String,
-    val constraints: ActionConstraints = ActionConstraints()
+    val constraints: ActionConstraints = ActionConstraints(),
+    /** Explicit feedback loaded for this profile; Replaced entries only affect their stored date. */
+    val appliedFeedback: List<ActionFeedback> = emptyList()
 )
 
 data class MealSuggestion(
@@ -24,7 +26,8 @@ data class MealSuggestion(
     val score: Int,
     val evidence: List<ActionEvidence>,
     val estimatedPriceCents: Int? = null,
-    val prepMinutes: Int? = null
+    val prepMinutes: Int? = null,
+    val candidateKey: String = ""
 )
 
 data class ActivitySuggestion(
@@ -33,7 +36,8 @@ data class ActivitySuggestion(
     val bestPeriod: String,
     val avoid: String?,
     val score: Int,
-    val evidence: List<ActionEvidence>
+    val evidence: List<ActionEvidence>,
+    val candidateKey: String = ""
 )
 
 data class OutingSuggestion(
@@ -42,7 +46,8 @@ data class OutingSuggestion(
     val cityLabel: String,
     val score: Int,
     val evidence: List<ActionEvidence>,
-    val indoor: Boolean? = null
+    val indoor: Boolean? = null,
+    val candidateKey: String = ""
 )
 
 data class ActionEvidence(

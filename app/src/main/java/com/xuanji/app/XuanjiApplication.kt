@@ -6,6 +6,7 @@ import com.xuanji.app.data.repository.FortuneRepository
 import com.xuanji.app.data.local.foodPreferenceStore
 import com.xuanji.app.data.local.DataStorePreferenceBridge
 import com.xuanji.app.data.local.ReadingFavoriteStore
+import com.xuanji.app.data.local.ActionFeedbackDataStore
 import com.xuanji.app.data.repository.ActionRepository
 import com.xuanji.app.data.repository.HistoryRepository
 import com.xuanji.app.data.repository.LiuYaoRepository
@@ -28,6 +29,7 @@ class XuanjiApplication : Application() {
         super.onCreate()
         installCrashLogger()
         val favoriteStore = ReadingFavoriteStore(DataStorePreferenceBridge(this))
+        val actionFeedbackStore = ActionFeedbackDataStore(DataStorePreferenceBridge(this))
         val repository = FortuneRepository(this, favoriteStore)
         val testRecordRepository = TestRecordRepository(this)
         AppModule.init(
@@ -37,7 +39,12 @@ class XuanjiApplication : Application() {
             LiuYaoRepository(this),
             ReferenceRepository(this),
             testRecordRepository,
-            ActionRepository(repository, testRecordRepository, foodPreferenceStore()),
+            ActionRepository(
+                repository,
+                testRecordRepository,
+                foodPreferenceStore(),
+                feedbackStore = actionFeedbackStore
+            ),
             favoriteStore
         )
 

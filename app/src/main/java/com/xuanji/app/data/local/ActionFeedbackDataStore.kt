@@ -25,6 +25,16 @@ class ActionFeedbackDataStore(private val bridge: PreferenceBridge) {
         bridge.write(key(profileKey), gson.toJson(current.takeLast(100)))
     }
 
+    /** Removes one explicit feedback event so a replacement can be undone without touching preferences. */
+    suspend fun remove(profileKey: String, id: String): ActionFeedback? {
+        val current = list(profileKey, 100).asReversed().toMutableList()
+        val removed = current.firstOrNull { it.id == id } ?: return null
+        current.removeAll { it.id == id }
+        if (current.isEmpty()) bridge.delete(key(profileKey))
+        else bridge.write(key(profileKey), gson.toJson(current))
+        return removed
+    }
+
     suspend fun clear(profileKey: String) = bridge.delete(key(profileKey))
 
     fun key(profileKey: String): String = KEY_PREFIX + fingerprint(profileKey)

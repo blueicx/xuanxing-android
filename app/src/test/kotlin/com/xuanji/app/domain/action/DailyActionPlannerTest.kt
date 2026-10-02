@@ -73,11 +73,58 @@ class DailyActionPlannerTest {
         assertTrue(plan.activities.all { it.durationMinutes.first <= 30 })
     }
 
+    @Test
+    fun replacing_top_meal_excludes_it_for_today_and_preserves_base_scores() {
+        val planner = DailyActionPlanner()
+        val baseline = planner.plan(input())
+        val replaced = baseline.meals.first()
+        val next = planner.plan(
+            input(
+                feedback = listOf(
+                    ActionFeedback(
+                        "replace-${replaced.candidateKey}",
+                        "2026-09-19",
+                        "meal",
+                        replaced.candidateKey,
+                        ActionFeedbackKind.Replaced
+                    )
+                )
+            )
+        )
+
+        assertFalse(next.meals.any { it.candidateKey == replaced.candidateKey })
+        val baseScores = baseline.meals.associate { it.candidateKey to it.score }
+        assertTrue(next.meals.filter { it.candidateKey in baseScores }
+            .all { it.score == baseScores[it.candidateKey] })
+        assertTrue(next.appliedFeedback.any { it.kind == ActionFeedbackKind.Replaced })
+    }
+
+    @Test
+    fun feedback_cannot_reintroduce_meals_removed_by_hard_constraints() {
+        val plan = DailyActionPlanner().plan(
+            input(
+                preference = FoodPreference(vegetarian = true),
+                feedback = (1..20).map { index ->
+                    ActionFeedback(
+                        "accepted-$index",
+                        "2026-09-19",
+                        "meal",
+                        "halal-lamb-rice",
+                        ActionFeedbackKind.Accepted
+                    )
+                }
+            )
+        )
+
+        assertTrue(plan.meals.none { it.candidateKey == "halal-lamb-rice" })
+    }
+
     private fun input(
         preference: FoodPreference = FoodPreference(),
         city: CityProfile? = CityProfileCatalog.defaultCity,
         date: LocalDate = LocalDate.of(2026, 9, 19),
-        constraints: ActionConstraints = ActionConstraints()
+        constraints: ActionConstraints = ActionConstraints(),
+        feedback: List<ActionFeedback> = emptyList()
     ) = DailyActionInput(
         profileKey = "profile-a",
         date = date,
@@ -107,6 +154,7 @@ class DailyActionPlannerTest {
         ),
         city = city,
         preference = preference,
-        constraints = constraints
+        constraints = constraints,
+        feedback = feedback
     )
 }

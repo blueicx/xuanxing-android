@@ -101,7 +101,7 @@
 - [x] 把 LifeProfile 摘要作为「一生命盘」的概览 tab；东方本命/西方本命仍调用 chartOnly 实际盘面；不从每日详情跳转排盘。
 - [x] 保留 v14 卡片 token、旧内容、东方农历和公历日期语义；不改变算法计算或分类顺序。
 - [x] 运行 `node _dev/xuanji_v14_shell_contract_test.js` 与 `.\gradlew.bat :app:testDebugUnitTest --tests '*CompositePresentationContractTest' --console=plain`。
-- [ ] 单独提交任务 4，提交信息 `feat(运势): 补全周期解说与本命概览`。
+- [x] 单独提交任务 4，提交信息 `feat(运势): 补全周期解说与本命概览`（`d21b016`）。
 
 ## 任务 5：行动反馈参与排序并可撤销
 
@@ -110,13 +110,13 @@
 - 创建 `app/src/test/kotlin/com/xuanji/app/domain/action/ActionFeedbackRankingTest.kt`
 - 修改 `_dev/action_profile_contract_test.js`
 
-- [ ] 先写纯 Kotlin 测试：Accepted 在下次同类别排序给予上限 +5；NotSuitable 降权上限 -8；Replaced 只暂时排除当日已换候选且可撤销；类别隔离；不能过滤掉硬约束候选的约束检查。
-- [ ] 执行 `.\gradlew.bat :app:testDebugUnitTest --tests '*ActionFeedbackRankingTest' --console=plain`，确认排序辅助 API 缺失而失败。
-- [ ] 添加纯函数 `applyExplicitFeedback(candidates, feedback, category, dateKey)`；反馈只按 profile/category 候选 ID 聚合，结果可解释，基准五行/星座权重不变。
-- [ ] store 增加按 ID 删除最近一条 feedback 的 API；“换一个”记录原排序并撤销只恢复当次候选选择，不删除饮食偏好。
-- [ ] UI 显示筛选来源与反馈生效提示；保存/撤销后刷新今日结果，空候选时保留明确空态。
-- [ ] 运行 Node action contract、ActionFeedback JVM 测试、`:app:testDebugUnitTest`。
-- [ ] 单独提交任务 5，提交信息 `feat(行动): 使用可撤回反馈调整候选顺序`。
+- [x] 先写纯 Kotlin 测试：Accepted 在下次同类别排序给予上限 +5；NotSuitable 降权上限 -8；Replaced 只暂时排除当日已换候选且可撤销；类别隔离；不能过滤掉硬约束候选的约束检查。
+- [x] 执行 `.\gradlew.bat :app:testDebugUnitTest --tests '*ActionFeedbackRankingTest' --console=plain`，确认排序辅助 API 缺失而失败。
+- [x] 添加纯函数 `applyExplicitFeedback(candidates, feedback, category, dateKey)`；反馈只按 profile/category 候选 ID 聚合，结果可解释，基准五行/星座权重不变。
+- [x] store 增加按 ID 删除最近一条 feedback 的 API；“换一个”记录原排序并撤销只恢复当次候选选择，不删除饮食偏好。
+- [x] UI 显示反馈来源与生效提示；保存/撤销后刷新今日结果，空候选时保留明确空态；隐私设置中可单独确认并清除当前档案反馈。
+- [x] 运行 `node _dev/action_profile_contract_test.js`、ActionFeedback JVM 测试及完整 `:app:testDebugUnitTest`；AndroidTest 新增操作测试已编译。
+- [x] 单独提交任务 5，提交信息 `feat(行动): 使用可撤回反馈调整候选顺序`。
 
 ## 任务 6：角色对话引用实际游戏存档
 

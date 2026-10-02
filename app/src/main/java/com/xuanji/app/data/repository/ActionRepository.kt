@@ -1,6 +1,7 @@
 package com.xuanji.app.data.repository
 
 import com.xuanji.app.data.local.FoodPreferenceStore
+import com.xuanji.app.data.local.ActionFeedbackDataStore
 import com.xuanji.app.data.model.UserProfile
 import com.xuanji.app.domain.action.CityProfileCatalog
 import com.xuanji.app.domain.action.DailyActionInput
@@ -21,7 +22,8 @@ class ActionRepository(
     private val testRecords: TestRecordRepository,
     private val preferences: FoodPreferenceStore,
     private val dailyPlanner: DailyActionPlanner = DailyActionPlanner(),
-    private val lifePlanner: LifeProfilePlanner = LifeProfilePlanner()
+    private val lifePlanner: LifeProfilePlanner = LifeProfilePlanner(),
+    private val feedbackStore: ActionFeedbackDataStore? = null
 ) {
     suspend fun loadToday(date: LocalDate = LocalDate.now()): DailyActionPlan? {
         val profile = fortuneRepository.userProfileState.value ?: return null
@@ -36,6 +38,7 @@ class ActionRepository(
         )
         val profileKey = profileKey(profile)
         val preference = preferences.read(profileKey)
+        val feedback = feedbackStore?.list(profileKey).orEmpty()
         return dailyPlanner.plan(
             DailyActionInput(
                 profileKey = profileKey,
@@ -45,7 +48,8 @@ class ActionRepository(
                 zodiacElement = western.element.toElement(),
                 fortune = fortune,
                 city = cityFrom(profile),
-                preference = preference
+                preference = preference,
+                feedback = feedback
             )
         )
     }

@@ -16,7 +16,8 @@ data class DailyActionInput(
     val fortune: CompositeDailyFortune,
     val city: CityProfile?,
     val preference: FoodPreference,
-    val constraints: ActionConstraints = ActionConstraints()
+    val constraints: ActionConstraints = ActionConstraints(),
+    val feedback: List<ActionFeedback> = emptyList()
 )
 
 class DailyActionPlanner {
@@ -45,7 +46,7 @@ class DailyActionPlanner {
                 (maxPrep == null || candidate.prepMinutes <= maxPrep)
         }
 
-        val mealRanked = eligibleMeals.map { candidate ->
+        val mealBaseRanked = eligibleMeals.map { candidate ->
             val score = score(
                 elementFit = elementFit(favorable, candidate.elementTags),
                 zodiacFit = zodiacFit(input.zodiacElement, candidate.zodiacTags),
@@ -55,6 +56,7 @@ class DailyActionPlanner {
             Candidate(candidate.key, score) to candidate
         }.sortedWith(compareByDescending<Pair<Candidate, MealCandidate>> { it.first.score }
             .thenBy { StableScore.tieBreak(input.profileKey, dateKey, it.first.key) })
+        val mealRanked = applyFeedbackOrder(mealBaseRanked, input.feedback, "meal", dateKey)
 
         val meals = MealSlot.values().mapNotNull { slot ->
             mealRanked.firstOrNull { it.second.slot == slot }?.let { (rank, candidate) ->
@@ -67,12 +69,13 @@ class DailyActionPlanner {
                     score = rank.score,
                     evidence = evidenceForMeal(input, candidate, season, favorable, rank.score),
                     estimatedPriceCents = candidate.estimatedPriceCents,
-                    prepMinutes = candidate.prepMinutes
+                    prepMinutes = candidate.prepMinutes,
+                    candidateKey = candidate.key
                 )
             }
         }
 
-        val activityRanked = ActionCatalog.activities.filter { candidate ->
+        val activityBaseRanked = ActionCatalog.activities.filter { candidate ->
             val maxMinutes = input.constraints.maxActivityMinutes
             val maxEnergy = input.constraints.energy
             (maxMinutes == null || candidate.durationMinutes.first <= maxMinutes) &&
@@ -87,7 +90,7 @@ class DailyActionPlanner {
             Candidate(candidate.key, score) to candidate
         }.sortedWith(compareByDescending<Pair<Candidate, ActivityCandidate>> { it.first.score }
             .thenBy { StableScore.tieBreak(input.profileKey, dateKey, it.first.key) })
-            .take(3)
+        val activityRanked = applyFeedbackOrder(activityBaseRanked, input.feedback, "activity", dateKey).take(3)
 
         val activities = activityRanked.map { (rank, candidate) ->
             ActivitySuggestion(
@@ -96,11 +99,12 @@ class DailyActionPlanner {
                 bestPeriod = candidate.bestPeriod,
                 avoid = candidate.avoid,
                 score = rank.score,
-                evidence = evidenceForActivity(input, candidate, season, rank.score)
+                evidence = evidenceForActivity(input, candidate, season, rank.score),
+                candidateKey = candidate.key
             )
         }
 
-        val outingRanked = ActionCatalog.outings.filter { candidate ->
+        val outingBaseRanked = ActionCatalog.outings.filter { candidate ->
             !input.constraints.indoorOnly || candidate.indoor
         }.map { candidate ->
             val score = score(
@@ -112,7 +116,7 @@ class DailyActionPlanner {
             Candidate(candidate.key, score) to candidate
         }.sortedWith(compareByDescending<Pair<Candidate, OutingCandidate>> { it.first.score }
             .thenBy { StableScore.tieBreak(input.profileKey, dateKey, it.first.key) })
-            .take(3)
+        val outingRanked = applyFeedbackOrder(outingBaseRanked, input.feedback, "outing", dateKey).take(3)
 
         val outings = outingRanked.map { (rank, candidate) ->
             val cityLabel = input.city?.label ?: "附近的${candidate.placeType}环境"
@@ -122,7 +126,8 @@ class DailyActionPlanner {
                 cityLabel = cityLabel,
                 score = rank.score,
                 evidence = evidenceForOuting(input, candidate, season, rank.score),
-                indoor = candidate.indoor
+                indoor = candidate.indoor,
+                candidateKey = candidate.key
             )
         }
 
@@ -151,8 +156,20 @@ class DailyActionPlanner {
             evidence = planEvidence,
             confidence = confidence,
             disclaimer = disclaimer,
-            constraints = input.constraints
+            constraints = input.constraints,
+            appliedFeedback = input.feedback
         )
+    }
+
+    private fun <T> applyFeedbackOrder(
+        ranked: List<Pair<Candidate, T>>,
+        feedback: List<ActionFeedback>,
+        category: String,
+        dateKey: String
+    ): List<Pair<Candidate, T>> {
+        val byKey = ranked.associateBy { it.first.key }
+        return applyExplicitFeedback(ranked.map { it.first }, feedback, category, dateKey)
+            .mapNotNull { byKey[it.key] }
     }
 
     private fun score(elementFit: Int, zodiacFit: Int, fortuneFit: Int, seasonOrCityFit: Int): Int =

@@ -104,6 +104,7 @@ fun ProfileScreen() {
     var gender by rememberSaveable { mutableStateOf<String?>(null) }
     var showClearProfileDialog by rememberSaveable { mutableStateOf(false) }
     var showClearDialog by rememberSaveable { mutableStateOf(false) }
+    var showClearActionFeedbackDialog by rememberSaveable { mutableStateOf(false) }
     val dailyReminderOn by viewModel.dailyReminderOn.collectAsStateWithLifecycle()
     val mysticGuideEnabled by viewModel.mysticGuideEnabled.collectAsStateWithLifecycle()
     var networkContextEnabled by rememberSaveable { mutableStateOf(false) }
@@ -534,6 +535,18 @@ fun ProfileScreen() {
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                    OutlinedButton(
+                        enabled = !actionState.profileKey.isNullOrBlank(),
+                        onClick = { showClearActionFeedbackDialog = true },
+                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
+                    ) {
+                        Text("清除本机行动反馈")
+                    }
+                    Text(
+                        "只清除当前档案的采纳、不合适和换选记录；不会改动饮食偏好、运势收藏或游戏存档。",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                     Row(
                         Modifier
                             .fillMaxWidth()
@@ -691,7 +704,7 @@ fun ProfileScreen() {
             AlertDialog(
                 onDismissRequest = { showClearDialog = false },
                 title = { Text("清除全部本地数据") },
-                text = { Text("将删除本机出生档案、测试记录、收藏快照、角色对话与本地游戏数据，且无法恢复。") },
+                text = { Text("将删除本机出生档案、测试记录、收藏快照、行动反馈、角色对话与本地游戏数据，且无法恢复。") },
                 confirmButton = {
                     TextButton(
                         onClick = {
@@ -709,6 +722,32 @@ fun ProfileScreen() {
                     TextButton(onClick = { showClearDialog = false }) {
                         Text("取消")
                     }
+                }
+            )
+        }
+
+        if (showClearActionFeedbackDialog) {
+            AlertDialog(
+                onDismissRequest = { showClearActionFeedbackDialog = false },
+                title = { Text("确认清除本机行动反馈") },
+                text = { Text("只删除当前档案的采纳、不合适与换选记录；今日候选排序恢复为基础五行、星座和盘面结果。饮食偏好不会更改。") },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            showClearActionFeedbackDialog = false
+                            val key = actionState.profileKey ?: return@TextButton
+                            scope.launch {
+                                actionFeedbackStore.clear(key)
+                                actionViewModel.refresh()
+                                Toast.makeText(context, "已清除此档案的行动反馈", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    ) {
+                        Text("确认清除", color = MaterialTheme.colorScheme.error)
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showClearActionFeedbackDialog = false }) { Text("取消") }
                 }
             )
         }
