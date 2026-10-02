@@ -25,6 +25,15 @@ build/
 app/build/
 build_artifacts/
 
+# Brainstorm server session credentials and runtime state
+.superpowers/brainstorm/**/.last-token
+.superpowers/brainstorm/**/state/server-info
+.superpowers/brainstorm/**/state/server.pid
+.superpowers/brainstorm/**/state/server-instance-id
+.superpowers/brainstorm/**/state/server.log
+.superpowers/brainstorm/**/state/server.out.log
+.superpowers/brainstorm/**/state/server.err.log
+
 # Local screenshot / verification scratch artifacts (not part of the source)
 *.png
 crashlog.txt
