@@ -86,7 +86,7 @@
 - [x] 新增 Node contract 锁定旧历史内容和新收藏入口并存；运行 `node _dev/reading_favorites_contract_test.js`。
 - [x] 运行 `.\gradlew.bat :app:testDebugUnitTest --tests '*MysticPrivacyExportTest' --tests '*ReadingFavorite*' :app:compileDebugAndroidTestKotlin --console=plain`。
 - [ ] 执行收藏 AndroidTest；本机未发现可用模拟器/设备，ADB 5038 设备列表为空；不连接真机、不安装。
-- [ ] 单独提交任务 3，提交信息 `feat(记录): 加入运势和玄师收藏回看`。
+- [x] 单独提交任务 3，提交信息 `feat(记录): 加入运势和玄师收藏回看`（`3bf4697`）。
 
 ## 任务 4：周期趋势与一生命盘概览
 
@@ -95,12 +95,12 @@
 - 修改 `app/src/test/kotlin/com/xuanji/app/ui/composite/CompositePresentationContractTest.kt`
 - 修改 `_dev/xuanji_v14_shell_contract_test.js`
 
-- [ ] 先写测试：day/week/month/year 切换后日期/标题对应现有结果；每日行动只出现在 day；无历史序列时不得显示拼造的折线数据；本命盘独立入口保留。
-- [ ] 执行 `.\gradlew.bat :app:testDebugUnitTest --tests '*CompositePresentationContractTest' --console=plain`，确认新增趋势契约失败。
-- [ ] 使用 `fortune.periodSummary`、`dimensions`、`insights` 和已有东/西方周期字段呈现层级清晰的周期解说及依据；没有跨期观测序列时只呈现当前周期与文字依据，不造图。
-- [ ] 把 LifeProfile 摘要作为「一生命盘」的概览 tab；东方本命/西方本命仍调用 chartOnly 实际盘面；不从每日详情跳转排盘。
-- [ ] 保留 v14 卡片 token、旧内容、东方农历和公历日期语义；不改变算法计算或分类顺序。
-- [ ] 运行 `node _dev/xuanji_v14_shell_contract_test.js` 与 `.\gradlew.bat :app:testDebugUnitTest --tests '*CompositePresentationContractTest' --console=plain`。
+- [x] 先写测试：day/week/month/year 切换后日期/标题对应现有结果；每日行动只出现在 day；无历史序列时不得显示拼造的折线数据；本命盘独立入口保留。
+- [x] 执行 `.\gradlew.bat :app:testDebugUnitTest --tests '*CompositePresentationContractTest' --console=plain`，确认新增周期展示契约因 API 尚未定义而失败。
+- [x] 使用 `fortune.periodSummary`、`dimensions`、`insights` 和已有东/西方周期字段呈现层级清晰的周期解说及依据；没有跨期观测序列时只呈现当前周期与文字依据，不造图。
+- [x] 把 LifeProfile 摘要作为「一生命盘」的概览 tab；东方本命/西方本命仍调用 chartOnly 实际盘面；不从每日详情跳转排盘。
+- [x] 保留 v14 卡片 token、旧内容、东方农历和公历日期语义；不改变算法计算或分类顺序。
+- [x] 运行 `node _dev/xuanji_v14_shell_contract_test.js` 与 `.\gradlew.bat :app:testDebugUnitTest --tests '*CompositePresentationContractTest' --console=plain`。
 - [ ] 单独提交任务 4，提交信息 `feat(运势): 补全周期解说与本命概览`。
 
 ## 任务 5：行动反馈参与排序并可撤销

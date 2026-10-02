@@ -8,6 +8,8 @@ const stickyHeader = fs.readFileSync(path.join(root, 'app/src/main/java/com/xuan
 const eastern = fs.readFileSync(path.join(root, 'app/src/main/java/com/xuanji/app/ui/eastern/EasternScreen.kt'), 'utf8');
 const composite = fs.readFileSync(path.join(root, 'app/src/main/java/com/xuanji/app/ui/composite/CompositeFortuneScreen.kt'), 'utf8');
 const actions = fs.readFileSync(path.join(root, 'app/src/main/java/com/xuanji/app/ui/components/DailyActionCards.kt'), 'utf8');
+const compositePage = fs.readFileSync(path.join(root, 'app/src/main/java/com/xuanji/app/ui/composite/CompositeFortuneScreen.kt'), 'utf8');
+const lifeChartHub = fs.readFileSync(path.join(root, 'app/src/main/java/com/xuanji/app/ui/XuanjiApp.kt'), 'utf8');
 const surfacesPath = path.join(root, 'app/src/main/java/com/xuanji/app/ui/components/FortuneSurfaceTokens.kt');
 
 const itemsMatch = app.match(/val items = listOf\(([\s\S]*?)\n\s*\)/);
@@ -39,6 +41,15 @@ assert(actions.includes('ActionAccent('), 'daily action cards must have distinct
 assert(!actions.includes('SectionTitle("今日行动")'), 'daily action section must not duplicate the card title');
 assert(eastern.includes('formatEasternLunarDate'), 'Eastern daily header must show the lunar date');
 assert(eastern.includes('chartOnly'), 'Eastern life-chart destination must omit daily fortune content');
+assert(compositePage.includes('compositePeriodPresentation(period, fortune.dateKey)'), 'cycle headline and dates must follow the active period result');
+assert(compositePage.includes('fortune.periodSummary'), 'cycle explanation must reuse the already computed summary');
+assert(compositePage.includes('fortune.insights'), 'cycle basis must reuse the actual weighted evidence');
+assert(!/LineChart|TrendChart|Sparkline/.test(compositePage), 'do not draw a fake historical trend without observations');
+assert(lifeChartHub.includes('lifetimeChartTabs()'), 'lifetime charts must expose their separate overview tab');
+assert(lifeChartHub.includes('LifeProfileSection(lifeProfile)'), 'lifetime overview must reuse the real life profile');
+assert(lifeChartHub.includes('AppModule.actionRepository.loadLifeProfile()'), 'life profile overview must load computed profile data');
+assert(lifeChartHub.includes('EasternScreen(chartOnly = true)'), 'Eastern destination must remain a natal chart');
+assert(lifeChartHub.includes('WesternScreen(chartOnly = true)'), 'Western destination must remain a natal chart');
 
 assert(fs.existsSync(surfacesPath), 'v14 card surface tokens must be centralized');
 const surfaces = fs.readFileSync(surfacesPath, 'utf8');

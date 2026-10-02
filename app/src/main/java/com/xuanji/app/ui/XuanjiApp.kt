@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -43,12 +44,14 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -121,9 +124,11 @@ import com.xuanji.app.ui.components.LocalImmersiveStageOpen
 import com.xuanji.app.ui.components.LocalMysticGuideVisible
 import com.xuanji.app.ui.components.TodayFortuneMode
 import com.xuanji.app.ui.components.CompanionGameCard
+import com.xuanji.app.ui.components.LifeProfileSection
 import com.xuanji.app.di.AppModule
 import com.xuanji.app.domain.MysticCharacterId
 import com.xuanji.app.domain.game.CompanionGameCatalog
+import com.xuanji.app.domain.action.LifeProfile
 
 sealed class Screen(val route: String, val label: String, val icon: androidx.compose.ui.graphics.vector.ImageVector) {
     data object Today : Screen("today", "今日", Icons.Filled.AutoAwesome)
@@ -276,7 +281,26 @@ private fun TodayFortuneHub() {
 
 @Composable
 private fun LifetimeChartHub() {
-    var selectedChart by rememberSaveable { mutableStateOf("eastern") }
+    var selectedChart by rememberSaveable { mutableStateOf("overview") }
+    val profile by AppModule.repository.userProfileFlow.collectAsStateWithLifecycle(initialValue = null)
+    val baziFull by AppModule.repository.baziFullFlow.collectAsStateWithLifecycle(initialValue = null)
+    val natalChart by AppModule.repository.natalChartFlow.collectAsStateWithLifecycle(initialValue = null)
+    var lifeProfile by remember(profile) { mutableStateOf<LifeProfile?>(null) }
+    var lifeProfileLoaded by remember(profile) { mutableStateOf(false) }
+    LaunchedEffect(profile, baziFull, natalChart) {
+        lifeProfileLoaded = false
+        when {
+            profile == null -> {
+                lifeProfile = null
+                lifeProfileLoaded = true
+            }
+            baziFull == null || natalChart == null -> Unit
+            else -> {
+                lifeProfile = runCatching { AppModule.actionRepository.loadLifeProfile() }.getOrNull()
+                lifeProfileLoaded = true
+            }
+        }
+    }
     Column(Modifier.fillMaxSize()) {
         Column(
             Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 12.dp),
@@ -284,29 +308,54 @@ private fun LifetimeChartHub() {
         ) {
             Text("一生命盘", style = MaterialTheme.typography.headlineSmall)
             Text(
-                "出生盘与长期结构；今日、周、月、年运势请在「今日」查看。",
+                "人生画像与出生盘分开展示；今日、周、月、年运势请在「今日」查看。",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                FilterChip(
-                    selected = selectedChart == "eastern",
-                    onClick = { selectedChart = "eastern" },
-                    label = { Text("东方本命") }
-                )
-                FilterChip(
-                    selected = selectedChart == "western",
-                    onClick = { selectedChart = "western" },
-                    label = { Text("西方本命") }
-                )
+            Row(
+                Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                lifetimeChartTabs().forEach { tab ->
+                    FilterChip(
+                        selected = selectedChart == tab.id,
+                        onClick = { selectedChart = tab.id },
+                        modifier = Modifier.testTag("lifetime-tab-${tab.id}"),
+                        label = { Text(tab.label) }
+                    )
+                }
             }
         }
         Box(Modifier.weight(1f)) {
-            if (selectedChart == "eastern") EasternScreen(chartOnly = true)
-            else WesternScreen(chartOnly = true)
+            when (selectedChart) {
+                "overview" -> Column(
+                    Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 8.dp)
+                ) {
+                    when {
+                        !lifeProfileLoaded || (profile != null && (baziFull == null || natalChart == null)) ->
+                            Text("正在整理人生画像…", style = MaterialTheme.typography.bodyMedium)
+                        profile != null && lifeProfile == null -> Text(
+                            "目前出生资料还不足以生成完整画像。请到「我的」检查出生时间与地区。",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        else -> LifeProfileSection(lifeProfile)
+                    }
+                }
+                "eastern" -> EasternScreen(chartOnly = true)
+                else -> WesternScreen(chartOnly = true)
+            }
         }
     }
 }
+
+internal data class LifetimeChartTab(val id: String, val label: String)
+
+internal fun lifetimeChartTabs(): List<LifetimeChartTab> = listOf(
+    LifetimeChartTab("overview", "人生画像"),
+    LifetimeChartTab("eastern", "东方本命"),
+    LifetimeChartTab("western", "西方本命")
+)
 
 @Composable
 private fun ExploreHub(onOpenToday: () -> Unit) {

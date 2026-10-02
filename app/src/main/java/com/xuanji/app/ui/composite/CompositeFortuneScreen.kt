@@ -120,6 +120,7 @@ private fun CompositeContent(
     dailyAction: com.xuanji.app.domain.action.DailyActionPlan?,
     onTodayModeChange: ((TodayFortuneMode) -> Unit)?
 ) {
+    val periodPresentation = compositePeriodPresentation(period, fortune.dateKey)
     val controller = rememberCardLayoutController("composite", bazi.chart.display)
     val cards = fortuneCards(fortune, period)
     val context = LocalContext.current
@@ -150,8 +151,8 @@ private fun CompositeContent(
                             verticalArrangement = Arrangement.spacedBy(16.dp)
                         ) {
                             FortunePageIntro(
-                                title = if (period == "day") "今天的总趋势" else "${periodLabel(period)}的总趋势",
-                                subtitle = "${fortune.dateKey} · 八字与星盘合参",
+                                title = periodPresentation.title,
+                                subtitle = periodPresentation.subtitle,
                                 modeLabel = "综合"
                             )
                             DailyOutlookHero(fortune, period)
@@ -207,9 +208,27 @@ internal fun compositeHeadlineLine(dateKey: String): String = "$dateKey · 八�
 /** 今日行动是日程建议，只在今日盘面展示，不延伸到周/月/年周期。 */
 internal fun shouldShowDailyAction(period: String): Boolean = period == "day"
 
+internal data class CompositePeriodPresentation(
+    val label: String,
+    val title: String,
+    val subtitle: String,
+    val showDailyAction: Boolean
+)
+
+internal fun compositePeriodPresentation(period: String, dateKey: String): CompositePeriodPresentation {
+    val label = periodLabel(period)
+    return CompositePeriodPresentation(
+        label = label,
+        title = if (period == "day") "今天的总趋势" else "${label}的总趋势",
+        subtitle = "$dateKey · 八字与星盘合参",
+        showDailyAction = shouldShowDailyAction(period)
+    )
+}
+
 /** 趋势主视觉：只突出综合分、短结论和少量维度，不承载长篇解说。 */
 @Composable
 private fun DailyOutlookHero(fortune: CompositeDailyFortune, period: String) {
+    val periodLabel = compositePeriodPresentation(period, fortune.dateKey).label
     val summary = fortune.periodSummary.trim()
     val sentenceEnd = summary.indexOfFirst { it in "。！？" }
     val shortConclusion = when {
@@ -230,7 +249,7 @@ private fun DailyOutlookHero(fortune: CompositeDailyFortune, period: String) {
                 ScoreRing(fortune.overallScore, diameter = 68.dp, caption = "综合总分")
                 Spacer(Modifier.width(13.dp))
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text("${periodLabel(period)}综合指数", style = MaterialTheme.typography.labelSmall, color = Color(0xFFE5D6F4))
+                    Text("${periodLabel}综合指数", style = MaterialTheme.typography.labelSmall, color = Color(0xFFE5D6F4))
                     Text("沿用旧版综合结论", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
                     Text(shortConclusion, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.9f), maxLines = 2)
                 }
