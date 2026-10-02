@@ -71,6 +71,7 @@ import com.xuanji.app.di.AppModule
 import com.xuanji.app.domain.MysticClarifierOption
 import com.xuanji.app.domain.MysticInteraction
 import com.xuanji.app.domain.MysticInteractionOption
+import com.xuanji.app.domain.MysticDetailContext
 import com.xuanji.app.domain.MysticGuideGenerator
 import com.xuanji.app.domain.MysticCharacterCatalog
 import com.xuanji.app.domain.MysticCharacterEvent
@@ -293,6 +294,7 @@ fun MysticGuideCard(
     stageCostumeRequest: Pair<String, String>? = null,
     onStageCostumeConsumed: () -> Unit = {},
     stageActionRequest: String? = null,
+    stageDetailContext: MysticDetailContext? = null,
     onStageActionConsumed: () -> Unit = {}
 ) {
     val records by AppModule.testRecordRepository.records.collectAsStateWithLifecycle(initialValue = emptyList())
@@ -425,6 +427,7 @@ fun MysticGuideCard(
         com.xuanji.app.domain.game.GameDialogueBridge(recordOf = { gameRecord })
     }
     var pendingCustom by remember(guide) { mutableStateOf<String?>(null) }
+    var pendingCustomDetailContext by remember(guide) { mutableStateOf<MysticDetailContext?>(null) }
     LaunchedEffect(visitProfile) {
         gameRecord = runCatching { gameArchiveStore.loadRecord(visitProfile) }
             .getOrElse { com.xuanji.app.domain.game.GameRecord() }
@@ -661,6 +664,7 @@ fun MysticGuideCard(
         ) return
         val cleanQuestion = customQuestion.trim().take(200)
         if (cleanQuestion.isEmpty()) return
+        pendingCustomDetailContext = stageDetailContext
         rememberLongTerm(RecollectionKind.USER_INPUT, cleanQuestion)
         rememberSoftTopic(cleanQuestion)
         sessionState = reduce(sessionState, MysticEvent.SendInput(cleanQuestion))
@@ -795,6 +799,9 @@ fun MysticGuideCard(
         val action = stageActionRequest ?: return@LaunchedEffect
         if (action.startsWith("__companion_game__:")) {
             companionGameId = action.substringAfter(":").takeIf { it.isNotBlank() }
+        } else if (action == MYSTIC_DETAIL_QUESTION_ACTION) {
+            val title = stageDetailContext?.title?.takeIf(String::isNotBlank) ?: "当前详情"
+            submitPanelInput("请结合我当前打开的「$title」继续解读")
         } else {
             submitPanelInput(action)
         }
@@ -818,6 +825,7 @@ fun MysticGuideCard(
     fun cancelPanelReply() {
         val pending = sessionState.requestState as? com.xuanji.app.domain.MysticRequestState.Pending ?: return
         pendingCustom = null
+        pendingCustomDetailContext = null
         sessionState = reduce(sessionState, MysticEvent.CancelReply(pending.sessionToken, pending.turnId))
     }
 
@@ -1312,7 +1320,7 @@ fun MysticGuideCard(
         rememberLongTerm(RecollectionKind.USER_CHOICE, choice.label)
     }
 
-    LaunchedEffect(pendingCustom, guide, characterId) {
+    LaunchedEffect(pendingCustom, pendingCustomDetailContext, guide, characterId) {
         val question = pendingCustom ?: return@LaunchedEffect
         val requestToken = sessionState.sessionToken
         val requestTurnId = (sessionState.requestState as? com.xuanji.app.domain.MysticRequestState.Pending)?.turnId
@@ -1334,7 +1342,8 @@ fun MysticGuideCard(
             characterName = characterProfile.displayName,
             characterId = characterProfile.id,
             dailyActionPlan = dailyActionPlan,
-            lifeProfile = lifeProfile
+            lifeProfile = lifeProfile,
+            detailContext = pendingCustomDetailContext
         )
         val providerResult = dialogueProvider.complete(
             DialogueRequest(dialogueContext, question, requestToken)
@@ -1400,6 +1409,7 @@ fun MysticGuideCard(
         completedRhythmKey = null
         guestChoiceCarryoverKey = null
         pendingCustom = null
+        if (providerResult is ProviderResult.Success) pendingCustomDetailContext = null
         rememberMemory("ask", question)
     }
 

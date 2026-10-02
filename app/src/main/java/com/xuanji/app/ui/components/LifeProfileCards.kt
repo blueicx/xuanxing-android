@@ -19,6 +19,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.xuanji.app.domain.action.ConfidenceLevel
 import com.xuanji.app.domain.action.LifeProfile
+import com.xuanji.app.domain.MysticDetailContext
+import com.xuanji.app.domain.MysticEvidenceBuilder
 
 data class LifeProfileRegionCardModel(
     val title: String,
@@ -57,7 +59,26 @@ fun LifeProfileSection(profile: LifeProfile?, modifier: Modifier = Modifier) {
         return
     }
     val model = LifeProfileCardModel.from(profile)
-    FortuneCard(modifier = modifier, title = "人生画像") {
+    FortuneCard(
+        modifier = modifier,
+        title = "人生画像",
+        detailContext = MysticDetailContext(
+            mode = "人生画像",
+            period = "终身",
+            dateKey = "",
+            title = "人生画像",
+            result = buildString {
+                append("职业倾向：${profile.careerClusters.take(4).joinToString("、") { "${it.label} ${it.score}分" }}。")
+                append("色彩灵感：${profile.colorPalette.take(5).joinToString("、") { "${it.label} ${it.hex}" }}。")
+                append("环境画像：${profile.environmentProfile.tags.joinToString("、")}；${profile.environmentProfile.rhythm}。")
+                append("地区示例：${profile.regionCandidates.take(4).joinToString("、") { "${it.country}·${it.city}" }}。")
+                if (profile.missingInputs.isNotEmpty()) append("缺少输入：${profile.missingInputs.joinToString("、")}。")
+            },
+            evidence = profile.evidence.joinToString("；") { "${it.source}：${it.label}（${it.contribution}）" },
+            sourceStatus = "本地人生画像匹配；${model.confidence}",
+            algorithmVersion = MysticEvidenceBuilder.ALGORITHM_VERSION
+        )
+    ) {
         SectionTitle("人生画像")
         Spacer(Modifier.height(6.dp))
         Text("${model.confidence} · ${profile.disclaimer}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)

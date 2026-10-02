@@ -13,6 +13,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -26,11 +27,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.xuanji.app.domain.MysticDetailContext
 
 @Composable
 internal fun FortuneDetailPage(
     title: String,
     onDismiss: () -> Unit,
+    detailContext: MysticDetailContext? = null,
+    onAskMystic: ((MysticDetailContext) -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit
 ) {
     Dialog(
@@ -99,6 +103,18 @@ internal fun FortuneDetailPage(
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     content()
+                }
+                if (detailContext != null && onAskMystic != null) {
+                    Spacer(Modifier.height(10.dp))
+                    Button(
+                        onClick = { onAskMystic.invoke(detailContext) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("fortune-detail-ask-mystic")
+                            .semantics { contentDescription = "带着${detailContext.title}的当前结果询问玄师" }
+                    ) {
+                        Text("问玄师")
+                    }
                 }
             }
         }

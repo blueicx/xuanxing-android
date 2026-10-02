@@ -58,7 +58,9 @@ data class DialogueContext(
     /** Stable identity used by the voice/specialty adapter; null keeps legacy callers on Shen's default. */
     val characterId: MysticCharacterId? = null,
     /** Optional explicit specialty chosen by the UI; the adapter still validates it against the catalog. */
-    val characterSpecialtyKey: String? = null
+    val characterSpecialtyKey: String? = null,
+    /** Exact, already-rendered detail being discussed; not persisted as memory. */
+    val detailContext: MysticDetailContext? = null
 )
 
 /** Minimal, UI-independent turn record used when the dialogue engine is called off-screen. */
@@ -121,7 +123,8 @@ class DefaultMysticDialogueEngine : MysticDialogueEngine {
             context.divinationSummary,
             context.weatherSummary,
             context.personalitySource,
-            characterName = context.characterName
+            characterName = context.characterName,
+            detailContext = context.detailContext
         )
         val voice = MysticCharacterVoiceAdapter.adapt(
             context = context,

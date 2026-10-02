@@ -145,7 +145,13 @@ private fun WesternContent(
     val cards = westernCards(detail, fortune, chart, interp, period)
 
     CompositionLocalProvider(LocalCardLayout provides controller) {
-        MysticFloatingGuide(bazi, composite) { scrollState ->
+        MysticFloatingGuide(
+            bazi,
+            composite,
+            readingMode = "西方",
+            readingPeriod = "本命盘".takeIf { chartOnly },
+            readingDateKey = "".takeIf { chartOnly }
+        ) { scrollState ->
             Column(Modifier.fillMaxSize()) {
                 if (!chartOnly) {
                     FortuneStickyHeader(

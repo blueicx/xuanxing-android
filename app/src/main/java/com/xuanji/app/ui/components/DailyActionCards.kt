@@ -37,6 +37,8 @@ import com.xuanji.app.domain.action.ConfidenceLevel
 import com.xuanji.app.domain.action.DailyActionPlan
 import com.xuanji.app.domain.action.MealSuggestion
 import com.xuanji.app.domain.action.OutingSuggestion
+import com.xuanji.app.domain.MysticDetailContext
+import com.xuanji.app.domain.MysticEvidenceBuilder
 
 data class DailyActionCardModel(
     val title: String,
@@ -200,9 +202,11 @@ fun DailyActionSection(
         cards.firstOrNull { it.title == title }?.let { card ->
             DailyActionDetailPage(
                 card = card,
+                dateKey = plan.dateKey,
                 relatedCards = cards.filterNot { it.title == card.title },
                 feedbackStatus = feedbackStatus,
                 onDismiss = { selectedDetailTitle = null },
+                onRestore = { selectedDetailTitle = card.title },
                 onOpenRelated = { related ->
                     selectedDetailTitle = related.title
                     feedbackStatus = null
@@ -276,13 +280,41 @@ private data class ActionAccent(
 @Composable
 private fun DailyActionDetailPage(
     card: DailyActionCardModel,
+    dateKey: String,
     relatedCards: List<DailyActionCardModel>,
     feedbackStatus: String?,
     onDismiss: () -> Unit,
+    onRestore: () -> Unit,
     onOpenRelated: (DailyActionCardModel) -> Unit,
     onFeedback: (ActionFeedbackKind) -> Unit
 ) {
-    FortuneDetailPage(title = card.title, onDismiss = onDismiss) {
+    val askMystic = LocalMysticDetailQuestion.current
+    val detailContext = MysticDetailContext(
+        mode = "综合 · 五行 + 星座",
+        period = "今日",
+        dateKey = dateKey,
+        title = card.title,
+        result = buildString {
+            append(card.summary)
+            card.detailFields.forEach { append("\n${it.label}：${it.value}") }
+            append("\n匹配评分：${card.score} · ${card.confidence}")
+        },
+        evidence = (card.evidenceDetails.map { "${it.sourceLabel}：${it.signalLabel} · ${it.contributionText()}" }
+            .ifEmpty { card.why }).joinToString("；"),
+        sourceStatus = "本地今日行动候选计算 · ${card.confidence}",
+        algorithmVersion = MysticEvidenceBuilder.ALGORITHM_VERSION
+    )
+    FortuneDetailPage(
+        title = card.title,
+        onDismiss = onDismiss,
+        detailContext = detailContext,
+        onAskMystic = askMystic?.let { submitDetail ->
+            { selectedDetail ->
+                onDismiss()
+                submitDetail(selectedDetail, onRestore)
+            }
+        }
+    ) {
         Text(
             text = card.summary,
             style = MaterialTheme.typography.titleMedium,

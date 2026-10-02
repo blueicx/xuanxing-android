@@ -29,6 +29,8 @@ import com.xuanji.app.domain.external.ExternalResult
 import com.xuanji.app.domain.external.OfflineContextProvider
 import com.xuanji.app.domain.external.OpenMeteoContextProvider
 import com.xuanji.app.domain.external.WeatherSnapshot
+import com.xuanji.app.domain.MysticDetailContext
+import com.xuanji.app.domain.MysticEvidenceBuilder
 import kotlinx.coroutines.launch
 
 /** Manual city search + optional weather; no GPS and no background requests. */
@@ -44,7 +46,29 @@ fun ExternalContextCard(networkEnabled: Boolean, modifier: Modifier = Modifier) 
     var weather by remember { mutableStateOf<WeatherSnapshot?>(null) }
     var message by remember { mutableStateOf<String?>(null) }
 
-    FortuneCard(modifier = modifier, title = "天气与地点（可选）") {
+    val detailContext = MysticDetailContext(
+        mode = "用户主动选择的天气与地点",
+        period = if (weather == null) "当前地点" else "天气快照",
+        dateKey = weather?.fetchedAtEpochMs?.toString().orEmpty(),
+        title = "天气与地点（可选）",
+        result = buildString {
+            selected?.let { append("所选地点：${it.name} · ${it.country}（${it.latitude}, ${it.longitude}）。") }
+            weather?.let {
+                append("天气来源：${it.source}。")
+                it.temperatureC?.let { value -> append("气温：$value°C。") }
+                it.apparentTemperatureC?.let { value -> append("体感：$value°C。") }
+                it.precipitationProbability?.let { value -> append("降水概率：$value%。") }
+                it.windSpeedKmh?.let { value -> append("风速：$value km/h。") }
+            }
+            if (isEmpty()) append("尚未选择地点或获得天气数据；不推测当前位置和实时天气。")
+        },
+        evidence = weather?.let { "${it.source} · 抓取时间戳 ${it.fetchedAtEpochMs}" }
+            ?: selected?.let { "用户主动选择的离线城市目录坐标：${it.latitude}, ${it.longitude}" }.orEmpty(),
+        sourceStatus = weather?.let { "用户主动请求 · ${it.source}" }
+            ?: if (selected != null) "用户主动选择 · 离线地点数据" else "尚无用户选择或联网天气数据",
+        algorithmVersion = MysticEvidenceBuilder.ALGORITHM_VERSION
+    )
+    FortuneCard(modifier = modifier, title = "天气与地点（可选）", detailContext = detailContext) {
         SectionTitle("天气与地点")
         Text(
             if (networkEnabled) "已开启联网：只在你点击搜索/天气时请求，使用 Open-Meteo；未开启时不猜测实时天气。"

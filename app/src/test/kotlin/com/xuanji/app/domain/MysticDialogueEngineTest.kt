@@ -7,6 +7,7 @@ import com.xuanji.app.data.model.EasternDailyFortune
 import com.xuanji.app.data.model.WesternDailyFortune
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import kotlinx.coroutines.runBlocking
 
@@ -100,6 +101,32 @@ class MysticDialogueEngineTest {
         assertEquals(MysticIntent.Identity, reply.intent)
         assertEquals(true, reply.text.contains("沈砚舟"))
         assertEquals(false, reply.text.contains("玄学家"))
+    }
+
+    @Test
+    fun detail_question_uses_exact_displayed_result_in_reply_and_evidence() {
+        val detail = MysticDetailContext(
+            mode = "东方",
+            period = "本周",
+            dateKey = "2026-W40",
+            title = "事业",
+            result = "本周事业评分 76，适合先完成既定项目。",
+            evidence = "本周事业维度 76 分；日主偏木。",
+            sourceStatus = "本地计算",
+            algorithmVersion = "x3-test"
+        )
+        val context = contextFor("为什么").copy(topicKey = "career", detailContext = detail)
+
+        val reply = DefaultMysticDialogueEngine().reply(context, "为什么")
+
+        assertEquals(MysticIntent.Why, reply.intent)
+        assertTrue("actual reply: ${reply.text}", reply.text.contains("本周事业评分 76"))
+        assertTrue(reply.text.contains("本周事业维度 76 分"))
+        assertTrue(reply.text.contains("东方·本周"))
+        val detailTrace = reply.evidence?.items.orEmpty().filter { it.key.startsWith("selected_detail") }
+        assertEquals(3, detailTrace.size)
+        assertTrue(reply.evidence?.inputs.orEmpty().contains("详情板块：事业"))
+        assertTrue(reply.evidence?.systems.orEmpty().contains("东方"))
     }
 
     @Test

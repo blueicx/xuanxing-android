@@ -43,10 +43,33 @@ object MysticEvidenceBuilder {
             add("问题意图：${analysis.intent.value}")
             add("综合分：${fortune.overallScore}")
             if (context.latestTest != null) add("主动完成测验：${context.latestTest.testName}")
+            context.detailContext?.let { detail ->
+                add("详情周期：${detail.period}")
+                add("详情板块：${detail.title}")
+                detail.dateKey.takeIf(String::isNotBlank)?.let { add("详情日期：$it") }
+                detail.algorithmVersion.takeIf(String::isNotBlank)?.let { add("详情算法：$it") }
+            }
         }
-        val systems = listOf("composite_fortune", specialty.specialtyKey).distinct()
+        val systems = buildList {
+            add("composite_fortune")
+            add(specialty.specialtyKey)
+            context.detailContext?.mode?.takeIf(String::isNotBlank)?.let(::add)
+        }.distinct()
         val items = buildList {
             add(MysticEvidenceItem("fortune", "今日综合盘面", MysticEvidenceStatus.Computed, "综合 ${fortune.overallScore} 分；日期 ${fortune.dateKey}"))
+            context.detailContext?.let { detail ->
+                val status = when {
+                    detail.sourceStatus.contains("未启用") ||
+                        detail.sourceStatus.contains("缺失") ||
+                        detail.sourceStatus.contains("不足") -> MysticEvidenceStatus.NotEnabled
+                    detail.sourceStatus.contains("文化参考") -> MysticEvidenceStatus.CulturalReference
+                    detail.sourceStatus.contains("用户") -> MysticEvidenceStatus.UserProvided
+                    else -> MysticEvidenceStatus.Computed
+                }
+                add(MysticEvidenceItem("selected_detail", detail.title.ifBlank { "当前详情" }, status, detail.result.ifBlank { "未提供已显示结果" }))
+                add(MysticEvidenceItem("selected_detail_basis", "详情依据", status, detail.evidence.ifBlank { "暂无可用依据；不补造来源" }))
+                add(MysticEvidenceItem("selected_detail_source", "结果来源", status, detail.sourceStatus.ifBlank { "未提供" }))
+            }
             add(
                 MysticEvidenceItem(
                     "specialty",

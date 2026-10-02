@@ -40,6 +40,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.compositionLocalOf
@@ -76,6 +77,7 @@ import com.xuanji.app.domain.MysticGuideGenerator
 import com.xuanji.app.domain.MysticCharacterCatalog
 import com.xuanji.app.domain.MysticCharacterId
 import com.xuanji.app.domain.MysticCharacterProfile
+import com.xuanji.app.domain.MysticDetailContext
 import com.xuanji.app.domain.game.CompanionGameCatalog
 import android.content.Context
 import android.content.ContextWrapper
@@ -148,6 +150,9 @@ fun MysticFloatingGuide(
     bazi: BaziFull?,
     fortune: CompositeDailyFortune?,
     modifier: Modifier = Modifier,
+    readingMode: String = "综合",
+    readingPeriod: String? = null,
+    readingDateKey: String? = null,
     content: @Composable (ScrollState) -> Unit
 ) {
     val guideAvailable = bazi != null && fortune != null
@@ -171,6 +176,8 @@ fun MysticFloatingGuide(
     var stageMode by rememberSaveable(companionKey) { mutableStateOf(suggestedCharacter.dialogueMode) }
     var stageSkinId by rememberSaveable(companionKey) { mutableStateOf(suggestedCharacter.legacySkinId) }
     var stageActionRequest by rememberSaveable(companionKey) { mutableStateOf<String?>(null) }
+    var stageDetailContext by remember(companionKey) { mutableStateOf<MysticDetailContext?>(null) }
+    var stageDetailReturn by remember(companionKey) { mutableStateOf<(() -> Unit)?>(null) }
     val skin = if (guideAvailable) {
         MysticGuideGenerator.mysticSkinVoice(stageMode, stageSkinId)
             ?: MysticGuideGenerator.defaultMysticSkin(stageMode, fortune!!)
@@ -191,10 +198,30 @@ fun MysticFloatingGuide(
         stageMode = profile.dialogueMode
         stageSkinId = profile.legacySkinId
         stageActionRequest = null
+        stageDetailContext = null
     }
 
     Box(modifier.fillMaxSize()) {
-        content(pageScroll)
+        CompositionLocalProvider(
+            LocalMysticReadingMetadata provides MysticReadingMetadata(
+                mode = readingMode,
+                period = readingPeriod ?: when (fortune?.period) {
+                    "week" -> "本周"
+                    "month" -> "本月"
+                    "year" -> "本年"
+                    else -> "今日"
+                },
+                dateKey = readingDateKey ?: fortune?.dateKey.orEmpty()
+            ),
+            LocalMysticDetailQuestion provides { selectedDetail, returnToDetail ->
+                stageDetailContext = selectedDetail
+                stageDetailReturn = returnToDetail
+                stageActionRequest = MYSTIC_DETAIL_QUESTION_ACTION
+                detailOpen = true
+            }
+        ) {
+            content(pageScroll)
+        }
 
         if (skin != null && companionUiState.presence == CompanionPresence.OrbVisible && !companionUiState.stageOpen) {
             MysticOrb(
@@ -238,7 +265,13 @@ fun MysticFloatingGuide(
                             "__companion_game__:${game.id}"
                         }
                     },
-                    onClose = { detailOpen = false },
+                    onClose = {
+                        detailOpen = false
+                        val returnToDetail = stageDetailReturn
+                        stageDetailReturn = null
+                        stageDetailContext = null
+                        returnToDetail?.invoke()
+                    },
                 ) {
                     MysticGuideCard(
                         bazi,
@@ -248,7 +281,11 @@ fun MysticFloatingGuide(
                         onStageModeChange = { stageMode = it },
                         onStageSkinChange = { stageSkinId = it },
                         stageActionRequest = stageActionRequest,
-                        onStageActionConsumed = { stageActionRequest = null }
+                        stageDetailContext = stageDetailContext,
+                        onStageActionConsumed = {
+                            stageActionRequest = null
+                            stageDetailContext = null
+                        }
                     )
                 }
             }

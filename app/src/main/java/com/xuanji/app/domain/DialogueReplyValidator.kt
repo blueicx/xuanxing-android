@@ -28,6 +28,10 @@ object DialogueReplyValidator {
             add(context.fortune.western.wealthScore)
             add(context.fortune.western.loveScore)
             add(context.fortune.western.healthScore)
+            context.detailContext?.let { detail ->
+                SCORE_PATTERN.findAll("${detail.result} ${detail.evidence}")
+                    .forEach { it.groupValues[1].toIntOrNull()?.let(::add) }
+            }
         }
         if (SCORE_PATTERN.findAll(reply).any { it.groupValues[1].toInt() !in allowedScores }) {
             return ValidationResult.Reject("ungrounded_fact")

@@ -189,7 +189,13 @@ fun EasternScreen(
     val readyBazi = (uiState as? EasternUiState.Ready)?.full
     if (readyBazi != null && composite != null) {
         CompositionLocalProvider(LocalCardLayout provides controller) {
-            MysticFloatingGuide(readyBazi, composite) { scrollState -> content(scrollState) }
+            MysticFloatingGuide(
+                readyBazi,
+                composite,
+                readingMode = "东方",
+                readingPeriod = "本命盘".takeIf { chartOnly },
+                readingDateKey = if (chartOnly) "" else readyState?.fortune?.dateKey?.let(::formatEasternLunarDate)
+            ) { scrollState -> content(scrollState) }
         }
     } else {
         content(rememberScrollState())

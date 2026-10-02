@@ -48,6 +48,8 @@ import com.xuanji.app.data.model.FortuneDimension
 import com.xuanji.app.data.model.FortuneInsight
 import com.xuanji.app.domain.elementColorCompose
 import com.xuanji.app.domain.elementName
+import com.xuanji.app.domain.MysticDetailContext
+import com.xuanji.app.domain.MysticEvidenceBuilder
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.size
@@ -62,10 +64,13 @@ fun FortuneCard(
     cardId: String? = null,
     title: String? = null,
     shareCard: ShareCard? = null,
+    detailContext: MysticDetailContext? = null,
     previewContent: (@Composable ColumnScope.() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit
 ) {
     val layout = LocalCardLayout.current
+    val readingMetadata = LocalMysticReadingMetadata.current
+    val askMystic = LocalMysticDetailQuestion.current
     val editable = layout != null && cardId != null && title != null
     val editing = editable && layout?.editingCardId == cardId
     var detailOpen by rememberSaveable(cardId, title) { mutableStateOf(false) }
@@ -134,9 +139,43 @@ fun FortuneCard(
     }
 
     if (detailOpen && title != null) {
+        val resolvedDetailContext = detailContext ?: shareCard?.let { card ->
+            val displayedResult = buildList {
+                card.badge.takeIf(String::isNotBlank)?.let { add("标记：$it") }
+                if (card.headline.isNotBlank()) add("${card.headline} ${card.headlineUnit}".trim())
+                card.summary.takeIf(String::isNotBlank)?.let(::add)
+                card.rows.forEach { (label, value) -> add("$label：$value") }
+            }.joinToString("\n")
+            MysticDetailContext(
+                mode = readingMetadata.mode,
+                period = readingMetadata.period,
+                dateKey = readingMetadata.dateKey,
+                title = title,
+                result = displayedResult,
+                evidence = card.rows.joinToString("；") { (label, value) -> "$label：$value" },
+                sourceStatus = "${card.eyebrow} · 页面已展示的本地结果",
+                algorithmVersion = MysticEvidenceBuilder.ALGORITHM_VERSION
+            )
+        } ?: MysticDetailContext(
+            mode = readingMetadata.mode,
+            period = readingMetadata.period,
+            dateKey = readingMetadata.dateKey,
+            title = title,
+            result = "当前详情没有提供结构化结果文本；可以继续普通对话，但玄师不会补造缺失事实。",
+            evidence = "",
+            sourceStatus = "详情数据缺失",
+            algorithmVersion = MysticEvidenceBuilder.ALGORITHM_VERSION
+        )
         FortuneDetailPage(
             title = title,
             onDismiss = { detailOpen = false },
+            detailContext = resolvedDetailContext,
+            onAskMystic = askMystic?.let { submitDetail ->
+                { selectedDetail ->
+                    detailOpen = false
+                    submitDetail(selectedDetail) { detailOpen = true }
+                }
+            },
             content = content
         )
     }

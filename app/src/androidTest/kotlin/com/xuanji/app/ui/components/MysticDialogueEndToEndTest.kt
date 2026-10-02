@@ -5,13 +5,17 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Button
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
@@ -19,6 +23,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -29,6 +34,7 @@ import com.xuanji.app.data.model.FortuneDimension
 import com.xuanji.app.data.model.WesternDailyFortune
 import com.xuanji.app.domain.DialogueContext
 import com.xuanji.app.domain.DialogueReply
+import com.xuanji.app.domain.MysticDetailContext
 import com.xuanji.app.domain.MysticCompanionAction
 import com.xuanji.app.domain.MysticCompanionActionRouter
 import com.xuanji.app.domain.MysticDialogueCoordinator
@@ -102,6 +108,84 @@ class MysticDialogueEndToEndTest {
         compose.onNodeWithText("这条回答的依据").assertExists()
         compose.onNodeWithText("算法版本：x3-offline-2026.09").assertExists()
         compose.onNodeWithText("确定性 seed：", substring = true).assertExists()
+    }
+
+    @Test
+    fun detail_page_asks_the_offline_character_with_its_exact_visible_result() {
+        var answer by mutableStateOf("")
+        var session by mutableStateOf(MysticSessionState())
+        var stageOpen by mutableStateOf(false)
+        var restoreDetail by mutableStateOf<(() -> Unit)?>(null)
+        compose.setContent {
+            val scope = rememberCoroutineScope()
+            val context = remember { syntheticContext(testDailyActionPlan(), testLifeProfile()).copy(topicKey = "career") }
+            MaterialTheme {
+                CompositionLocalProvider(
+                    LocalMysticReadingMetadata provides MysticReadingMetadata(
+                        mode = "东方",
+                        period = "本周",
+                        dateKey = "2026-W40"
+                    ),
+                    LocalMysticDetailQuestion provides { detail, returnToDetail ->
+                        restoreDetail = returnToDetail
+                        stageOpen = true
+                        val input = "请结合我当前打开的详情继续解读"
+                        scope.launch {
+                            dialogueTestCoordinator.complete(
+                                session,
+                                context.copy(detailContext = detail),
+                                input
+                            ).forEach { event ->
+                                if (event is MysticEvent.ReplySucceeded) answer = event.reply.text
+                                session = reduce(session, event)
+                            }
+                        }
+                    }
+                ) {
+                    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+                        FortuneCard(
+                            modifier = Modifier.testTag("detail-question-card"),
+                            cardId = "career",
+                            title = "事业",
+                            shareCard = ShareCard(
+                                eyebrow = "玄星 · 本周",
+                                title = "事业",
+                                badge = "76分",
+                                headline = "76",
+                                headlineUnit = "分",
+                                summary = "本周事业评分 76，适合先完成既定项目。",
+                                rows = listOf("五行依据" to "日主偏木")
+                            )
+                        ) {
+                            Text("本周事业评分 76，适合先完成既定项目。")
+                            Text("五行依据：日主偏木")
+                        }
+                        if (stageOpen) {
+                            Text("角色舞台")
+                            if (answer.isNotBlank()) Text("玄师：$answer")
+                            Button(onClick = {
+                                stageOpen = false
+                                restoreDetail?.invoke()
+                                restoreDetail = null
+                            }) { Text("关闭玄师") }
+                        }
+                    }
+                }
+            }
+        }
+
+        compose.onNodeWithTag("detail-question-card").performClick()
+        compose.onNodeWithTag("fortune-detail-ask-mystic").performClick()
+        compose.waitForIdle()
+
+        compose.onNodeWithTag("fortune-detail-page").assertDoesNotExist()
+        compose.onNodeWithText("角色舞台").assertExists()
+        compose.onNodeWithText("玄师：", substring = true).assertExists()
+        compose.onNodeWithText("本周事业评分 76，适合先完成既定项目。", substring = true).assertExists()
+        compose.onNodeWithText("日主偏木", substring = true).assertExists()
+        compose.onNodeWithText("关闭玄师").performClick()
+        compose.onNodeWithTag("fortune-detail-page").assertExists()
+        compose.onNodeWithText("五行依据：日主偏木", useUnmergedTree = true).assertExists()
     }
 
     @Test

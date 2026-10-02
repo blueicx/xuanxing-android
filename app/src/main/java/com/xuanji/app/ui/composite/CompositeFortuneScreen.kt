@@ -37,6 +37,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.xuanji.app.data.model.BaziFull
 import com.xuanji.app.data.model.CompositeDailyFortune
 import com.xuanji.app.data.model.FortuneDimension
+import com.xuanji.app.domain.MysticDetailContext
+import com.xuanji.app.domain.MysticEvidenceBuilder
 import com.xuanji.app.data.local.actionFeedbackStore
 import com.xuanji.app.di.AppModule
 import com.xuanji.app.ui.components.CardLayouts
@@ -52,6 +54,7 @@ import com.xuanji.app.ui.components.FortuneSurfaceTokens
 import com.xuanji.app.ui.components.FortuneStickyHeader
 import com.xuanji.app.ui.components.TodayFortuneMode
 import com.xuanji.app.ui.components.LocalCardLayout
+import com.xuanji.app.ui.components.LocalMysticDetailQuestion
 import com.xuanji.app.ui.components.MysticFloatingGuide
 import com.xuanji.app.ui.components.ResultShareCards
 import com.xuanji.app.ui.components.RestoreCardsBar
@@ -124,7 +127,7 @@ private fun CompositeContent(
     val feedbackStore = remember(context) { context.actionFeedbackStore() }
 
     CompositionLocalProvider(LocalCardLayout provides controller) {
-        MysticFloatingGuide(bazi, fortune) { scrollState ->
+        MysticFloatingGuide(bazi, fortune, readingMode = "综合") { scrollState ->
             Column(Modifier.fillMaxSize()) {
                 FortuneStickyHeader(
                     period = period,
@@ -153,7 +156,7 @@ private fun CompositeContent(
                             )
                             DailyOutlookHero(fortune, period)
                             SummaryBlock(fortune)
-                            CompositeDimensionGrid(fortune.dimensions)
+                            CompositeDimensionGrid(fortune)
                             if (shouldShowDailyAction(period)) {
                                 DailyActionSection(
                                     plan = dailyAction,
@@ -251,9 +254,21 @@ private fun DailyOutlookHero(fortune: CompositeDailyFortune, period: String) {
 /** 本周期总评：原始完整结论进入详情；首屏只呈现短预览与幸运信息。 */
 @Composable
 private fun SummaryBlock(fortune: CompositeDailyFortune) {
+    val period = periodLabel(fortune.period)
+    val detailContext = MysticDetailContext(
+        mode = "综合",
+        period = period,
+        dateKey = fortune.dateKey,
+        title = "本周期总评",
+        result = "综合评分 ${fortune.overallScore} 分。${fortune.periodSummary} 幸运提示：${fortune.luckyNumber}、${fortune.luckyColor}、${fortune.luckyDirection}。",
+        evidence = fortune.insights.joinToString("；") { "${it.tag} · ${it.title}：${it.body}（${it.weight}）" },
+        sourceStatus = "东方与西方周期结果的本地合参",
+        algorithmVersion = MysticEvidenceBuilder.ALGORITHM_VERSION
+    )
     FortuneCard(
         cardId = "summary",
         title = "本周期总评",
+        detailContext = detailContext,
         previewContent = {
             Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
                 Text("综合结论", style = MaterialTheme.typography.labelMedium, color = Color(0xFFD9C27E), fontWeight = FontWeight.Bold)
@@ -295,8 +310,10 @@ private fun SummaryMetaChip(label: String, value: String) {
 }
 
 @Composable
-private fun CompositeDimensionGrid(dimensions: List<FortuneDimension>) {
+private fun CompositeDimensionGrid(fortune: CompositeDailyFortune) {
+    val dimensions = fortune.dimensions
     var selectedKey by rememberSaveable { mutableStateOf<String?>(null) }
+    val askMystic = LocalMysticDetailQuestion.current
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         SectionTitle("六维运势") {
             Text("点击查看解说", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.secondary)
@@ -333,7 +350,35 @@ private fun CompositeDimensionGrid(dimensions: List<FortuneDimension>) {
     }
     selectedKey?.let { key ->
         dimensions.firstOrNull { it.key == key }?.let { dimension ->
-            FortuneDetailPage(title = dimension.label, onDismiss = { selectedKey = null }) {
+            val period = when (fortune.period) {
+                "week" -> "本周"
+                "month" -> "本月"
+                "year" -> "本年"
+                else -> "今日"
+            }
+            val detailContext = MysticDetailContext(
+                mode = "综合",
+                period = period,
+                dateKey = fortune.dateKey,
+                title = dimension.label,
+                result = "当前周期评分：${dimension.score} 分。${dimension.interpretation}",
+                evidence = fortune.insights
+                    .filter { it.title.contains(dimension.label) || it.body.contains(dimension.label) || it.tag.contains(dimension.key) }
+                    .joinToString("；") { "${it.title}：${it.body}（${it.weight}）" },
+                sourceStatus = "离线综合运势计算",
+                algorithmVersion = MysticEvidenceBuilder.ALGORITHM_VERSION
+            )
+            FortuneDetailPage(
+                title = dimension.label,
+                onDismiss = { selectedKey = null },
+                detailContext = detailContext,
+                onAskMystic = askMystic?.let { submitDetail ->
+                    { selectedDetail ->
+                        selectedKey = null
+                        submitDetail(selectedDetail) { selectedKey = key }
+                    }
+                }
+            ) {
                 Text("当前周期评分 · ${dimension.score} 分", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
                 Spacer(Modifier.height(10.dp))
                 FortuneProse(dimension.interpretation)
@@ -377,7 +422,18 @@ private fun LuckCard(shareCard: ShareCard?, fortune: CompositeDailyFortune) {
 /** 评分依据：把这一周期真正参与加减分的信号摊开给用户提供证据 */
 @Composable
 private fun EvidenceCard(shareCard: ShareCard?, fortune: CompositeDailyFortune) {
-    FortuneCard(cardId = "evidence", title = "评分依据", shareCard = shareCard) {
+    val detailContext = MysticDetailContext(
+        mode = "综合",
+        period = periodLabel(fortune.period),
+        dateKey = fortune.dateKey,
+        title = "评分依据",
+        result = fortune.insights.joinToString("\n") { "${it.title}：${it.body}（${it.weight}）" }
+            .ifBlank { "这一周期没有额外改变分数的可追溯信号；分数由基础盘面规则给出。" },
+        evidence = fortune.insights.joinToString("；") { "${it.tag}：${it.title}（${it.weight}）" },
+        sourceStatus = "本周期实际参与计分的可追溯信号",
+        algorithmVersion = MysticEvidenceBuilder.ALGORITHM_VERSION
+    )
+    FortuneCard(cardId = "evidence", title = "评分依据", shareCard = shareCard, detailContext = detailContext) {
         Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(
                 "下面每一条都是${periodLabel(fortune.period)}加减分的实际理由，不是事后配的文案。",

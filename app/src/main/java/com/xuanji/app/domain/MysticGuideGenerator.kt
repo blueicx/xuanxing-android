@@ -2718,7 +2718,8 @@ object MysticGuideGenerator {
         divinationSummary: String? = null,
         weatherSummary: String? = null,
         personalitySource: PersonalitySource = PersonalitySource.Unknown,
-        characterName: String? = null
+        characterName: String? = null,
+        detailContext: MysticDetailContext? = null
     ): String {
         val label = topics[topicKey] ?: "综合"
         val focus = if (topicKey == "test") {
@@ -2864,11 +2865,20 @@ object MysticGuideGenerator {
                 test?.testName.orEmpty()
             )
         }
+        val detailLead = detailContext?.let { detail ->
+            buildString {
+                append("你现在打开的是${detail.mode.take(40)}·${detail.period.take(40)}「${detail.title.take(80)}」详情，日期为${detail.dateKey.take(40)}。")
+                append("页面已显示的结果是：${detail.result.ifBlank { "暂无已显示结果" }.take(500)}。")
+                append("来源状态：${detail.sourceStatus.ifBlank { "未提供" }.take(80)}。")
+                if (detail.evidence.isNotBlank()) append("页面依据：${detail.evidence.take(400)}。")
+                detail.algorithmVersion.takeIf(String::isNotBlank)?.let { append("算法版本：${it.take(80)}。") }
+            }
+        }.orEmpty()
         return MysticSafetyGuard.enforce(
             mode,
             question,
             (customPulse(question) % 2L).toInt(),
-            draft
+            listOf(detailLead, draft).filter(String::isNotBlank).joinToString("\n\n")
         )
     }
 

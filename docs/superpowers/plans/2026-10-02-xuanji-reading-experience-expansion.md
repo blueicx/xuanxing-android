@@ -31,22 +31,25 @@
 - 创建 `app/src/main/java/com/xuanji/app/domain/MysticDetailContext.kt`
 - 修改 `app/src/main/java/com/xuanji/app/domain/MysticDialogueEngine.kt`
 - 修改 `app/src/main/java/com/xuanji/app/domain/MysticEvidence.kt`
+- 修改 `app/src/main/java/com/xuanji/app/domain/DialogueReplyValidator.kt`
 - 修改 `app/src/main/java/com/xuanji/app/ui/components/FortuneDetailPage.kt`
+- 创建 `app/src/main/java/com/xuanji/app/ui/components/MysticDetailQuestionBridge.kt`
 - 修改 `app/src/main/java/com/xuanji/app/ui/components/FortuneComponents.kt`
 - 修改 `app/src/main/java/com/xuanji/app/ui/components/DailyActionCards.kt`
 - 修改 `app/src/main/java/com/xuanji/app/ui/composite/CompositeFortuneScreen.kt`
 - 修改 `app/src/main/java/com/xuanji/app/ui/components/MysticFloatingGuide.kt`
 - 修改 `app/src/main/java/com/xuanji/app/ui/components/MysticGuideCard.kt`
-- 修改 `app/src/androidTest/kotlin/com/xuanji/app/ui/components/FortuneDetailPageTest.kt`
+- 修改 `app/src/main/java/com/xuanji/app/ui/eastern/EasternScreen.kt` 和 `app/src/main/java/com/xuanji/app/ui/western/WesternScreen.kt`
+- 修改 `app/src/androidTest/kotlin/com/xuanji/app/ui/components/MysticDialogueEndToEndTest.kt`
 
-- [ ] 先写纯 Kotlin 测试：详情问题文本包含所选模式、周期、日期、标题、真实显示值和依据；截断字段保持在 4000 字符内；空依据如实为空。
-- [ ] 执行 `.\gradlew.bat :app:testDebugUnitTest --tests '*MysticDetailContextTest' --console=plain`，确认失败原因是 `MysticDetailContext` 尚未定义。
-- [ ] 实现 `MysticDetailContext(mode, period, dateKey, title, result, evidence, sourceStatus, algorithmVersion)` 和 `toQuestion()`；避免把出生资料全文或未收藏会话数据混入详情上下文。
-- [ ] 在 `DialogueContext` 增加可选 detail context；证据构造器包含同一 `title/date/period/result/evidence`，离线引擎生成时将其作为当前轮补充输入并保留原安全 guard。
-- [ ] 用 composition local 或显式回调将 `FortuneDetailPage` 的“问玄师”动作送回 `MysticFloatingGuide`；由 `MysticGuideCard` 在当前角色线程提交对应追问，复用 sessionToken 和 provider 失败回退。
-- [ ] 为综合维度、通用 ShareCard 和每日行动构造精确 context；东方/西方所有普通卡的结果文本使用其 `ShareCard` 标题、摘要、内容和已有来源，命盘详情不错误标记成每日周期结果。
-- [ ] 扩展 Compose AndroidTest：打开真实详情、点“问玄师”、断言当前详情和结果被传入对话、关闭舞台后原标题和详情保持可见。
-- [ ] 运行 `.\gradlew.bat :app:testDebugUnitTest :app:assembleDebugAndroidTest --console=plain`。
+- [x] 先写纯 Kotlin 测试：详情问题文本包含所选模式、周期、日期、标题、真实显示值和依据；截断字段保持在 4000 字符内；空依据如实为空。
+- [x] 执行 `.\gradlew.bat :app:testDebugUnitTest --tests '*MysticDetailContextTest' --console=plain`，确认失败原因是 `MysticDetailContext` 尚未定义。
+- [x] 实现 `MysticDetailContext(mode, period, dateKey, title, result, evidence, sourceStatus, algorithmVersion)` 和 `toQuestion()`；避免把出生资料全文或未收藏会话数据混入详情上下文。
+- [x] 在 `DialogueContext` 增加可选 detail context；证据构造器包含同一 `title/date/period/result/evidence`，离线引擎生成时将其作为当前轮补充输入并保留原安全 guard。
+- [x] 用 composition local 或显式回调将 `FortuneDetailPage` 的“问玄师”动作送回 `MysticFloatingGuide`；由 `MysticGuideCard` 在当前角色线程提交对应追问，复用 sessionToken 和 provider 失败回退。
+- [x] 为综合维度、通用 ShareCard 和每日行动构造精确 context；东方/西方所有普通卡的结果文本使用其 `ShareCard` 标题、摘要、内容和已有来源，命盘详情不错误标记成每日周期结果。
+- [x] 扩展 Compose AndroidTest：打开真实详情、点“问玄师”、断言当前详情和结果被传入对话、关闭舞台后原标题和详情保持可见。
+- [x] 运行 `.\gradlew.bat :app:testDebugUnitTest :app:assembleDebugAndroidTest --console=plain`。
 - [ ] 单独提交任务 1，提交信息 `feat(详情): 把当前结果带入玄师对话`。
 
 ## 任务 2：用户主动收藏的版本化快照
