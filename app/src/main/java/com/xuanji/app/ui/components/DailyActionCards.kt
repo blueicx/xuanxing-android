@@ -308,6 +308,7 @@ private fun DailyActionDetailPage(
         title = card.title,
         onDismiss = onDismiss,
         detailContext = detailContext,
+        favoriteType = "action",
         onAskMystic = askMystic?.let { submitDetail ->
             { selectedDetail ->
                 onDismiss()

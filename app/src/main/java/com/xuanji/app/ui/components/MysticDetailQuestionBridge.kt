@@ -2,6 +2,7 @@ package com.xuanji.app.ui.components
 
 import androidx.compose.runtime.compositionLocalOf
 import com.xuanji.app.domain.MysticDetailContext
+import com.xuanji.app.data.local.ReadingFavoriteStore
 
 data class MysticReadingMetadata(
     val mode: String = "综合",
@@ -13,5 +14,9 @@ data class MysticReadingMetadata(
 val LocalMysticDetailQuestion = compositionLocalOf<((MysticDetailContext, () -> Unit) -> Unit)?> { null }
 
 val LocalMysticReadingMetadata = compositionLocalOf { MysticReadingMetadata() }
+
+val LocalReadingFavoriteStore = compositionLocalOf<ReadingFavoriteStore?> { null }
+
+val LocalReadingFavoriteProfileKey = compositionLocalOf<String?> { null }
 
 const val MYSTIC_DETAIL_QUESTION_ACTION = "__ask_about_current_detail__"

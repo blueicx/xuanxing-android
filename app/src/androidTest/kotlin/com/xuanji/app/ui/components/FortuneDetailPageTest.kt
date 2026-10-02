@@ -2,6 +2,7 @@ package com.xuanji.app.ui.components
 
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -20,6 +21,11 @@ import com.xuanji.app.domain.action.DailyActionPlan
 import com.xuanji.app.domain.action.MealSlot
 import com.xuanji.app.domain.action.MealSuggestion
 import com.xuanji.app.domain.action.OutingSuggestion
+import com.xuanji.app.data.local.PreferenceBridge
+import com.xuanji.app.data.local.ReadingFavoriteStore
+import com.xuanji.app.domain.ReadingFavoriteDataState
+import kotlinx.coroutines.runBlocking
+import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -28,6 +34,13 @@ import org.junit.runner.RunWith
 class FortuneDetailPageTest {
     @get:Rule
     val compose = createComposeRule()
+
+    private class MemoryBridge : PreferenceBridge {
+        val values = mutableMapOf<String, String>()
+        override suspend fun read(key: String): String? = values[key]
+        override suspend fun write(key: String, value: String) { values[key] = value }
+        override suspend fun delete(key: String) { values.remove(key) }
+    }
 
     @Test
     fun titled_fortune_card_opens_original_content_and_returns() {
@@ -156,5 +169,46 @@ class FortuneDetailPageTest {
         compose.onAllNodesWithText("杭州 · 西湖")[0].assertExists()
         compose.onNodeWithText("建议理由").assertExists()
         compose.onNodeWithText("环境开阔，适合短时散步").assertExists()
+    }
+
+    @Test
+    fun detail_favorite_toggles_and_persists_only_the_selected_snapshot() {
+        val store = ReadingFavoriteStore(MemoryBridge()) { 700L }
+        compose.setContent {
+            MaterialTheme {
+                CompositionLocalProvider(
+                    LocalReadingFavoriteStore provides store,
+                    LocalReadingFavoriteProfileKey provides "synthetic-profile"
+                ) {
+                    FortuneCard(
+                        modifier = Modifier.testTag("favorite-card-test"),
+                        title = "事业",
+                        shareCard = ShareCard(
+                            eyebrow = "玄星 · 今日",
+                            title = "事业",
+                            badge = "76分",
+                            summary = "当前周期适合稳步推进。",
+                            rows = listOf("依据" to "事业维度")
+                        )
+                    ) {
+                        Text("当前周期适合稳步推进。")
+                    }
+                }
+            }
+        }
+
+        compose.onNodeWithTag("favorite-card-test").performClick()
+        compose.onNodeWithTag("fortune-detail-toggle-favorite").performClick()
+        compose.waitForIdle()
+        compose.onNodeWithText("已收藏到「我的收藏」").assertExists()
+        val saved = runBlocking { store.list("synthetic-profile") }
+        assertEquals(ReadingFavoriteDataState.Ready, saved.state)
+        assertEquals(1, saved.entries.size)
+        assertEquals("当前周期适合稳步推进。", saved.entries.single().body)
+
+        compose.onNodeWithTag("fortune-detail-toggle-favorite").performClick()
+        compose.waitForIdle()
+        compose.onNodeWithText("已取消收藏").assertExists()
+        assertEquals(ReadingFavoriteDataState.Missing, runBlocking { store.list("synthetic-profile") }.state)
     }
 }

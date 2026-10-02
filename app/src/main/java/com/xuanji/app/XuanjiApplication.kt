@@ -4,6 +4,8 @@ import android.app.Application
 import android.util.Log
 import com.xuanji.app.data.repository.FortuneRepository
 import com.xuanji.app.data.local.foodPreferenceStore
+import com.xuanji.app.data.local.DataStorePreferenceBridge
+import com.xuanji.app.data.local.ReadingFavoriteStore
 import com.xuanji.app.data.repository.ActionRepository
 import com.xuanji.app.data.repository.HistoryRepository
 import com.xuanji.app.data.repository.LiuYaoRepository
@@ -25,7 +27,8 @@ class XuanjiApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         installCrashLogger()
-        val repository = FortuneRepository(this)
+        val favoriteStore = ReadingFavoriteStore(DataStorePreferenceBridge(this))
+        val repository = FortuneRepository(this, favoriteStore)
         val testRecordRepository = TestRecordRepository(this)
         AppModule.init(
             repository,
@@ -34,7 +37,8 @@ class XuanjiApplication : Application() {
             LiuYaoRepository(this),
             ReferenceRepository(this),
             testRecordRepository,
-            ActionRepository(repository, testRecordRepository, foodPreferenceStore())
+            ActionRepository(repository, testRecordRepository, foodPreferenceStore()),
+            favoriteStore
         )
 
         // 出生信息默认空白（不预填任何生日），由用户自行填写。

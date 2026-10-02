@@ -73,6 +73,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import com.xuanji.app.data.model.BaziFull
 import com.xuanji.app.data.model.CompositeDailyFortune
+import com.xuanji.app.di.AppModule
 import com.xuanji.app.domain.MysticGuideGenerator
 import com.xuanji.app.domain.MysticCharacterCatalog
 import com.xuanji.app.domain.MysticCharacterId
@@ -156,6 +157,8 @@ fun MysticFloatingGuide(
     content: @Composable (ScrollState) -> Unit
 ) {
     val guideAvailable = bazi != null && fortune != null
+    val favoriteStore = AppModule.readingFavoriteStore
+    val readingProfileKey = remember(bazi) { bazi?.let { "bazi|${it.chart.display}" } }
     val companionKey = remember(bazi, fortune) {
         if (bazi == null || fortune == null) "unavailable" else "${bazi.hashCode()}|${fortune.hashCode()}"
     }
@@ -218,7 +221,9 @@ fun MysticFloatingGuide(
                 stageDetailReturn = returnToDetail
                 stageActionRequest = MYSTIC_DETAIL_QUESTION_ACTION
                 detailOpen = true
-            }
+            },
+            LocalReadingFavoriteStore provides favoriteStore,
+            LocalReadingFavoriteProfileKey provides readingProfileKey
         ) {
             content(pageScroll)
         }

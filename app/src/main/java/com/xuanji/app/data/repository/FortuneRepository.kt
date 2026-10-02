@@ -7,6 +7,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.google.gson.Gson
 import com.xuanji.app.data.local.dataStore
+import com.xuanji.app.data.local.ReadingFavoriteStore
 import com.xuanji.app.data.model.BaziChart
 import com.xuanji.app.data.model.BaziFull
 import com.xuanji.app.data.model.CompositeDailyFortune
@@ -38,7 +39,10 @@ import java.time.format.DateTimeFormatter
 /**
  * 离线优先的数据层：用户命盘存于 DataStore，每日运势按日期缓存。
  */
-class FortuneRepository(private val context: Context) {
+class FortuneRepository(
+    private val context: Context,
+    private val readingFavoriteStore: ReadingFavoriteStore? = null
+) {
 
     private val gson = Gson()
     private val profileKey = stringPreferencesKey("user_profile")
@@ -155,7 +159,10 @@ class FortuneRepository(private val context: Context) {
         context.dataStore.data.map { it[dailyReminderKey] ?: false }.first()
 
     /** 用户主动清除本机 DataStore 中的命盘、缓存与测试记录 */
-    suspend fun clearAllLocalData() {
+    suspend fun clearAllLocalData(favoriteProfileKey: String? = null) {
+        if (!favoriteProfileKey.isNullOrBlank()) {
+            readingFavoriteStore?.clear(favoriteProfileKey)
+        }
         context.dataStore.edit { it.clear() }
     }
 

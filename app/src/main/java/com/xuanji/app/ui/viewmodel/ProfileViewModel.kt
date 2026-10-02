@@ -51,9 +51,9 @@ class ProfileViewModel(private val repository: FortuneRepository) : ViewModel() 
         }
     }
 
-    fun clearAllLocalData() {
+    fun clearAllLocalData(favoriteProfileKey: String? = null) {
         viewModelScope.launch {
-            repository.clearAllLocalData()
+            repository.clearAllLocalData(favoriteProfileKey)
         }
     }
 

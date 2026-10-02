@@ -68,6 +68,7 @@ import com.xuanji.app.ui.xuanjiViewModel
 import com.xuanji.app.domain.external.ExternalContextConsent
 import com.xuanji.app.domain.MysticPrivacyExport
 import com.xuanji.app.domain.MysticPrivacyExportCodec
+import com.xuanji.app.domain.MysticPrivacyFavorite
 import com.xuanji.app.domain.privacyFingerprint
 import java.time.LocalDate
 import kotlinx.coroutines.launch
@@ -78,6 +79,8 @@ fun ProfileScreen() {
     val actionViewModel = xuanjiViewModel { ActionViewModel(AppModule.actionRepository) }
     val profile by viewModel.profile.collectAsStateWithLifecycle()
     val actionState by actionViewModel.state.collectAsStateWithLifecycle()
+    val baziFull by AppModule.repository.baziFullFlow.collectAsStateWithLifecycle(initialValue = null)
+    val favoritesProfileKey = remember(baziFull) { baziFull?.let { "bazi|${it.chart.display}" } }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val externalConsentStore = remember { context.externalContextConsentStore() }
@@ -486,6 +489,10 @@ fun ProfileScreen() {
                                 val memory = runCatching { conversationMemoryStore.load(key) }.getOrNull()
                                 val tags = runCatching { softMemoryStore.read(key).tags }.getOrDefault(emptyList())
                                 val feedbackCount = runCatching { actionFeedbackStore.list(key, 100).size }.getOrDefault(0)
+                                val favoriteSnapshot = favoritesProfileKey?.let { profileKey ->
+                                    runCatching { AppModule.readingFavoriteStore.list(profileKey) }.getOrNull()
+                                }
+                                val favorites = favoriteSnapshot?.entries.orEmpty()
                                 val exported = MysticPrivacyExportCodec.encode(
                                     MysticPrivacyExport(
                                         profileFingerprint = privacyFingerprint(key),
@@ -493,7 +500,24 @@ fun ProfileScreen() {
                                         characterSessionSnapshot = runCatching { characterSessionStore.raw(key) }.getOrNull(),
                                         longTermMemory = memory?.entries.orEmpty().map { "${it.dateKey}|${it.kind.wire}|${it.text}" },
                                         softMemoryLabels = tags.map { "${it.key}|${it.value}|${it.source.name}" },
-                                        actionFeedbackCount = feedbackCount
+                                        actionFeedbackCount = feedbackCount,
+                                        readingFavoriteCount = favorites.size,
+                                        readingFavorites = favorites.map { favorite ->
+                                            MysticPrivacyFavorite(
+                                                id = favorite.id,
+                                                type = favorite.type,
+                                                title = favorite.title,
+                                                dateKey = favorite.dateKey,
+                                                period = favorite.period,
+                                                mode = favorite.mode,
+                                                characterId = favorite.characterId,
+                                                gameId = favorite.gameId,
+                                                body = favorite.body,
+                                                evidence = favorite.evidence,
+                                                algorithmVersion = favorite.algorithmVersion,
+                                                createdAt = favorite.createdAt
+                                            )
+                                        }
                                     )
                                 )
                                 val clipboard = context.getSystemService(ClipboardManager::class.java)
@@ -667,12 +691,12 @@ fun ProfileScreen() {
             AlertDialog(
                 onDismissRequest = { showClearDialog = false },
                 title = { Text("清除全部本地数据") },
-                text = { Text("将删除本机的出生档案和心理测试记录，且无法恢复。") },
+                text = { Text("将删除本机出生档案、测试记录、收藏快照、角色对话与本地游戏数据，且无法恢复。") },
                 confirmButton = {
                     TextButton(
                         onClick = {
                             showClearDialog = false
-                            viewModel.clearAllLocalData()
+                            viewModel.clearAllLocalData(favoritesProfileKey)
                             scope.launch { externalConsentStore.clear() }
                             ReminderScheduler.cancel(context)
                             Toast.makeText(context, "已全部清除", Toast.LENGTH_SHORT).show()

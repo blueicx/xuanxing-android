@@ -8,39 +8,59 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Card
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.xuanji.app.data.model.HistoryEvent
+import com.xuanji.app.data.local.ReadingFavoriteStore
 import com.xuanji.app.di.AppModule
+import com.xuanji.app.domain.ReadingFavorite
+import com.xuanji.app.domain.ReadingFavoriteDataState
+import com.xuanji.app.domain.ReadingFavoriteSnapshot
 import com.xuanji.app.domain.SameDayBirth
 import com.xuanji.app.domain.SameDayWork
 import com.xuanji.app.domain.SameDayWorks
 import com.xuanji.app.domain.WorkKind
 import com.xuanji.app.ui.viewmodel.HistoryViewModel
+import com.xuanji.app.ui.components.FortuneDetailPage
 import com.xuanji.app.ui.xuanjiViewModel
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
+import kotlinx.coroutines.launch
 
 @Composable
 fun HistoryScreen() {
     val viewModel = xuanjiViewModel { HistoryViewModel(AppModule.historyRepository) }
     val events by viewModel.events.collectAsStateWithLifecycle()
     val profile by AppModule.repository.userProfileFlow.collectAsStateWithLifecycle(initialValue = null)
+    val baziFull by AppModule.repository.baziFullFlow.collectAsStateWithLifecycle(initialValue = null)
+    val favoriteProfileKey = remember(baziFull) { baziFull?.let { "bazi|${it.chart.display}" } }
     val today = LocalDate.now()
     val todayStr = today.format(DateTimeFormatter.ofPattern("M月d日"))
 
@@ -114,7 +134,217 @@ fun HistoryScreen() {
         )
         SameDayBirth.forToday(sameDayDate).forEach { SameDayBirthCard(it) }
         SameDayWorks.forDate(sameDayDate).forEach { SameDayWorkCard(it) }
+
+        Spacer(Modifier.height(8.dp))
+        ReadingFavoritesSection(AppModule.readingFavoriteStore, favoriteProfileKey)
     }
+}
+
+@Composable
+fun ReadingFavoritesSection(store: ReadingFavoriteStore, profileKey: String?) {
+    var favoriteLoaded by remember(profileKey) { mutableStateOf(false) }
+    var favoriteSnapshot by remember(profileKey) {
+        mutableStateOf(ReadingFavoriteSnapshot(ReadingFavoriteDataState.Missing))
+    }
+    var favoriteFilter by rememberSaveable { mutableStateOf("all") }
+    var favoriteSearch by rememberSaveable { mutableStateOf("") }
+    var favoriteToRead by remember { mutableStateOf<ReadingFavorite?>(null) }
+    var showFavoriteClearConfirmation by rememberSaveable { mutableStateOf(false) }
+    val favoriteScope = rememberCoroutineScope()
+    val favoriteSnackbar = remember { SnackbarHostState() }
+    LaunchedEffect(profileKey, store) {
+        favoriteSnapshot = if (profileKey.isNullOrBlank()) {
+            ReadingFavoriteSnapshot(ReadingFavoriteDataState.InvalidProfile)
+        } else {
+            runCatching { store.list(profileKey) }
+                .getOrElse { ReadingFavoriteSnapshot(ReadingFavoriteDataState.Corrupt) }
+        }
+        favoriteLoaded = true
+    }
+
+    Column(
+        Modifier.fillMaxWidth().testTag("reading-favorites-section"),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Text("我的收藏", style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.primary)
+        Text(
+            "仅显示你主动收藏的快照；查看时不重新排盘、不生成新结果。",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        if (!profileKey.isNullOrBlank()) {
+            Row(
+                Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                listOf("all" to "全部", "fortune" to "运势", "action" to "行动", "mystic" to "玄师", "game" to "游戏")
+                    .forEach { (key, label) ->
+                        FilterChip(
+                            selected = favoriteFilter == key,
+                            onClick = { favoriteFilter = key },
+                            modifier = Modifier.testTag("reading-favorite-filter-$key"),
+                            label = { Text(label) }
+                        )
+                    }
+            }
+            OutlinedTextField(
+                value = favoriteSearch,
+                onValueChange = { favoriteSearch = it },
+                modifier = Modifier.fillMaxWidth().testTag("reading-favorite-search"),
+                label = { Text("搜索收藏") },
+                singleLine = true
+            )
+            when {
+                !favoriteLoaded -> Text("正在读取收藏…", style = MaterialTheme.typography.bodyMedium)
+                favoriteSnapshot.state in setOf(
+                    ReadingFavoriteDataState.Corrupt,
+                    ReadingFavoriteDataState.UnsupportedVersion,
+                    ReadingFavoriteDataState.ProfileMismatch
+                ) -> Card(Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("收藏数据无法读取，原始内容未被覆盖。")
+                        Text("你可以取消并保留数据，或确认清除这份损坏的收藏。", style = MaterialTheme.typography.bodySmall)
+                        OutlinedButton(onClick = { showFavoriteClearConfirmation = true }) {
+                            Text("清除损坏收藏")
+                        }
+                    }
+                }
+                favoriteSnapshot.state == ReadingFavoriteDataState.InvalidProfile -> Text("当前档案尚未准备好。")
+                else -> {
+                    val visibleFavorites = favoriteSnapshot.entries.filter { favorite ->
+                        (favoriteFilter == "all" || favorite.type == favoriteFilter) &&
+                            (favoriteSearch.isBlank() || listOf(
+                                favorite.title,
+                                favorite.body,
+                                favorite.evidence,
+                                favorite.mode,
+                                favorite.characterId.orEmpty(),
+                                favorite.gameId.orEmpty(),
+                                favorite.period,
+                                favorite.dateKey
+                            ).any { it.contains(favoriteSearch, ignoreCase = true) })
+                    }
+                    if (visibleFavorites.isEmpty()) {
+                        Text(
+                            if (favoriteSnapshot.entries.isEmpty()) "还没有收藏。打开详情后可点「收藏」，只保存你选中的这一项。"
+                            else "没有符合筛选条件的收藏。",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    } else {
+                        visibleFavorites.forEach { favorite ->
+                            ReadingFavoriteCard(
+                                favorite = favorite,
+                                modifier = Modifier.testTag("reading-favorite-card-${favorite.id}"),
+                                onRead = { favoriteToRead = favorite },
+                                onRemove = {
+                                    val key = profileKey.orEmpty()
+                                    favoriteScope.launch {
+                                        val updated = runCatching { store.remove(key, favorite.id) }.getOrNull()
+                                        if (updated == null) {
+                                            favoriteSnapshot = ReadingFavoriteSnapshot(ReadingFavoriteDataState.Corrupt)
+                                            return@launch
+                                        }
+                                        favoriteSnapshot = updated
+                                        val result = favoriteSnackbar.showSnackbar(
+                                            message = "已取消收藏",
+                                            actionLabel = "撤销",
+                                            withDismissAction = true
+                                        )
+                                        if (result == androidx.compose.material3.SnackbarResult.ActionPerformed) {
+                                            favoriteSnapshot = runCatching { store.upsert(key, favorite) }
+                                                .getOrElse { ReadingFavoriteSnapshot(ReadingFavoriteDataState.Corrupt) }
+                                        }
+                                    }
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+            if (favoriteSnapshot.entries.isNotEmpty() && favoriteSnapshot.state in setOf(
+                    ReadingFavoriteDataState.Ready,
+                    ReadingFavoriteDataState.Migrated
+                )) {
+                OutlinedButton(onClick = { showFavoriteClearConfirmation = true }) { Text("清空本档案收藏") }
+            }
+        } else {
+            Text("设置出生档案后，收藏会自动按档案隔离。", style = MaterialTheme.typography.bodyMedium)
+        }
+        SnackbarHost(favoriteSnackbar)
+    }
+
+    if (showFavoriteClearConfirmation && !profileKey.isNullOrBlank()) {
+        AlertDialog(
+            onDismissRequest = { showFavoriteClearConfirmation = false },
+            title = { Text("清除本档案收藏？") },
+            text = { Text("仅清除当前档案的收藏快照，不影响历史记录、角色对话或游戏存档。此操作不可撤销。") },
+            confirmButton = {
+                TextButton(onClick = {
+                    val key = profileKey.orEmpty()
+                    showFavoriteClearConfirmation = false
+                    favoriteScope.launch {
+                        favoriteSnapshot = runCatching { store.clear(key) }
+                            .getOrElse { ReadingFavoriteSnapshot(ReadingFavoriteDataState.Corrupt) }
+                    }
+                }, modifier = Modifier.testTag("reading-favorite-confirm-clear")) { Text("清除收藏") }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { showFavoriteClearConfirmation = false },
+                    modifier = Modifier.testTag("reading-favorite-cancel-clear")
+                ) { Text("取消") }
+            }
+        )
+    }
+
+    favoriteToRead?.let { favorite ->
+        FortuneDetailPage(
+            title = favorite.title,
+            onDismiss = { favoriteToRead = null }
+        ) {
+            Text("只读快照 · ${favoriteTypeLabel(favorite.type)}")
+            Text(listOf(favorite.mode, favorite.period, favorite.dateKey).filter(String::isNotBlank).joinToString(" · "))
+            Text(favorite.body, style = MaterialTheme.typography.bodyLarge)
+            if (favorite.evidence.isNotBlank()) {
+                Text("保存时的依据", style = MaterialTheme.typography.titleSmall)
+                Text(favorite.evidence, style = MaterialTheme.typography.bodyMedium)
+            }
+            Text("算法版本：${favorite.algorithmVersion.ifBlank { "未提供" }}", style = MaterialTheme.typography.labelSmall)
+        }
+    }
+}
+
+@Composable
+private fun ReadingFavoriteCard(
+    favorite: ReadingFavorite,
+    modifier: Modifier = Modifier,
+    onRead: () -> Unit,
+    onRemove: () -> Unit
+) {
+    Card(modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(favorite.title, style = MaterialTheme.typography.titleMedium)
+            Text(
+                "${favoriteTypeLabel(favorite.type)} · ${listOf(favorite.mode, favorite.period, favorite.dateKey).filter(String::isNotBlank).joinToString(" · ")}",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Text(favorite.body.take(180), style = MaterialTheme.typography.bodyMedium)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                TextButton(onClick = onRead, modifier = Modifier.testTag("reading-favorite-read-${favorite.id}")) { Text("查看快照") }
+                TextButton(onClick = onRemove, modifier = Modifier.testTag("reading-favorite-remove-${favorite.id}")) { Text("取消收藏") }
+            }
+        }
+    }
+}
+
+private fun favoriteTypeLabel(type: String): String = when (type) {
+    "fortune" -> "运势"
+    "action" -> "今日行动"
+    "mystic" -> "玄师对话"
+    "game" -> "游戏摘要"
+    else -> "收藏"
 }
 
 @Composable

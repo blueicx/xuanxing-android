@@ -67,7 +67,7 @@
 - [x] 实现 `ReadingFavoriteCodec`、`ReadingFavoriteStore(PreferenceBridge)`；键使用 `reading_favorites_<sha256(profileKey)>`，单档案上限 200 条，坏数据保留错误状态并提供显式清除方法。
 - [x] 补充测试：清档案只删本 profile、清全部 favorites 不影响角色线程和游戏存档。
 - [x] 运行 `.\gradlew.bat :app:testDebugUnitTest --tests '*ReadingFavorite*' --console=plain`。
-- [ ] 单独提交任务 2，提交信息 `feat(收藏): 增加本地版本化阅读快照`。
+- [x] 单独提交任务 2，提交信息 `feat(收藏): 增加本地版本化阅读快照`（`5c740b9`）。
 
 ## 任务 3：详情收藏入口与记录页回看
 
@@ -77,14 +77,15 @@
 - 创建 `app/src/androidTest/kotlin/com/xuanji/app/ui/history/ReadingFavoritesInteractionTest.kt`
 - 修改 `_dev/action_profile_contract_test.js` 或新增 `_dev/reading_favorites_contract_test.js`
 
-- [ ] 先写 Compose 测试：详情点收藏后标签状态变化；切“我的收藏”可筛选、搜索、打开只读快照、取消收藏；空列表、坏数据和清空确认有明确状态。
-- [ ] 执行新增 AndroidTest 编译/运行目标，确认失败因为收藏入口/记录页缺少收藏分段。
-- [ ] 将收藏 store 注册到应用现有数据入口；详情统一接收收藏当前 context 的回调，区分收藏/已收藏并提供“取消收藏”。
-- [ ] 记录页保留「历史上的今天」「同月同日生」全部内容，只增加「我的收藏」段；收藏视图按全部/运势/行动/玄师/游戏筛选，可关键词搜索，打开快照不自动重算。
-- [ ] 清空前显示一次系统风格确认；取消操作提供撤销；不增加首页快捷按钮。
-- [ ] 在现有隐私导出中加入收藏摘要条目数和快照字段；完整本地数据清除调用 favorites `clear(profileKey)`，不扩大到用户以外 profile。
-- [ ] 新增 Node contract 锁定旧历史内容和新收藏入口并存；运行 `node _dev/reading_favorites_contract_test.js`。
-- [ ] 运行 `.\gradlew.bat :app:testDebugUnitTest :app:assembleDebugAndroidTest --console=plain` 并执行收藏 AndroidTest。
+- [x] 先写 Compose 测试：详情点收藏后标签状态变化；切“我的收藏”可筛选、搜索、打开只读快照、取消收藏；空列表、坏数据和清空确认有明确状态。
+- [x] 执行新增 AndroidTest 编译目标，确认失败原因为收藏分段缺失；补齐实现后 AndroidTest 源码编译通过。
+- [x] 将收藏 store 注册到应用现有数据入口；详情统一接收收藏当前 context 的回调，区分收藏/已收藏并提供“取消收藏”。
+- [x] 记录页保留「历史上的今天」「同月同日生」全部内容，只增加「我的收藏」段；收藏视图按全部/运势/行动/玄师/游戏筛选，可关键词搜索，打开快照不自动重算。
+- [x] 清空前显示一次系统风格确认；取消操作提供撤销；不增加首页快捷按钮。
+- [x] 在现有隐私导出中加入收藏摘要条目数和快照字段；完整本地数据清除调用 favorites `clear(profileKey)`，不扩大到用户以外 profile。
+- [x] 新增 Node contract 锁定旧历史内容和新收藏入口并存；运行 `node _dev/reading_favorites_contract_test.js`。
+- [x] 运行 `.\gradlew.bat :app:testDebugUnitTest --tests '*MysticPrivacyExportTest' --tests '*ReadingFavorite*' :app:compileDebugAndroidTestKotlin --console=plain`。
+- [ ] 执行收藏 AndroidTest；本机未发现可用模拟器/设备，ADB 5038 设备列表为空；不连接真机、不安装。
 - [ ] 单独提交任务 3，提交信息 `feat(记录): 加入运势和玄师收藏回看`。
 
 ## 任务 4：周期趋势与一生命盘概览

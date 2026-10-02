@@ -7,6 +7,7 @@ import com.xuanji.app.data.repository.LiuYaoRepository
 import com.xuanji.app.data.repository.ReferenceRepository
 import com.xuanji.app.data.repository.TarotRepository
 import com.xuanji.app.data.repository.TestRecordRepository
+import com.xuanji.app.data.local.ReadingFavoriteStore
 
 /** 轻量级依赖容器（单例 Repository） */
 object AppModule {
@@ -24,6 +25,8 @@ object AppModule {
         private set
     lateinit var actionRepository: ActionRepository
         private set
+    lateinit var readingFavoriteStore: ReadingFavoriteStore
+        private set
 
     fun init(
         repository: FortuneRepository,
@@ -32,7 +35,8 @@ object AppModule {
         liuYaoRepository: LiuYaoRepository,
         referenceRepository: ReferenceRepository,
         testRecordRepository: TestRecordRepository,
-        actionRepository: ActionRepository
+        actionRepository: ActionRepository,
+        readingFavoriteStore: ReadingFavoriteStore
     ) {
         this.repository = repository
         this.historyRepository = historyRepository
@@ -41,5 +45,6 @@ object AppModule {
         this.referenceRepository = referenceRepository
         this.testRecordRepository = testRecordRepository
         this.actionRepository = actionRepository
+        this.readingFavoriteStore = readingFavoriteStore
     }
 }
