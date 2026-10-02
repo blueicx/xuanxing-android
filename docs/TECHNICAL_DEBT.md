@@ -2,7 +2,16 @@
 
 本台账记录全量审计后仍值得继续处理、但不应阻塞离线版本交付的工程债务。现有未提交源码、截图、UI dump 和脚本均视为用户成果，本台账不要求清理它们。
 
-## 当前基线
+## 当前状态（2026-10-03）
+
+- 本机完整 Gradle 门禁刚完成：`testDebugUnitTest` 415 项通过（0 失败、0 error、0 skipped），`lintDebug` 通过（0 Error、84 Warning、16 Information），`assembleDebug` 与 `assembleDebugAndroidTest` 均成功。
+- 六项 Node 契约均通过：authentic systems、dialogue（45 条 golden）、unified stage、action/profile、v14 shell、reading favorites。
+- `.github/workflows/build.yml` 配置了 dialogue 与 unified-stage Node 契约，以及 API 34 的 `MysticDialogueEndToEndTest` instrumented job。当前 `codex/reading-expansion` 分支未推送，故这些新改动还没有对应的远端 CI run。
+- 本机未配置 AVD；本轮 AndroidTest 只编译并打包，未执行模拟器交互测试，也未连接/安装到手机。Debug APK 位于 `app/build/outputs/apk/debug/app-debug.apk`（24,920,268 bytes）；AndroidTest APK 为 1,141,032 bytes。APK 产出是构建证据，不代表安装或运行验证。
+
+## 既有基线记录（滚动历史）
+
+以下保留此前记录时的状态与证据；涉及 CI 覆盖、APK 和设备执行的旧描述不代表当前运行状态，以本节上方的最新验证及各自日期为准。
 
 - Android 门禁：`testDebugUnitTest`、`lintDebug`、`assembleDebug` 已建立并在最近一轮通过；lint 当前无 error，剩余主要是既有 unused 参数/变量和 SDK XML 版本提示。
 - CI（`.github/workflows/build.yml`）：此前 `Build Debug APK` 在 `eb4c3bb`/`887e1ee`/`7dc3b52` 连续失败且 Gradle 从未启动；`1dbe42f`、`457dc7a` 已修复 SDK 包名与 wrapper jar，run #17（`f89f2f1`）已在干净 runner 通过 `testDebugUnitTest` / `assembleDebug` / `lintDebug`。本轮新增 Node 20 步骤并在 Gradle 前执行 `node _dev/dialogue_contract_test.js`，使 45 条 golden wording 成为 CI 阻断门禁；本机最终树验证为 `dialogue contract: PASS (45 golden entries)`，但本轮改动尚未推送，因此远端尚未产生新的 CI run。Gradle 成功日志不打印逐条测试数，instrumented `app/src/androidTest`、真机与 DataStore 运行时行为仍不在 CI 覆盖范围内。
@@ -47,6 +56,12 @@
   10. `TodayOracle` 不再用显示名当查询键：新增 `OracleTier { High, Mid, Low }` 与 `OracleRole(modeKey) { Scholar("scholar"), Half("half") }`，`oracleRole(draw)` 返回枚举，对外称谓取 `role.label = MysticGuideGenerator.personaName(modeKey)`，因此 `roleName` 仍是同一个字符串、界面取首字的头像和「某某离席」那句都不必改。`private fun oracleTier(String)` 删除，12 条签面在 `OraclePoem` 表上逐条声明自己的 tier，`TIER_BY_LEVEL` 由该表 `associate` 得出；`tier` 只做 `OracleResult` 的计算属性（getter，无 backing field）——这个对象经 `TodayOracleCache` 用 Gson 写进 DataStore，多一个构造字段会让当天已缓存的旧 JSON 反序列化出 null，Kotlin 默认值不生效，等于静默改掉用户正在看的那支签。`when (role)`、`when (role to choiceKey)`、三段 relay、两张 tier×role 表和 `if (firstRole == "玄学家")`（改为 `firstRole.other`）全部按枚举重排；四个公开函数签名与 `observerRelayGate` 的 7 个哈希输入未动，relay 的触发时机因此不变。
   行为差异要写清：旧 `oracleTier` 是 `else -> "low"`，任何没见过的 level 都静默当低签；现在 `TIER_BY_LEVEL.getValue(level)` 会抛 `NoSuchElementException`。全仓 `level` 只可能取签库里那 5 个值，所以唯一可达路径是「同一天内签库被换掉」这种构建期不一致——换来的是不再悄悄换成另一张嘴的口吻。回归矩阵此前缺的类别一并补上（37→45）：问候 / 感谢 / 告别 / 情绪各一条，超长输入两条（对话侧 200 字截断、棋局侧超长命令），换上下文两条（迟到的旧 token 回复整条作废、请求在飞时切 persona 回 Idle 并追加系统行）——上一轮那句把「超长输入」算进新增项的话由此变成事实。
   证据：`:app:testDebugUnitTest --rerun` 284 项通过（0 失败 0 跳过，较上一轮 +6 = `TodayOracleTest` 全量）、`:app:lintDebug` 0 errors / 81 warnings（均为既有）、`:app:assembleDebug` 重新产出 `app-debug.apk`（23,845,578 字节）、`:app:compileDebugAndroidTestKotlin` 针对改动后的 main 源码重新编译通过但 `packageDebugAndroidTest` 判定 UP-TO-DATE，磁盘上的 androidTest APK 仍是 01:07 那一份、`node _dev/dialogue_contract_test.js` PASS（45 条 golden）。四项都在最终树上跑过。文案不变做过机械核对：把两版文件里含标点的中文字面量取 multiset 比对，78 条完全一致，消失的只有 24×`"玄学家"`、14×`"半仙"`、7×`"high"`、7×`"mid"`、3×`"low"` 与 `oracleTier` 里的 3 个 level 名，新增只有 `"scholar"` 与 `"half"`。新门禁也做过反证：往 `TodayOracle.kt` 塞回一行 `private val PROBE_BANNED = "玄学家"`，脚本按预期以 `TodayOracle must never key a branch on "玄学家": …` 退出 1，删掉后恢复 PASS。路上真失败过两次，都记在这里：`the_cached_oracle_shape_is_unchanged` 首跑失败，因为 Compose 的 `@StabilityInferred` 会给 data class 加一个 `public static final int $stable`（javap flags 0x0019，并未标 ACC_SYNTHETIC），断言改成按 Gson 自己的口径过滤 static / transient；另有 `assertNull` 漏 import、以及 `Field.isTransient` 在本模块不能作为属性访问，改用 `Modifier.isTransient(...)`。**以上计数与静态扫描均为本机证据**；gradle 三项另在覆盖这一笔的干净 runner 上真实执行过一次（run #17，详见第 9 条同段），而 `_dev/dialogue_contract_test.js` 至今不在 CI 里。契约 `today_oracle.unverified` 记的仍是设备面：灵签页实际渲染、两种口吻在气泡里的排布与 TalkBack 播报，以及「同一天内签库变化」这个抛错窗口在真机上无从观察。
+
+## 2026-10-03 运势阅读扩充状态
+
+- 任务 1–6 已按 `docs/superpowers/plans/2026-10-02-xuanji-reading-experience-expansion.md` 分任务提交；当前第 6 项提交为 `9469e84`。角色对话只读本角色、本档案的有效游戏 checkpoint；游戏依据标记为本机存档，缺档不编进度，续局请求不会静默开始新局。完成摘要必须由用户主动收藏。
+- 当前源码回归：六项 Node 契约、45 条 dialogue golden、游戏上下文/摘要收藏/进度意图 JVM 测试通过；`compileDebugAndroidTestKotlin` 通过。
+- 设备边界：当前环境未配置 Android AVD；本轮未运行 `connectedDebugAndroidTest`，未连接、安装或操作用户手机。新增 Compose 交互用例只有编译证据，没有模拟器或真机运行时证据。
 
 ## P1：继续拆分大文件
 

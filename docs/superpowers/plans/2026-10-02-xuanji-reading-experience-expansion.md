@@ -125,21 +125,21 @@
 - 修改 `_dev/dialogue_contract_test.js`
 - 创建或扩展 `app/src/test/kotlin/com/xuanji/app/domain/MysticGameContextTest.kt`
 
-+ [x] 先写测试：四个角色通过同一条游戏上下文接口分别获得正确 characterId/gameId；有档案时回复里引用真实存档 checkpoint；无档案时产生诚实回退；清档案不串读。
-+ [x] 执行 `.\gradlew.bat :app:testDebugUnitTest --tests '*MysticGameContextTest' --console=plain`，确认接口/上下文尚未存在，并针对相邻站与依据来源补充红灯回归。
-+ [x] 将当前角色对应的版本化 `CompanionGameProgressState` 作为仅本轮的可选 dialogue context；conversation thread 不复制整个游戏 state，也不把生成回复保存成长记忆。
-+ [x] 游戏入口恢复现有状态、结束摘要可主动收藏；继续使用中国象棋 GameArchiveStore 和其他三款现有 store。
-+ [x] dialogue Node contract 与新增 JVM 测试通过；现有 dialogue AndroidTest 源码编译通过。
-+ [ ] 执行 dialogue AndroidTest：当前没有配置 AVD；按计划不触碰真机，因此运行时交互留待可用模拟器/用户通知后验证。
-+ [x] 单独提交任务 6，提交信息 `feat(玄师): 让角色对话读取实际游戏进度`。
+- [x] 先写测试：四个角色通过同一条游戏上下文接口分别获得正确 characterId/gameId；有档案时回复里引用真实存档 checkpoint；无档案时产生诚实回退；清档案不串读。
+- [x] 执行 `.\gradlew.bat :app:testDebugUnitTest --tests '*MysticGameContextTest' --console=plain`，确认接口/上下文尚未存在，并针对相邻站与依据来源补充红灯回归。
+- [x] 将当前角色对应的版本化 `CompanionGameProgressState` 作为仅本轮的可选 dialogue context；conversation thread 不复制整个游戏 state，也不把生成回复保存成长记忆。
+- [x] 游戏入口恢复现有状态、结束摘要可主动收藏；继续使用中国象棋 GameArchiveStore 和其他三款现有 store。
+- [x] dialogue Node contract 与新增 JVM 测试通过；现有 dialogue AndroidTest 源码编译通过。
+- [ ] 执行 dialogue AndroidTest：当前没有配置 AVD；按计划不触碰真机，因此运行时交互留待可用模拟器/用户通知后验证。
+- [x] 单独提交任务 6，提交信息 `feat(玄师): 让角色对话读取实际游戏进度`。
 
 ## 任务 7：文档与完整门禁
 
 **文件：** `README.md`、`docs/SYSTEMS_OVERVIEW.md`、`docs/TECHNICAL_DEBT.md`、`docs/superpowers/handoffs/2026-10-02-reading-experience-expansion-handoff.md`、相关契约测试。
 
-- [ ] 文档只记已经实现且可由源码验证的事实，区分 Android/JVM/Node/CI/模拟器/真机状态。
-- [ ] 运行全部 Node 契约：`node _dev/authentic_systems_contract_test.js`、`node _dev/dialogue_contract_test.js`、`node _dev/unified_stage_contract_test.js`、`node _dev/action_profile_contract_test.js`、`node _dev/xuanji_v14_shell_contract_test.js`、`node _dev/reading_favorites_contract_test.js`。
-- [ ] 运行 `.\gradlew.bat :app:testDebugUnitTest :app:lintDebug :app:assembleDebug :app:assembleDebugAndroidTest --console=plain`。
-- [ ] 在在线模拟器上执行新增 Compose 操作测试；用户指定的真机验收仍登记未做。
-- [ ] 检查 `git diff --check`、秘钥/私人数据未入库、分支状态，并更新计划复选框。
-- [ ] 提交任务 7，提交信息 `docs(交接): 记录扩充实现和验证状态`。
+- [x] 文档只记已经实现且可由源码验证的事实，区分 Android/JVM/Node/CI/模拟器/真机状态。
+- [x] 运行全部 Node 契约，六项均通过。
+- [x] 运行完整 Gradle 门禁：JVM 415 项通过，lint 0 error，Debug 与 AndroidTest APK 构建成功。
+- [ ] 在在线模拟器上执行新增 Compose 操作测试：本机没有配置 AVD；用户指定的真机验收仍登记未做。
+- [x] 检查 `git diff --check`、秘钥/私人数据未入库、分支状态，并更新计划复选框。
+- [x] 提交任务 7，提交信息 `docs(交接): 记录扩充实现和验证状态`。

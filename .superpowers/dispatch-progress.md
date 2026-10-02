@@ -16,4 +16,5 @@
 - [done] 任务 1–5：详情问玄师、收藏回看、周期/一生命盘解说、行动反馈排序已分任务提交；以 `docs/superpowers/plans/2026-10-02-xuanji-reading-experience-expansion.md` 为准
 - [done] 任务 6 代码：四角色对话读取当前 profile 的有效游戏 checkpoint；进度依据标为本机存档；缺档诚实回退；游戏结束摘要仅在用户主动操作后收藏
 - [pending] 任务 6 Compose 运行：AndroidTest 源码已编译；本机未配置 AVD，未运行 connected 测试，也未触碰真机
-- [in_progress] 任务 7：同步 README、系统概览、技术债与新交接，执行 Node/JVM/lint/Debug/AndroidTest 编译全量门禁
+- [done] 任务 7 文档与本机门禁：README/系统概览/技术债/交接已同步；六项 Node 契约通过；JVM 415 项通过；lint 0 Error、84 Warning、16 Information；Debug 与 AndroidTest APK 构建成功
+- [pending] 任务 7 Compose 运行：无 AVD；新增 AndroidTest 未运行，不连接/安装手机

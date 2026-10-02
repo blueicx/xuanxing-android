@@ -40,6 +40,10 @@
 
 `CompanionGameProgressStore` 使用 `companion_game_progress_<sha256(profileKey)>_<character>_<game>` 独立键保存三个逻辑小游戏的版本化状态；`CompanionGameProgressCodec` 对损坏、未知版本和错误角色安全降级。中国象棋继续由 `GameArchiveStore` 保存局面和棋谱，两套存档互不混用。对话输入经 `MysticCompanionActionRouter` 直接打开真实的今日饮食/行动/出游、人生画像、依据抽屉或游戏；缺少计算数据时保持对话回退，不生成空的具体结论。
 
+角色问“还剩几天 / 多少补给 / 下一站怎么选 / 继续游戏”时，`MysticGuideCard` 只读取当前角色、当前 `visitProfile` 对应的存档：诗句、星图与丝路读取 `CompanionGameProgressStore`，象棋读取 `GameArchiveStore`。`MysticGameContextFactory` 将有效进度压缩为最多 240 字的本轮 checkpoint；它验证三款小游戏的路线/关卡状态，并通过 `GameArchive.restore` 复核象棋棋谱。完整游戏状态不会复制进对话线程或生成式长期记忆。路线问题列出当前存档实际相邻的站点与游戏内消耗；没有有效存档时诚实回退，“继续”不会暗中创建新局。
+
+游戏问题的 `MysticEvidenceBuilder` 仅在存档有效时列出 `local_game_archive`，权重为 100，并将依据标为“本机存档”；不附带综合运势、角色专长算法或对应的运势分数。无有效存档时 confidence 为 0、体系与权重为空，并标明缺少本机存档。棋局、诗句、星图或丝路结束后，摘要只有在用户主动点“收藏本局摘要”时才写入 profile 隔离的收藏 store；保存的是简短游戏结果，不是角色生成文案或整个棋局 state。
+
 `MysticEvidenceBuilder` 为对话和综合盘面生成依据 trace：输入摘要、体系、权重、算法版本、确定性 seed、计算/用户输入/文化参考/未启用标签、置信度和缺失输入。天气没有用户授权时会明确记录“未启用能力”，不会从盘面猜实时天气。依据层和 `MysticPrivacyExportCodec` 均可离线运行。
 
 ## 棋局会话（2026-09）
@@ -120,4 +124,4 @@
 
 ## 本轮验证边界
 
-本轮已完成 Android 纯 Kotlin 测试、编译、lint 与 debug assemble 的代码级验证；手机复测按需求暂缓，后续需重新执行安装、启动、截图、旋转/返回键、TalkBack 与 reduced-motion 检查，不以旧截图替代当前版本证据。
+2026-10-03 本机完整门禁通过：`:app:testDebugUnitTest` 415 项通过（0 失败、0 error、0 skipped），`:app:lintDebug` 0 Error / 84 Warning / 16 Information，`:app:assembleDebug` 和 `:app:assembleDebugAndroidTest` 成功；六项 Node 契约全部通过。当前环境没有配置 AVD，因此 AndroidTest 仅编译/打包，未运行 Compose 交互；本轮也未连接或安装手机。GitHub Actions 已配置 API 34 的 `MysticDialogueEndToEndTest` 作业，但当前分支未推送，尚无覆盖这次提交的 CI 运行结果。
