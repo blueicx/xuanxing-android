@@ -12,6 +12,9 @@ assert(script.includes('ro.kernel.qemu') && script.includes('metadata.applicatio
 assert(script.includes("const pkg = 'com.xuanji.app.regression'") && script.includes("'force-stop', pkg"));
 assert(!script.includes("'uninstall'") && !script.includes("'pm', 'clear'"), 'runner must not erase app data');
 const workflow = fs.readFileSync(path.join(root, '.github/workflows/build.yml'), 'utf8');
+const sdkSetupSteps = workflow.match(/uses: android-actions\/setup-android@v3\r?\n(?:[ \t]+[^\r\n]*\r?\n)*/g) || [];
+assert.equal(sdkSetupSteps.length, 2);
+assert(sdkSetupSteps.every(step => /packages: 'platform-tools'/.test(step)), 'SDK setup must override the obsolete tools package in both jobs');
 assert(workflow.includes('node _dev/application_recovery_contract_test.js'), 'CI must include isolation contract');
 assert(workflow.includes('node _dev/isolated_application_recovery.js --auto'), 'CI must execute actual process restart');
 const journey = fs.readFileSync(path.join(root, 'app/src/androidTest/kotlin/com/xuanji/app/ui/ApplicationRecoveryJourneyTest.kt'), 'utf8');
