@@ -1,6 +1,8 @@
 # 玄星 · XuanXing（Android）
 
-2026-10-19 继续：塔罗增加牌阵关系与主动保存，卢恩补齐三符显示和 24 符学习，姓名/基础日期数字展示实际计算链并拒绝未映射文字。CI 已修复废弃 Android `tools` 包的初始化错误。当前源码 Debug 版本为 1.1.1（3）；本轮交付与验证见[占卜学习交接](docs/superpowers/handoffs/2026-10-19-divination-learning-handoff.md)，早前 1.1.0 状态保留作历史记录。
+2026-10-19 续补至 Debug 1.1.2（4）：探索计算步骤与相邻周期、八字时辰敏感性、测验草稿/复核/分数历史/引用授权、可续接角色任务、游戏规则学习、首页板块重排、阅读位置、桌面快捷入口及选择性全文图片分享。默认离线，旧存档保留；具体边界和最终验证见[深化收口交接](docs/superpowers/handoffs/2026-10-19-deepening-completion-handoff.md)。下面版本和验证数字为历史切片，不代表当前产物。
+
+2026-10-19 前次切片：塔罗增加牌阵关系与主动保存，卢恩补齐三符显示和 24 符学习，姓名/基础日期数字展示实际计算链并拒绝未映射文字。CI 已修复废弃 Android `tools` 包的初始化错误。当时源码 Debug 版本为 1.1.1（3）；交付与验证见[占卜学习交接](docs/superpowers/handoffs/2026-10-19-divination-learning-handoff.md)，早前 1.1.0 状态保留作历史记录。
 
 2026-10-19 续补：饮食偏好增加设备、简单做法、便当形式与库存优先，现实条件不改变文化分数。安排日历增加主动日记、心情与实际执行，以及周/月描述回顾；日记默认不导出，需显式勾选备注分区。DailyLife v6 / 备份 v8 兼容旧版。数字周期统一大师数归约并显示中间步骤；Debug 版本 1.1.0（2）已保留数据安装 XZ2。验证、产物与交付范围见[本轮交接](docs/superpowers/handoffs/2026-10-19-practical-journal-delivery-handoff.md)。12 包仍有剩余项，见[实施清单](docs/superpowers/plans/2026-10-18-daily-companion-deepening.md)。
 

@@ -45,16 +45,17 @@ import java.time.format.DateTimeFormatter
 
 /** 便捷保存入口：各测试结果页调用，带去重（同一结果只存一次，防重组重复保存）。 */
 object TestRecordRecorder {
-    private val savedKeys = mutableSetOf<String>()
 
     /** @param resultKey 结果的唯一标识（如 "MBTI|INTJ"），用于去重 */
-    fun save(testName: String, category: String, resultCode: String, resultName: String, resultKey: String) {
-        if (!savedKeys.add(resultKey)) return   // 已保存过该结果，跳过
+    fun save(testName: String, category: String, resultCode: String, resultName: String, resultKey: String, rawScores: Map<String, Int> = emptyMap()) {
+        if (resultKey.isBlank()) return
+        val owner = AppModule.repository.userProfileState.value?.let(AppModule.actionRepository::profileKey) ?: return
+        val epoch = com.xuanji.app.data.local.ProfileTestHistoryStore.epoch(owner)
         val scope = CoroutineScope(Dispatchers.IO)
-        scope.launch { AppModule.testRecordRepository.addRecord(testName, category, resultCode, resultName) }
+        scope.launch { AppModule.testRecordRepository.addRecord(testName, category, resultCode, resultName, owner, rawScores, epoch) }
     }
 
-    fun reset() { savedKeys.clear() }
+    fun reset() = Unit // Result effects and store equality protect recomposition, not a process-global personality cache.
 }
 
 private data class TestRecordExport(
@@ -70,7 +71,11 @@ private val exportGson = Gson()
 /** 测试记录区块：显示在测试 tab 顶部，按职业/性格/趣味分组。 */
 @Composable
 fun TestRecordsSection() {
-    val records by AppModule.testRecordRepository.records.collectAsStateWithLifecycle(initialValue = emptyList())
+    val currentRecords = profileTestRecords()
+    val legacyRecords by AppModule.testRecordRepository.records.collectAsStateWithLifecycle(initialValue = emptyList())
+    var showLegacy by remember { mutableStateOf(false) }
+    val records = if (showLegacy) legacyRecords else currentRecords
+    val recordingError by AppModule.testRecordRepository.recordingError.collectAsStateWithLifecycle()
     var expanded by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -103,6 +108,11 @@ fun TestRecordsSection() {
         }
     }
 
+    recordingError?.let { Text(it) }
+    if (legacyRecords.isNotEmpty()) androidx.compose.material3.TextButton(onClick = { showLegacy = !showLegacy }) {
+        Text(if (showLegacy) "返回当前档案记录" else "查看旧版未归档记录（${legacyRecords.size}）")
+    }
+    if (showLegacy) Text("旧版记录没有档案归属和完整原始分；只读保留，不擅自归到当前档案，也不自动授权玄师。下方导出仅导出这批旧记录。")
     if (records.isEmpty()) return
 
     Card(
@@ -138,7 +148,7 @@ fun TestRecordsSection() {
             }
             if (expanded) {
                 Spacer(Modifier.height(8.dp))
-                listOf("职业", "性格", "趣味").forEach { cat ->
+                (listOf("职业", "性格", "趣味", "自我探索") + records.map { it.category }).distinct().forEach { cat ->
                     val catRecords = records.filter { it.category == cat }
                     if (catRecords.isNotEmpty()) {
                         Text("【$cat】", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.secondary)
@@ -149,12 +159,20 @@ fun TestRecordsSection() {
                                 color = MaterialTheme.colorScheme.onSurface,
                                 modifier = Modifier.padding(vertical = 2.dp)
                             )
+                            if (r.rawScores.orEmpty().isNotEmpty()) Text("原始/项目分：" + r.rawScores.orEmpty().entries.joinToString { "${it.key}=${it.value}" }, style = MaterialTheme.typography.bodySmall)
+                            val previous = records.filter { it.testName == r.testName && it.date < r.date }.maxByOrNull { it.date }
+                            previous?.let { before ->
+                                val differences = com.xuanji.app.domain.TestHistoryComparison.differences(before, r)
+                                Text(if (differences.isEmpty()) "与上次标签对照：${before.resultCode} → ${r.resultCode}；旧记录没有可比较的同版本分数。"
+                                    else "较上次同版项目分变化：" + differences.entries.joinToString { "${it.key} ${if (it.value >= 0) "+" else ""}${it.value}" }, style = MaterialTheme.typography.bodySmall)
+                            }
+                            if (!showLegacy) TestReferenceConsentButton(r, records)
                         }
                         Spacer(Modifier.height(6.dp))
                     }
                 }
                 Text(
-                    "结果保存在本机；导出的 JSON 不包含出生档案。",
+                    if (showLegacy) "旧版记录保持原样；导出不包含出生档案。" else "当前档案最多保存100条，不静默覆盖旧结果；分数变化不等于心理改善、恶化或人格诊断。导出不包含出生档案。",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

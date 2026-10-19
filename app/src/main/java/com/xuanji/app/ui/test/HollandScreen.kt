@@ -31,9 +31,10 @@ import com.xuanji.app.ui.components.SectionTitle
 
 @Composable
 fun HollandScreen() {
-    var index by remember { mutableIntStateOf(0) }   // 0=介绍, 1..60=答题, 61=结果
-    val answers = remember { mutableStateListOf<Boolean>() }
-    var pick by remember { mutableStateOf<Boolean?>(null) }
+    val progress = rememberBooleanQuestionnaire("holland-style", Holland.QUESTIONS.size) ?: return
+    var index by progress.index
+    val answers = progress.answers
+    var pick by progress.pick
 
     Column(
         Modifier
@@ -92,6 +93,7 @@ fun HollandScreen() {
                     }
                 }
             }
+            index > Holland.QUESTIONS.size && !progress.reviewed -> QuestionnaireReview(progress, Holland.QUESTIONS.map { it.text }, mapOf("true" to "是", "false" to "否"))
             else -> HollandResultPage(answers, onRestart = { index = 0; answers.clear(); pick = null })
         }
     }
@@ -125,7 +127,7 @@ private fun HollandResultPage(answers: List<Boolean>, onRestart: () -> Unit) {
     }
     val result = Holland.calculate(answers)
     androidx.compose.runtime.LaunchedEffect(Unit) {
-        TestRecordRecorder.save("霍兰德职业兴趣", "职业", "三码 ${result.code}", result.codeAdvice.take(20), "Holland|${result.code}")
+        TestRecordRecorder.save("霍兰德职业兴趣", "职业", "三码 ${result.code}", result.codeAdvice.take(20), "Holland|${result.code}", result.types.associate { it.code to it.score })
     }
 
     FortuneCard {

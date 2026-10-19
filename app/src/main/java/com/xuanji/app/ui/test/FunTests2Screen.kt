@@ -105,9 +105,10 @@ private fun Fun2TestCard(title: String, badge: String, desc: String, onPick: () 
 @Composable
 private fun Fun2TakingScreen(subTest: String, onBackToMenu: () -> Unit, onFinished: (Fun2Result) -> Unit) {
     val questions = FunTests2.questionsOf(subTest)
-    var index by remember { mutableIntStateOf(0) }   // 0=说明, 1..N=答题
-    val answers = remember { mutableStateListOf<String>() }
-    var pick by remember { mutableStateOf<String?>(null) }
+    val progress = rememberStringQuestionnaire("fun2-" + subTest.lowercase(), questions.map { q -> q.options.map { it.first }.toSet() }) ?: return
+    var index by progress.index
+    val answers = progress.answers
+    var pick by progress.pick
 
     Column(
         Modifier
@@ -118,6 +119,12 @@ private fun Fun2TakingScreen(subTest: String, onBackToMenu: () -> Unit, onFinish
     ) {
         when {
             index == 0 -> Fun2Intro(subTest, onStart = { index = 1; answers.clear(); pick = null }, onBackToMenu = onBackToMenu)
+            index > questions.size -> {
+                if (!progress.reviewed) QuestionnaireReview(progress, questions.map { it.text })
+                else androidx.compose.runtime.LaunchedEffect(answers.toList()) {
+                    onFinished(FunTests2.calculate(subTest, answers.toList()))
+                }
+            }
             index in 1..questions.size -> {
                 val q = questions[index - 1]
                 LinearProgressIndicator(
@@ -150,11 +157,7 @@ private fun Fun2TakingScreen(subTest: String, onBackToMenu: () -> Unit, onFinish
                         if (pick == null) return@Button
                         answers.add(pick!!)
                         pick = null
-                        if (index == questions.size) {
-                            onFinished(FunTests2.calculate(subTest, answers.toList()))
-                        } else {
-                            index++
-                        }
+                        index++
                     }, modifier = Modifier.weight(1f)) {
                         Text(if (index == questions.size) "查看结果" else "下一题")
                     }
@@ -190,7 +193,7 @@ private fun Fun2ResultPage(result: Fun2Result, onRestart: () -> Unit, onBackToMe
     // 菲尔为经典性格测评 → 性格类；牛马/恋爱为趣味
     val category = if (result.subTest == "Phil") "性格" else "趣味"
     androidx.compose.runtime.LaunchedEffect(Unit) {
-        TestRecordRecorder.save("趣味2·${result.subTest}", category, result.name, result.interpretation.take(20), "Fun2|${result.subTest}|${result.code}")
+        TestRecordRecorder.save("趣味2·${result.subTest}", category, result.name, result.interpretation.take(20), "Fun2|${result.subTest}|${result.code}", result.scores)
     }
     Column(
         Modifier

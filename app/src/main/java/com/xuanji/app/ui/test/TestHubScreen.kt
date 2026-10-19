@@ -54,7 +54,36 @@ import com.xuanji.app.ui.components.SbtiTestIcon
 /** 测试 tab：入口列表，点击进入具体测试。支持带 initialSubTest 直达合集内子测试。 */
 @Composable
 fun TestHubScreen() {
-    var current by remember { mutableStateOf<TestEntry?>(null) }
+    var current by androidx.compose.runtime.saveable.rememberSaveable(
+        stateSaver = androidx.compose.runtime.saveable.Saver<TestEntry?, String>(
+            save = { entry -> when (entry) {
+                null -> ""
+                TestEntry.Mbti -> "mbti"
+                TestEntry.BigFive -> "bigfive"
+                TestEntry.Cattell16 -> "cattell"
+                TestEntry.Mmpi -> "mmpi"
+                TestEntry.Holland -> "holland"
+                TestEntry.Hogwarts -> "hogwarts"
+                is TestEntry.FunSub -> "fun1:${entry.sub}"
+                is TestEntry.Fun2Sub -> "fun2:${entry.sub}"
+                is TestEntry.Fun3Sub -> "fun3:${entry.sub}"
+            } },
+            restore = { value -> when (value) {
+                "mbti" -> TestEntry.Mbti
+                "bigfive" -> TestEntry.BigFive
+                "cattell" -> TestEntry.Cattell16
+                "mmpi" -> TestEntry.Mmpi
+                "holland" -> TestEntry.Holland
+                "hogwarts" -> TestEntry.Hogwarts
+                else -> when {
+                    value.startsWith("fun1:") -> TestEntry.FunSub(value.substringAfter(':'))
+                    value.startsWith("fun2:") -> TestEntry.Fun2Sub(value.substringAfter(':'))
+                    value.startsWith("fun3:") -> TestEntry.Fun3Sub(value.substringAfter(':'))
+                    else -> null
+                }
+            } }
+        )
+    ) { mutableStateOf<TestEntry?>(null) }
     val entry = current
     when (entry) {
         null -> TestList(onPick = { current = it })
@@ -113,7 +142,7 @@ private fun TestList(onPick: (TestEntry) -> Unit) {
     ) {
         Text("心理测试", style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.primary)
         Text(
-            "精选经典心理学与能力测评，帮助你更了解自己的性格、职业倾向与潜能。所有测试离线进行，结果仅供自我探索参考。",
+            "项目自编的离线自我探索与趣味题目，不是正式授权量表，不提供临床诊断或人口常模。已保存档案的作答会自动保存草稿；完成后先复核，再计分。玄师引用结果须逐条授权。",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )

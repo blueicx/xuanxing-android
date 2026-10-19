@@ -126,6 +126,7 @@ private fun CompositeContent(
 ) {
     val periodPresentation = compositePeriodPresentation(period, fortune.dateKey)
     val controller = rememberCardLayoutController("composite", bazi.chart.display)
+    val homeController = rememberCardLayoutController("today-sections", com.xuanji.app.ui.components.LocalDailyLifeProfileKey.current ?: bazi.chart.display)
     val cards = fortuneCards(fortune, period)
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -159,9 +160,12 @@ private fun CompositeContent(
                                 subtitle = periodPresentation.subtitle,
                                 modeLabel = "综合"
                             )
-                            DailyOutlookHero(fortune, period)
-                            SummaryBlock(fortune)
-                            CompositeDimensionGrid(fortune)
+                            com.xuanji.app.ui.components.HomeSectionOrganizer(homeController)
+                            CardLayouts.ordered(listOf(
+                                CardMeta("hero", "总览") { DailyOutlookHero(fortune, period) },
+                                CardMeta("summary", "综合结论") { SummaryBlock(fortune) },
+                                CardMeta("dimensions", "六项运势") { CompositeDimensionGrid(fortune) },
+                                CardMeta("actions", "今日行动") {
                             if (shouldShowDailyAction(period)) {
                                 DailyActionSection(
                                     plan = dailyAction,
@@ -196,6 +200,8 @@ private fun CompositeContent(
                                     }
                                 )
                             }
+                                },
+                                CardMeta("extras", "幸运与依据") {
                             CardLayouts.ordered(cards, controller.state).forEach { card ->
                                 when (card.id) {
                                     "luck" -> LuckCard(card.shareCard, fortune)
@@ -205,6 +211,8 @@ private fun CompositeContent(
                                     else -> card.content()
                                 }
                             }
+                                }
+                            ), homeController.state).forEach { section -> section.content() }
                             if (controller.state.hiddenCount > 0) {
                                 RestoreCardsBar(controller)
                             }

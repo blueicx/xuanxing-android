@@ -163,7 +163,9 @@ class FortuneRepository(
         if (!favoriteProfileKey.isNullOrBlank()) {
             readingFavoriteStore?.clear(favoriteProfileKey)
         }
-        context.dataStore.edit { it.clear() }
+        com.xuanji.app.data.local.LocalDataEraseFence.erase {
+            context.dataStore.edit { it.clear() }
+        }
     }
 
     /** 首次启动写入默认命盘（用户的生日），保证开屏即有内容 */

@@ -93,7 +93,7 @@ class ActionRepository(
                 chart = bazi.chart,
                 zodiacKey = western.sign,
                 zodiacElement = western.element.toElement(),
-                tests = testRecords.records.first(),
+                tests = testRecords.recordsForProfile(profileKey(profile)).first(),
                 preferredCityKey = cityFrom(profile)?.key,
                 regionPreference = regionPreference
             )

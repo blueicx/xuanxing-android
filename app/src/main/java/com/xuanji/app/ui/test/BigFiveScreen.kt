@@ -33,9 +33,10 @@ private val SCALE = listOf(1 to "非常不符合", 2 to "不符合", 3 to "中�
 
 @Composable
 fun BigFiveScreen() {
-    var index by remember { mutableIntStateOf(0) }   // 0=介绍, 1..50=答题, 51=结果
-    val answers = remember { mutableStateListOf<Int>() }
-    var pick by remember { mutableIntStateOf(0) }
+    val progress = rememberIntQuestionnaire("bigfive", BigFive.QUESTIONS.size, (1..5).toSet(), 0) ?: return
+    var index by progress.index
+    val answers = progress.answers
+    var pick by progress.pick
 
     Column(
         Modifier
@@ -90,6 +91,7 @@ fun BigFiveScreen() {
                     }
                 }
             }
+            index > BigFive.QUESTIONS.size && !progress.reviewed -> QuestionnaireReview(progress, BigFive.QUESTIONS.map { it.text }, SCALE.associate { it.first.toString() to it.second })
             else -> BigFiveResultPage(answers, onRestart = { index = 0; answers.clear(); pick = 0 })
         }
     }
@@ -124,7 +126,7 @@ private fun BigFiveResultPage(answers: List<Int>, onRestart: () -> Unit) {
     val result = BigFive.calculate(answers)
     androidx.compose.runtime.LaunchedEffect(Unit) {
         val top = result.dimensions.first()
-        TestRecordRecorder.save("大五人格测试", "性格", "大五·${top.name}(${top.level})", result.portrait.take(20), "BigFive|${result.dimensions.joinToString { "${it.code}${it.level}" }}")
+        TestRecordRecorder.save("大五人格测试", "性格", "大五·${top.name}(${top.level})", result.portrait.take(20), "BigFive|${result.dimensions.joinToString { "${it.code}${it.level}" }}", result.dimensions.associate { it.code to it.score })
     }
 
     FortuneCard {

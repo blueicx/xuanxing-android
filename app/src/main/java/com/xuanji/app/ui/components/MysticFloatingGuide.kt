@@ -90,6 +90,8 @@ import kotlin.math.sin
 
 /** 外层 Scaffold 读取此状态，沉浸舞台打开时隐藏底部导航栏。 */
 val LocalImmersiveStageOpen = compositionLocalOf { mutableStateOf(false) }
+val LocalMysticExternalOpenRequest = compositionLocalOf { mutableStateOf<Long?>(null) }
+val LocalMysticResumeEligible = compositionLocalOf { false }
 
 /** 全局微光浮球显示状态；默认开启，完整人物仅在点击浮球后出现。 */
 val LocalMysticGuideVisible = compositionLocalOf { mutableStateOf(true) }
@@ -224,6 +226,14 @@ fun MysticFloatingGuide(
     val guideVisible = LocalMysticGuideVisible.current
     val pageScroll = rememberScrollState()
     val stageOpenState = LocalImmersiveStageOpen.current
+    val externalOpenRequest = LocalMysticExternalOpenRequest.current
+    val resumeEligible = LocalMysticResumeEligible.current
+    LaunchedEffect(externalOpenRequest.value, guideAvailable, checkpointLoaded, resumeEligible) {
+        if (resumeEligible && externalOpenRequest.value != null && guideAvailable && checkpointLoaded) {
+            detailOpen = true
+            externalOpenRequest.value = null
+        }
+    }
     LaunchedEffect(detailOpen) { stageOpenState.value = detailOpen }
     val companionUiState = CompanionUiState(
         presence = if (guideVisible.value) CompanionPresence.OrbVisible else CompanionPresence.FullyHidden,

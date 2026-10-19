@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="match_parent"
+    android:orientation="vertical" android:padding="12dp" android:background="#241B37"
+    android:theme="@style/Theme.Xuanji.Widget">
+    <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:text="@string/widget_title" android:textColor="#E4D4A6" android:textSize="16sp" />
+    <Button android:id="@+id/widget_agenda" android:layout_width="match_parent" android:layout_height="48dp"
+        android:text="@string/widget_agenda" />
+    <Button android:id="@+id/widget_resume" android:layout_width="match_parent" android:layout_height="48dp"
+        android:text="@string/widget_resume" />
+</LinearLayout>

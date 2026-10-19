@@ -1,0 +1,7 @@
+<resources>
+    <!-- A launcher RemoteViews has no activity window; only the widget root paints its surface. -->
+    <style name="Theme.Xuanji.Widget" parent="android:style/Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@null</item>
+        <item name="android:colorAccent">#D9C27E</item>
+    </style>
+</resources>

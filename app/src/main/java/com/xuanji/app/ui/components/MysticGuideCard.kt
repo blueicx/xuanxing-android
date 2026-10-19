@@ -143,7 +143,7 @@ fun MysticGuideCard(
     onStageActionConsumed: () -> Unit = {},
     onRequestCharacterHandoff: ((MysticCharacterId, MysticDetailContext) -> Unit)? = null
 ) {
-    val records by AppModule.testRecordRepository.records.collectAsStateWithLifecycle(initialValue = emptyList())
+    val records = com.xuanji.app.ui.test.profileTestRecords()
     val context = LocalContext.current
     val visitStore = remember(context) { MysticVisitStore(context) }
     val memoryStore = remember(context) { ConversationMemoryStore(DataStorePreferenceBridge(context)) }
@@ -189,7 +189,7 @@ fun MysticGuideCard(
         memorySequence = 0
         memoryExpanded = false
     }
-    val latestTest = records.maxByOrNull { it.date }
+    val latestTest = com.xuanji.app.ui.test.authorizedCompanionTest(records)
     var sessionState by remember(visitProfile, characterId) { mutableStateOf(companion.sessionFor(characterId)) }
     var characterSessionsLoaded by remember(visitProfile) { mutableStateOf(false) }
     fun currentInteraction() = sessionState.interaction.forDate(fortune.dateKey)
@@ -771,11 +771,16 @@ fun MysticGuideCard(
         submitCustom()
     }
 
-    LaunchedEffect(stageActionRequest, characterId) {
+    LaunchedEffect(stageActionRequest, characterId, characterSessionsLoaded) {
+        if (!characterSessionsLoaded) return@LaunchedEffect
         val action = stageActionRequest ?: return@LaunchedEffect
         if (action.startsWith("__companion_game__:")) {
             companionGameId = action.substringAfter(":").takeIf { it.isNotBlank() }
         } else if (action == MYSTIC_DETAIL_QUESTION_ACTION) {
+            stageDetailContext?.let { detail ->
+                val task = com.xuanji.app.domain.MysticTaskReference(detail, characterId)
+                if (task.valid()) updateInteraction { it.copy(task = task) }
+            }
             val title = stageDetailContext?.title?.takeIf(String::isNotBlank) ?: "当前详情"
             submitPanelInput("请结合我当前打开的「$title」继续解读")
         } else {
@@ -1711,6 +1716,20 @@ fun MysticGuideCard(
                 color = Color.Transparent
             ) {
                 Column(Modifier.verticalScroll(rememberScrollState())) {
+                    currentInteraction().task?.takeUnless { it.completed }?.let { task ->
+                        Text("未完成任务 · ${task.detail.title}（${task.detail.dateKey}）", style = MaterialTheme.typography.labelMedium)
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            OutlinedButton(onClick = {
+                                cancelPanelReply()
+                                val question = "继续解释已保存的「${task.detail.title}」"
+                                sessionState = reduce(sessionState, MysticEvent.SendInput(question))
+                                pendingCustomDetailContext = task.detail
+                                pendingCustom = question
+                            }, modifier = Modifier.testTag("mystic-resume-task")) { Text("继续此项") }
+                            OutlinedButton(onClick = { updateInteraction { it.copy(task = task.copy(completed = true)) } }) { Text("标记完成") }
+                            OutlinedButton(onClick = { updateInteraction { it.copy(task = null) } }) { Text("移除") }
+                        }
+                    }
                     companionGameId?.let { gameId ->
                         CompanionGameCard(
                             gameId = gameId,
@@ -1877,7 +1896,7 @@ fun MysticGuideCard(
                             MysticCharacterCatalog.all.filter { it.id != characterId }.forEach { target ->
                                 OutlinedButton(onClick = {
                                     val latest = sessionState.recentTurns.lastOrNull()
-                                    val detail = MysticDetailContext(mode = "角色交接", period = "今日", dateKey = fortune.dateKey,
+                                    val detail = currentInteraction().task?.takeUnless { it.completed }?.detail ?: MysticDetailContext(mode = "角色交接", period = "今日", dateKey = fortune.dateKey,
                                         title = latest?.question ?: "当前问题", result = latest?.answer.orEmpty(),
                                         evidence = guide.evidence.joinToString("；"), sourceStatus = "当前会话交接摘要",
                                         algorithmVersion = com.xuanji.app.domain.MysticEvidenceBuilder.ALGORITHM_VERSION)

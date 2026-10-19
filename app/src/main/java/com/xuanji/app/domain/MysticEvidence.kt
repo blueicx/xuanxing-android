@@ -155,11 +155,13 @@ object MysticEvidenceBuilder {
                 "西方分：${fortune.western.overallScore}"
             ),
             systems = systems,
-            weights = mapOf("eastern" to 50, "western" to 50),
+            weights = emptyMap(), // No uniform blend: actual per-dimension weights are listed below.
             items = listOf(
                 MysticEvidenceItem("eastern", "东方盘", MysticEvidenceStatus.Computed, "${fortune.eastern.overallScore} 分"),
                 MysticEvidenceItem("western", "西方盘", MysticEvidenceStatus.Computed, "${fortune.western.overallScore} 分"),
-                MysticEvidenceItem("composite", "综合结论", MysticEvidenceStatus.Computed, "${fortune.overallScore} 分")
+                MysticEvidenceItem("composite", "综合结论", MysticEvidenceStatus.Computed, "${fortune.overallScore} 分"),
+                MysticEvidenceItem("scoring", "实际合参规则", MysticEvidenceStatus.Computed,
+                    "东方:西方＝事业55:45、财富50:50、桃花50:50、情感45:55、学习60:40、健康55:45。总分＝(六维均值×4＋东方总分＋西方总分)÷6，四舍五入后限于12–97；信号只修正桃花/情感。不是预测成功率。")
             ),
             confidence = 100,
             missingInputs = emptyList()

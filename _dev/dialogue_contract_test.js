@@ -432,6 +432,7 @@ assert(codecSource.includes('!in 1..VERSION'), 'legacy v1 snapshots must remain 
 assert(codecSource.includes('interaction = runCatching'), 'explicit interaction choices must be restored with validation');
 requireVerify(persistence.verify, `session_persistence ${persistence.verify}`);
 requireVerify(persistence.store_verify, `session_persistence ${persistence.store_verify}`);
+requireVerify(persistence.task_verify, `session_persistence task ${persistence.task_verify}`);
 
 const evidence = contract.evidence_trace;
 const evidenceSource = fs.readFileSync(path.join(APP_SRC, 'domain', 'MysticEvidence.kt'), 'utf8');

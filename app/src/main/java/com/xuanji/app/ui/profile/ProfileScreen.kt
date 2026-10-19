@@ -486,6 +486,7 @@ fun ProfileScreen() {
 
                 ProfileSection.Privacy -> FortuneCard {
                     SectionTitle("隐私与数据")
+                    com.xuanji.app.ui.test.QuestionnairePrivacyPanel()
                     Spacer(Modifier.height(8.dp))
                     Text(
                         "玄星的命理推算默认在本地完成，不上传或统计你的出生档案与测试记录。天气/城市联网是可选扩展，仅在你手动开启并选择城市后请求。",

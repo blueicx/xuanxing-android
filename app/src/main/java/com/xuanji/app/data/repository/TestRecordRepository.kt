@@ -17,6 +17,13 @@ import java.time.format.DateTimeFormatter
  * 离线、确定性。
  */
 class TestRecordRepository(private val context: Context) {
+    val recordingError = kotlinx.coroutines.flow.MutableStateFlow<String?>(null)
+    private val profileHistory = com.xuanji.app.data.local.ProfileTestHistoryStore(com.xuanji.app.data.local.DataStorePreferenceBridge(context))
+    fun recordsForProfile(owner: String?): Flow<List<TestRecord>> = if (owner == null) records else context.dataStore.data.map { prefs ->
+        runCatching {
+            com.xuanji.app.data.local.ProfileTestHistoryStore.decode(prefs[stringPreferencesKey(com.xuanji.app.data.local.ProfileTestHistoryStore.key(owner))], owner)
+        }.onFailure { recordingError.value = "当前档案测验记录不可读，原数据未覆盖。" }.getOrDefault(emptyList())
+    }
 
     private val gson = Gson()
     private val key = stringPreferencesKey("test_records")
@@ -32,14 +39,20 @@ class TestRecordRepository(private val context: Context) {
         }
     }
 
-    suspend fun addRecord(testName: String, category: String, resultCode: String, resultName: String) {
+    suspend fun addRecord(testName: String, category: String, resultCode: String, resultName: String,
+        owner: String? = null, rawScores: Map<String, Int> = emptyMap(), expectedEpoch: Long? = null) {
         val record = TestRecord(
             testName = testName,
             category = category,
             resultCode = resultCode,
             resultName = resultName,
-            date = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"))
+            date = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")), rawScores = rawScores
         )
+        if (owner != null) {
+            runCatching { profileHistory.add(owner, record, expectedEpoch) }.onSuccess { recordingError.value = null }
+                .onFailure { recordingError.value = "结果未保存：记录已满、数据不可读或写入失败。可先导出再清除。" }
+            return
+        }
         context.dataStore.edit { prefs ->
             val oldJson = prefs[key] ?: ""
             val old = try {

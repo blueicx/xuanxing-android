@@ -31,9 +31,10 @@ import com.xuanji.app.ui.components.SectionTitle
 
 @Composable
 fun HogwartsScreen() {
-    var index by remember { mutableIntStateOf(0) }   // 0=介绍, 1..40=答题, 41=结果
-    val answers = remember { mutableStateListOf<String>() }
-    var currentPick by remember { mutableStateOf<String?>(null) }
+    val progress = rememberStringQuestionnaire("hogwarts", Hogwarts.QUESTIONS.map { q -> q.options.map { it.first }.toSet() }) ?: return
+    var index by progress.index
+    val answers = progress.answers
+    var currentPick by progress.pick
 
     Column(
         Modifier
@@ -93,6 +94,7 @@ fun HogwartsScreen() {
                     }
                 }
             }
+            index > Hogwarts.QUESTIONS.size && !progress.reviewed -> QuestionnaireReview(progress, Hogwarts.QUESTIONS.map { it.text })
             else -> HogwartsResultPage(answers, onRestart = { index = 0; answers.clear(); currentPick = null })
         }
     }
@@ -126,7 +128,7 @@ private fun HogwartsResultPage(answers: List<String>, onRestart: () -> Unit) {
     }
     val result = Hogwarts.calculate(answers)
     androidx.compose.runtime.LaunchedEffect(Unit) {
-        TestRecordRecorder.save("霍格沃茨学院", "趣味", result.houseName, result.portrait.take(20), "Hogwarts|${result.houseCode}")
+        TestRecordRecorder.save("霍格沃茨学院", "趣味", result.houseName, result.portrait.take(20), "Hogwarts|${result.houseCode}", result.scores)
     }
 
     FortuneCard {

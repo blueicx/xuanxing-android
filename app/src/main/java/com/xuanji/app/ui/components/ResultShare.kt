@@ -16,6 +16,10 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
@@ -43,23 +47,35 @@ fun ShareButton(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-
-    IconButton(
-        onClick = {
-            scope.launch {
+    var showSelection by remember(sharedCard) { mutableStateOf(false) }
+    var busy by remember { mutableStateOf(false) }
+    if (showSelection) SelectiveShareDialog(sharedCard, onDismiss = { showSelection = false }) { selectedCard ->
+        showSelection = false
+        busy = true
+        scope.launch {
+            try {
                 val uri = withContext(Dispatchers.IO) {
-                    val file = ResultShareCardRenderer.shareImage(context, sharedCard)
+                    val file = ResultShareCardRenderer.shareImage(context, selectedCard)
                     ResultShareCardRenderer.uri(context, file)
                 }
                 val intent = Intent(Intent.ACTION_SEND).apply {
                     type = "image/png"
                     putExtra(Intent.EXTRA_STREAM, uri)
-                    clipData = ClipData.newRawUri(sharedCard.title, uri)
+                    clipData = ClipData.newRawUri(selectedCard.title, uri)
                     addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                 }
-                context.startActivity(Intent.createChooser(intent, sharedCard.title))
-            }
-        },
+                context.startActivity(Intent.createChooser(intent, selectedCard.title))
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                android.widget.Toast.makeText(context, "无法生成或打开分享，请重试。", android.widget.Toast.LENGTH_SHORT).show()
+            } finally { busy = false }
+        }
+    }
+
+    IconButton(
+        onClick = { showSelection = true },
+        enabled = !busy,
         modifier = modifier
             .size(38.dp)
             .clip(CircleShape)

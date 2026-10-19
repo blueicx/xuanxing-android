@@ -33,9 +33,10 @@ private val FACTOR_NAMES = Cattell16PF.FACTORS.associate { it }
 
 @Composable
 fun Cattell16Screen() {
-    var index by remember { mutableIntStateOf(0) }   // 0=介绍, 1..34=答题, 35=结果
-    val answers = remember { mutableStateListOf<Int>() }
-    var pick by remember { mutableIntStateOf(-1) }
+    val progress = rememberIntQuestionnaire("cattell-style", Cattell16PF.QUESTIONS.size, (0..2).toSet(), -1) ?: return
+    var index by progress.index
+    val answers = progress.answers
+    var pick by progress.pick
 
     Column(
         Modifier
@@ -92,6 +93,7 @@ fun Cattell16Screen() {
                     }
                 }
             }
+            index > Cattell16PF.QUESTIONS.size && !progress.reviewed -> QuestionnaireReview(progress, Cattell16PF.QUESTIONS.map { it.text }, CATELL_OPTIONS.associate { it.first.toString() to it.second })
             else -> CattellResultPage(answers, onRestart = { index = 0; answers.clear(); pick = -1 })
         }
     }
@@ -126,7 +128,7 @@ private fun CattellResultPage(answers: List<Int>, onRestart: () -> Unit) {
     val result = Cattell16PF.calculate(answers)
     androidx.compose.runtime.LaunchedEffect(Unit) {
         val f = result.factors.first()
-        TestRecordRecorder.save("卡特尔 16PF", "职业", "16PF·${f.name}(${f.level})", result.portrait.take(20), "16PF|${result.factors.joinToString { "${it.code}${it.level}" }}")
+        TestRecordRecorder.save("卡特尔 16PF", "职业", "16PF·${f.name}(${f.level})", result.portrait.take(20), "16PF|${result.factors.joinToString { "${it.code}${it.level}" }}", result.factors.associate { it.code to it.score })
     }
 
     FortuneCard {

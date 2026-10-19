@@ -74,6 +74,7 @@ data class CardMeta(
 )
 
 object CardLayouts {
+    val TODAY_SECTIONS = listOf("hero", "summary", "dimensions", "actions", "extras")
     val COMPOSITE = listOf(
         "overall", "luck", "dim-peach", "dim-emotion", "dim-career",
         "dim-study", "dim-wealth", "dim-health", "caution"
@@ -90,6 +91,7 @@ object CardLayouts {
 
     fun default(page: String): CardLayoutState {
         val ids = when (page) {
+            "today-sections" -> TODAY_SECTIONS
             "composite" -> COMPOSITE
             "eastern" -> EASTERN
             else -> WESTERN

@@ -165,6 +165,7 @@ fun CompanionGameCard(
             when (gameId) {
                 "poetry_chain" -> {
                     val prompt = PoetryChainEngine.prompt(poetry)
+                    PoetryStructurePanel(prompt)
                     if (!poetry.completed) {
                         Text("第 ${poetry.promptIndex + 1} / ${poetry.levelCountAtStart} 题 · 接下一句：${prompt.line}", style = MaterialTheme.typography.bodyMedium)
                         Text("出处：${prompt.source}", style = MaterialTheme.typography.labelSmall)
@@ -234,6 +235,7 @@ fun CompanionGameCard(
                             ) { Text("撤销连线") }
                         }
                     }
+                    StarLogicLearningPanel(starMap)
                     Text(starMap.feedback.ifBlank { "${puzzle.start} 起步，按连线逐步抵达目标。" }, style = MaterialTheme.typography.labelSmall)
                     if (starMap.completed) {
                         val result = StarMapPuzzleEngine.result(starMap)
@@ -265,6 +267,7 @@ fun CompanionGameCard(
                         persist(CompanionGameProgressState.SilkRoad(route))
                     }
                     val mission = SilkRoadMissionCatalog.find(route.missionId)
+                    SilkRoadReferencePanel(route)
                     Text("任务：${mission?.title.orEmpty()} · 目标${route.target}", style = MaterialTheme.typography.titleSmall)
                     Text(mission?.explanation.orEmpty(), style = MaterialTheme.typography.labelSmall)
                     Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {

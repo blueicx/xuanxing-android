@@ -29,12 +29,14 @@ import kotlinx.coroutines.launch
 class MainActivity : ComponentActivity() {
     private var requestedTab by mutableStateOf<String?>(null)
     private var requestedDate by mutableStateOf<String?>(null)
+    private var requestedNonce by mutableStateOf(0L)
 
     override fun onNewIntent(intent: android.content.Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
         requestedTab = intent.getStringExtra("open_tab")
-        requestedDate = intent.getStringExtra("record_date")
+        requestedDate = com.xuanji.app.domain.DailyQuickEntry.resolveDate(intent.action, intent.getStringExtra("record_date"), java.time.LocalDate.now(), packageName)
+        requestedNonce++
     }
 
     private val notificationPermission = registerForActivityResult(
@@ -46,7 +48,7 @@ class MainActivity : ComponentActivity() {
         installSplashScreen()
         super.onCreate(savedInstanceState)
         requestedTab = intent.getStringExtra("open_tab")
-        requestedDate = intent.getStringExtra("record_date")
+        requestedDate = com.xuanji.app.domain.DailyQuickEntry.resolveDate(intent.action, intent.getStringExtra("record_date"), java.time.LocalDate.now(), packageName)
         // 全屏幕沉浸式：内容延伸到状态栏与导航栏下方，
         // 深色底 + 浅色图标由 Scaffold 统一分发 insets，页面不再出现多余空带。
         enableEdgeToEdge(
@@ -78,7 +80,7 @@ class MainActivity : ComponentActivity() {
                                 guideSeen = true
                             }
                         )
-                        else -> XuanjiApp(requestedTab, requestedDate)
+                        else -> XuanjiApp(requestedTab, requestedDate, requestedNonce)
                     }
                 }
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {

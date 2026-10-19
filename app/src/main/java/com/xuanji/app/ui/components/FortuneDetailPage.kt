@@ -53,6 +53,7 @@ internal fun FortuneDetailPage(
 ) {
     val favoriteStore = LocalReadingFavoriteStore.current
     val profileKey = LocalReadingFavoriteProfileKey.current
+    val detailScroll = rememberDetailReadingPosition(LocalDailyLifeProfileKey.current ?: profileKey, detailContext)
     val coroutineScope = rememberCoroutineScope()
     val favorite = remember(detailContext, favoriteType) {
         detailContext?.let { detail ->
@@ -138,7 +139,7 @@ internal fun FortuneDetailPage(
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f)
-                        .verticalScroll(rememberScrollState()),
+                        .verticalScroll(detailScroll),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Spacer(Modifier.height(2.dp))
@@ -155,6 +156,7 @@ internal fun FortuneDetailPage(
                             Text(detail.evidence, style = MaterialTheme.typography.bodySmall)
                         }
                         RelatedLearningTerms("${detail.title} ${detail.result} ${detail.evidence}")
+                        ReadingExplorationPanel(detail)
                     }
                     detailContext?.let { SaveReadingSnapshotAction(it) }
                 }

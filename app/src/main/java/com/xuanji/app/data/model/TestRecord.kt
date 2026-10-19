@@ -8,5 +8,7 @@ data class TestRecord(
     val category: String,   // 职业 / 性格 / 趣味
     val resultCode: String, // 如 "INTJ"、"大五·高开放"、"格兰芬多"
     val resultName: String, // 一句话结果/解读摘要
-    val date: String        // "yyyy-MM-dd HH:mm"
+    val date: String,        // "yyyy-MM-dd HH:mm"
+    val rawScores: Map<String, Int>? = emptyMap(),
+    val scoringVersion: String = "project-self-report-v1"
 )

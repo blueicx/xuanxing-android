@@ -41,6 +41,17 @@ class MysticEvidenceBuilderTest {
         assertEquals(100, trace.confidence)
     }
 
+    @Test fun composite_trace_does_not_invent_a_uniform_fifty_fifty_weight() {
+        val trace = MysticEvidenceBuilder.forFortune(fortune, "profile")
+        assertTrue(trace.weights.isEmpty())
+        assertTrue(trace.items.any { it.detail.contains("55:45") && it.detail.contains("60:40") })
+        val generated = CompositeFortuneGenerator.generate(fortune.eastern, fortune.western, java.time.LocalDate.parse(fortune.dateKey))
+        val steps = CompositeFortuneGenerator.calculationSteps(generated)
+        assertEquals(6, steps.size)
+        assertEquals(generated.dimensions.map { it.score }, steps.map { it.score })
+        assertEquals(generated.overallScore, CompositeFortuneGenerator.calculatedOverall(generated))
+    }
+
     private companion object {
         val fortune = CompositeDailyFortune(
             dateKey = "2026-09-22", overallScore = 72,

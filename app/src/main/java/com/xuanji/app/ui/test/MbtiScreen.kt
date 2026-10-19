@@ -31,11 +31,10 @@ import com.xuanji.app.ui.components.SectionTitle
 
 @Composable
 fun MbtiScreen() {
-    // 当前题号（0=未开始，1..40=答题中，41=结果页）
-    var index by remember { mutableIntStateOf(0) }
-    // 已答选项（A/B）
-    val answers = remember { mutableStateListOf<String>() }
-    var currentPick by remember { mutableStateOf<String?>(null) }
+    val progress = rememberStringQuestionnaire("mbti-style", Mbti.QUESTIONS.map { q -> q.options.map { it.key }.toSet() }) ?: return
+    var index by progress.index
+    val answers = progress.answers
+    var currentPick by progress.pick
 
     Column(
         Modifier
@@ -103,6 +102,7 @@ fun MbtiScreen() {
                     }
                 }
             }
+            index > Mbti.QUESTIONS.size && !progress.reviewed -> QuestionnaireReview(progress, Mbti.QUESTIONS.map { it.q })
             else -> ResultPage(
                 answers = answers,
                 onRestart = { index = 0; answers.clear(); currentPick = null }
@@ -142,7 +142,7 @@ private fun ResultPage(answers: List<String>, onRestart: () -> Unit) {
     val type = Mbti.calculate(answers)
     val dims = Mbti.scores(answers)
     androidx.compose.runtime.LaunchedEffect(Unit) {
-        TestRecordRecorder.save("MBTI 职业性格测试", "职业", type.code, type.name, "MBTI|${type.code}")
+        TestRecordRecorder.save("MBTI 职业性格测试", "职业", type.code, type.name, "MBTI|${type.code}", dims.flatMap { (labels, pair) -> labels.split('/').zip(listOf(pair.first, pair.second)) }.toMap())
     }
 
     FortuneCard {

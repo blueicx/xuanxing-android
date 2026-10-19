@@ -285,7 +285,8 @@
   },
   "session_persistence": {
     "key_prefix": "mystic_character_sessions_",
-    "codec_version": 2,
+    "codec_version": 3,
+    "task_verify": "MysticTaskReferenceTest.taskSurvivesThreadCodecAndNextDayWithoutBecomingTodayFacts",
     "verify": "MysticSessionSnapshotCodecTest.round_trip_keeps_threads_shared_notes_and_drops_pending_work",
     "store_verify": "MysticSessionSnapshotCodecTest.store_supports_reload_per_character_clear_and_clear_all"
   },

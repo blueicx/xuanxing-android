@@ -335,6 +335,7 @@ fun GameBoardCard(
                 }
             }
 
+            com.xuanji.app.ui.components.XiangqiRuleLearningPanel(position, isReviewing)
             // ---- controls ----------------------------------------------------------
             Row(
                 Modifier.fillMaxWidth(),

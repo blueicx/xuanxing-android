@@ -200,11 +200,16 @@ sealed class Screen(val route: String, val label: String, val icon: androidx.com
  * 彻底消除「切回东方/西方时整屏重新构建导致的卡顿」。占卜 tab 内部保留独立的 NavHost 处理子页跳转。
  */
 @Composable
-fun XuanjiApp(initialTab: String? = null, initialRecordDate: String? = null) {
+fun XuanjiApp(initialTab: String? = null, initialRecordDate: String? = null, initialRequestNonce: Long = 0L) {
     // 今日、排盘、探索、记录、我的；运势体系切换收在「今日」页内。
     var selectedTab by rememberSaveable { mutableStateOf(Screen.Today.route) }
-    LaunchedEffect(initialTab, initialRecordDate) {
+    val resumeRequest = rememberSaveable { mutableStateOf<Long?>(null) }
+    LaunchedEffect(initialTab, initialRecordDate, initialRequestNonce) {
         if (initialTab == Screen.History.route) selectedTab = Screen.History.route
+        if (initialTab == "companion") {
+            selectedTab = Screen.Today.route
+            resumeRequest.value = System.nanoTime()
+        }
     }
     val items = listOf(
         Screen.Today, Screen.Charts, Screen.Explore, Screen.History, Screen.Profile
@@ -221,6 +226,7 @@ fun XuanjiApp(initialTab: String? = null, initialRecordDate: String? = null) {
     }
 
     CompositionLocalProvider(
+        com.xuanji.app.ui.components.LocalMysticExternalOpenRequest provides resumeRequest,
         LocalImmersiveStageOpen provides immersiveStageOpen,
         LocalMysticGuideVisible provides mysticGuideVisible,
         com.xuanji.app.ui.components.LocalDailyLifeStore provides AppModule.dailyLifeStore,
@@ -260,7 +266,9 @@ fun XuanjiApp(initialTab: String? = null, initialRecordDate: String? = null) {
                     if (immersiveStageOpen.value) PaddingValues(0.dp) else innerPadding
                 )
             ) {
-                KeepAliveTab(active = selectedTab == Screen.Today.route) { TodayFortuneHub() }
+                KeepAliveTab(active = selectedTab == Screen.Today.route) {
+                    CompositionLocalProvider(com.xuanji.app.ui.components.LocalMysticResumeEligible provides (selectedTab == Screen.Today.route)) { TodayFortuneHub() }
+                }
                 KeepAliveTab(active = selectedTab == Screen.Charts.route) { LifetimeChartHub() }
                 KeepAliveTab(active = selectedTab == Screen.Explore.route) {
                     ExploreHub(onOpenToday = { selectedTab = Screen.Today.route }, onOpenTab = { selectedTab = it })

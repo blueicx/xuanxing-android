@@ -31,4 +31,6 @@ assert(guide.includes('fun resetCurrentThread()') && guide.includes('onClick = :
 assert(!guide.includes('private val mysticCompanionStates'), 'closed scopes must not revive threads after local data deletion');
 const scopeTest = fs.readFileSync(path.join(root, 'app/src/test/kotlin/com/xuanji/app/ui/components/MysticCompanionScopeTest.kt'), 'utf8');
 assert(scopeTest.includes('assertNotSame('), 'fresh companion scope requires a behavioral JVM regression');
+assert(workflow.includes('Enable KVM access') && workflow.includes('sudo chmod a+rw /dev/kvm'), 'hosted UI runner must grant KVM access before booting');
+assert(script.includes('com.xuanji.app.ui.QuickEntryNavigationJourneyTest') && script.includes('OK \\(2 tests\\)'), 'isolated CI must actually run both real widget navigation tests');
 console.log('Application recovery isolation contract PASS');

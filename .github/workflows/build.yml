@@ -72,6 +72,9 @@ jobs:
       - name: Verify offline region comparison contract
         run: node _dev/region_comparison_contract_test.js
 
+      - name: Verify deepening delivery contract
+        run: node _dev/deepening_delivery_contract_test.js
+
       - name: Build debug APK
         run: ./gradlew testDebugUnitTest lintDebug writeDebugApkManifest assembleDebugAndroidTest --no-daemon
 
@@ -135,6 +138,11 @@ jobs:
 
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
+
+      - name: Enable KVM access
+        run: |
+          test -c /dev/kvm
+          sudo chmod a+rw /dev/kvm
 
       - name: Run instrumented UI tests on API 34
         uses: reactivecircus/android-emulator-runner@v2

@@ -11,7 +11,7 @@ import com.google.gson.JsonParser
  * network/provider operation that no longer owns the session token.
  */
 object MysticSessionSnapshotCodec {
-    const val VERSION = 2
+    const val VERSION = 3
     private const val MAX_MESSAGES = 40
     private const val MAX_TURNS = 20
     private const val MAX_NOTES = 12

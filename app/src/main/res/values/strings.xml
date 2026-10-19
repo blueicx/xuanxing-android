@@ -49,4 +49,7 @@
     <string name="nav_history">历史</string>
     <string name="history_title">历史上的今天</string>
     <string name="history_subtitle">岁月长河中的玄学与人文印记</string>
+    <string name="widget_title">玄星 · 日常快捷入口</string>
+    <string name="widget_agenda">我的安排</string>
+    <string name="widget_resume">继续玄师与游戏</string>
 </resources>

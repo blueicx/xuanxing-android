@@ -82,6 +82,7 @@ fun HistoryScreen(initialRecordDate: String? = null) {
         )
     }
     val today = LocalDate.now()
+    val agendaFirst = runCatching { LocalDate.parse(initialRecordDate).toString() == initialRecordDate }.getOrDefault(false)
     val todayStr = today.format(DateTimeFormatter.ofPattern("M月d日"))
 
     // 同月同日生：以「用户出生日期」为准（若已设置），否则退化为当天日期并提示
@@ -100,6 +101,8 @@ fun HistoryScreen(initialRecordDate: String? = null) {
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
+        if (agendaFirst) AppModule.dailyLifeStore?.let { store -> DailyLifePanel(store, actionProfileKey, initialRecordDate,
+            loadWeeklyMealPool = { actionProfileKey?.let { AppModule.actionRepository.loadMealPool(it) } }) }
         Text(
             "历史上的今天",
             style = MaterialTheme.typography.headlineSmall,
@@ -156,7 +159,7 @@ fun HistoryScreen(initialRecordDate: String? = null) {
         SameDayWorks.forDate(sameDayDate).forEach { SameDayWorkCard(it) }
 
         Spacer(Modifier.height(8.dp))
-        AppModule.dailyLifeStore?.let { store -> DailyLifePanel(store, actionProfileKey, initialRecordDate,
+        if (!agendaFirst) AppModule.dailyLifeStore?.let { store -> DailyLifePanel(store, actionProfileKey, initialRecordDate,
             loadWeeklyMealPool = { actionProfileKey?.let { AppModule.actionRepository.loadMealPool(it) } }) }
         LocalReviewTimelineSection(reviewTimelineRepository, favoriteProfileKey, actionProfileKey)
         ReadingFavoritesSection(AppModule.readingFavoriteStore, favoriteProfileKey)

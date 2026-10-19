@@ -45,6 +45,28 @@ object CompositeFortuneGenerator {
 
     private data class Blend(val dim: Dim, val east: Int, val west: Int, val score: Int)
 
+    data class CalculationStep(val key: String, val label: String, val east: Int, val west: Int,
+        val eastShare: Int, val adjustment: Int, val score: Int) {
+        fun explanation(): String = "$label：(东方 $east × $eastShare% + 西方 $west × ${100 - eastShare}%) + 信号修正 $adjustment → 四舍五入并限于 8–98 = $score"
+    }
+
+    private fun calculationSteps(eastern: EasternDailyFortune, western: WesternDailyFortune): List<CalculationStep> {
+        val eNotes = eastern.dimensionNotes.associateBy { it.key }
+        val wNotes = western.dimensionNotes.associateBy { it.key }
+        val adjustments = insightAdjust(eastern.insights + western.insights)
+        return DIMS.map { dim ->
+            val east = eNotes[dim.eastKey]?.score ?: eastern.overallScore
+            val west = wNotes[dim.westKey]?.score ?: western.overallScore
+            val adjustment = adjustments[dim.key] ?: 0
+            CalculationStep(dim.key, dim.label, east, west, dim.eastShare, adjustment,
+                ((east * dim.eastShare + west * (100 - dim.eastShare)) / 100.0 + adjustment).roundToInt().coerceIn(8, 98))
+        }
+    }
+    fun calculationSteps(fortune: CompositeDailyFortune): List<CalculationStep> = calculationSteps(fortune.eastern, fortune.western)
+    fun calculatedOverall(fortune: CompositeDailyFortune): Int = overallFrom(calculationSteps(fortune), fortune.eastern, fortune.western)
+    private fun overallFrom(steps: List<CalculationStep>, eastern: EasternDailyFortune, western: WesternDailyFortune): Int =
+        ((steps.map { it.score }.average() * 4 + eastern.overallScore + western.overallScore) / 6).roundToInt().coerceIn(12, 97)
+
     fun generate(
         eastern: EasternDailyFortune,
         western: WesternDailyFortune,
@@ -52,23 +74,13 @@ object CompositeFortuneGenerator {
         period: String = "day"
     ): CompositeDailyFortune {
         val label = periodLabel(period)
-        val eNotes = eastern.dimensionNotes.associateBy { it.key }
-        val wNotes = western.dimensionNotes.associateBy { it.key }
         val insights = eastern.insights + western.insights
-        val adjust = insightAdjust(insights)
-
-        val blends = DIMS.map { dim ->
-            val e = eNotes[dim.eastKey]?.score ?: eastern.overallScore
-            val w = wNotes[dim.westKey]?.score ?: western.overallScore
-            val raw = (e * dim.eastShare + w * (100 - dim.eastShare)) / 100.0
-            Blend(dim, e, w, (raw + (adjust[dim.key] ?: 0)).roundToInt().coerceIn(8, 98))
-        }
+        val steps = calculationSteps(eastern, western)
+        val blends = steps.zip(DIMS).map { (step, dim) -> Blend(dim, step.east, step.west, step.score) }
         val dims = blends.map { b ->
             FortuneDimension(b.dim.key, b.dim.label, b.score, fuse(b, b.score, eastern, western, label))
         }
-        val dimMean = blends.map { it.score }.average()
-        val overall = ((dimMean * 4 + eastern.overallScore + western.overallScore) / 6)
-            .roundToInt().coerceIn(12, 97)
+        val overall = overallFrom(steps, eastern, western)
 
         return CompositeDailyFortune(
             dateKey = date.format(DateTimeFormatter.ISO_LOCAL_DATE),

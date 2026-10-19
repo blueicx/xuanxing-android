@@ -30,9 +30,10 @@ import com.xuanji.app.ui.components.SectionTitle
 
 @Composable
 fun MmpiScreen() {
-    var index by remember { mutableIntStateOf(0) }   // 0=介绍, 1..20=答题, 21=结果
-    val answers = remember { mutableStateListOf<Boolean>() }
-    var pick by remember { mutableStateOf<Boolean?>(null) }
+    val progress = rememberBooleanQuestionnaire("mmpi-style", Mmpi.QUESTIONS.size) ?: return
+    var index by progress.index
+    val answers = progress.answers
+    var pick by progress.pick
 
     Column(
         Modifier
@@ -93,6 +94,7 @@ fun MmpiScreen() {
                     }
                 }
             }
+            index > Mmpi.QUESTIONS.size && !progress.reviewed -> QuestionnaireReview(progress, Mmpi.QUESTIONS.map { it.text }, mapOf("true" to "是", "false" to "否"))
             else -> MmpiResultPage(answers, onRestart = { index = 0; answers.clear(); pick = null })
         }
     }
@@ -127,7 +129,7 @@ private fun MmpiResultPage(answers: List<Boolean>, onRestart: () -> Unit) {
     val result = Mmpi.calculate(answers)
     androidx.compose.runtime.LaunchedEffect(Unit) {
         val top = result.scales.maxByOrNull { it.tScore }
-        TestRecordRecorder.save("MMPI 风格自我探索", "自我探索", "演示维度·${top?.name ?: "N/A"}(${top?.tScore ?: 0})", if (result.valid) "自我探索完成" else "作答需复核", "MMPI_STYLE|${result.valid}")
+        TestRecordRecorder.save("MMPI 风格自我探索", "自我探索", "演示维度·${top?.name ?: "N/A"}(${top?.tScore ?: 0})", if (result.valid) "自我探索完成" else "作答需复核", "MMPI_STYLE|${result.valid}", result.scales.associate { it.code to it.raw })
     }
 
     FortuneCard {

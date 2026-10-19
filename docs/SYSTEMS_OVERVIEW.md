@@ -1,5 +1,19 @@
 # 玄星 X3 系统概览
 
+## 2026-10-19 详情、测验和日常入口收口
+
+`ReadingExploration` 调用既有算法计算相邻日/周/月/年，八字敏感性只重算已存时间前后 60 分钟的真实四柱，不修改档案。`CompositeFortuneGenerator.calculationSteps` 与正式出分共用同一路径；依据不再声称所有维度统一 50:50，而是展示真实维度比例、信号修正、舍入、限幅和总分公式。历史快照不被新算法重写。
+
+`QuestionnaireDraftStore` 以完整档案 key 的散列和题目 ID 隔离草稿，带版本及选项指纹校验；九个现有答题页面均接入持久化及计分前复核。`ProfileTestHistoryStore` 保存同档案的项目分和版本，100 条满额拒写；旧版全局摘要单独只读显示，不猜测归属。`TestReferenceConsentStore` 绑定记录摘要、分数、日期、版本及当前档案，玄师只读取明确授权条目，不自动取最新测验。新增私密数据不进入搜索/通用备份。独立清除及 `LocalDataEraseFence` 保证被清除的草稿/测验历史不会由旧保存票据复活。
+
+会话协议 v3 保留 v1/v2 兼容，并保存用户主动打开的 `MysticTaskReference`；跨日保留原始日期而非冒充今日结果，可继续、完成、移除或交接。异步请求仍由现有 session/turn token 归约，不恢复未完成的旧 provider 请求。生成的角色措辞不写入新的长期记忆。
+
+`CompanionGameTeaching` 只解释当前真实游戏状态：句式字数检查（不判古典对仗/平仄）、星图 BFS 最短路径（自编图）、象棋规则验证的单步演练（不证明多步必胜），以及丝路坐标归属和真实资源回放。关卡、棋局和旧游戏存档计分规则不变。`MysticScoreVoice` 将原分段语气从大生成器抽出，边界与既有 wording 保持。
+
+首页五个板块复用独立的档案化布局存储；原内容和卡片设计不删减，今日行动继续只属于日周期。详情阅读位置独立保存；`DailyQuickEntryWidget` 只含静态本地入口，PendingIntent 与通知分隔，不在桌面发布个人内容。选择性分享先核对字段，再生成完整高度的本地 PNG；超限明确失败，流和位图释放，FileProvider 仍限于既有私有分享目录。
+
+本轮验证与外部交付以[最新交接](superpowers/handoffs/2026-10-19-deepening-completion-handoff.md)为准；没有正式发布密钥，不宣称 Release 已签发。
+
 ## 2026-10-19 占卜学习与可复核数字
 
 `DivinationLearning` 是纯观察/解释模块：塔罗仅统计实际抽到的牌、正逆位、重复花色和相邻位置，不生成额外预测；`TarotLearningPanel` 可主动保存牌阵原文/种子/规则版本到已有记录日历。日期在本次抽牌时固定，切换档案时清除旧牌阵，不把旧牌面记到新档案。

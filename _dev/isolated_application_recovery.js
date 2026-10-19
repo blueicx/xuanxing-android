@@ -67,5 +67,9 @@ const manifest = { package: pkg, emulator: serial, beforePid: before, afterPid: 
     'future preference documents stop real daily and weekly recommendations without clearing data',
     'four-role handoff', 'poetry/star-map/Xiangqi progression and local saves', 'second synthetic birth profile does not read original Silk Road save'],
   boundaries: 'separate application data directory; only synthetic fixture; no production app or phone operations' };
+const quickEntry = run(['shell', 'am', 'instrument', '-w', '-r', '-e', 'class', 'com.xuanji.app.ui.QuickEntryNavigationJourneyTest', `${pkg}.test/androidx.test.runner.AndroidJUnitRunner`]);
+evidence('quick-entry-navigation.log', quickEntry);
+if (!/OK \(2 tests\)/.test(quickEntry) || /FAILURES|INSTRUMENTATION_FAILED/.test(quickEntry)) throw new Error(`Real shortcut navigation failed; retained evidence: ${out}`);
+manifest.verified.push('actual agenda and companion widget intent navigation');
 evidence('manifest.json', JSON.stringify(manifest, null, 2));
 process.stdout.write(`\nApplication process-recovery PASS. Evidence: ${out}\n`);

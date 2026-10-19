@@ -12,16 +12,18 @@ data class MysticInteractionState(
     val referenceId: String? = null,
     val actionKey: String = "",
     val evidenceOpen: Boolean = false,
-    val gameId: String? = null
+    val gameId: String? = null,
+    val task: MysticTaskReference? = null
 ) {
     fun forDate(date: String): MysticInteractionState = when {
         !valid() -> MysticInteractionState(dateKey = date)
         dateKey == date -> this
-        else -> MysticInteractionState(dateKey = date, gameId = gameId, actionKey = if (actionKey == "game") "game" else "")
+        else -> MysticInteractionState(dateKey = date, gameId = gameId, actionKey = if (actionKey == "game") "game" else "", task = task)
     }
 
     fun valid(): Boolean = runCatching {
         (dateKey.isEmpty() || LocalDate.parse(dateKey).toString() == dateKey) &&
+            (task == null || task.valid()) &&
             referenceCategory in setOf("", "meal", "activity", "outing") &&
             (referenceId == null || referenceId.length <= 180) &&
             actionKey in setOf("", "conversation", "meal", "activity", "outing", "profile", "evidence", "game", "resume_xiangqi") &&
