@@ -35,14 +35,32 @@ class SoftMemoryTagStoreTest {
     }
 
     @Test
-    fun corrupt_payload_is_reported_without_blocking_a_new_write() = runTest {
+    fun corrupt_payload_is_preserved_until_explicit_clear() = runTest {
         val bridge = FakePreferenceBridge()
         val store = SoftMemoryTagStore(bridge)
         bridge.values[store.memoryKey("profile-a")] = "broken"
 
         assertTrue(store.read("profile-a").unreadable)
         val tag = SoftMemoryTag("love", "topic", "最近常聊", "感情", SoftMemorySource.Inferred, "2026-09-12", "2026-09-12")
+        assertTrue(store.upsertInferred("profile-a", tag).unreadable)
+        assertEquals("broken", bridge.values[store.memoryKey("profile-a")])
+        store.clear("profile-a")
         assertEquals(listOf(tag), store.upsertInferred("profile-a", tag).tags)
-        assertTrue(!store.read("profile-a").unreadable)
+    }
+
+    @Test fun edited_and_revoked_tags_are_not_replaced_by_future_detection() = runTest {
+        val store = SoftMemoryTagStore(FakePreferenceBridge())
+        val original = SoftMemoryTag("work", "topic", "最近常聊", "工作", SoftMemorySource.Inferred, "2026-10-16", "2026-10-16")
+        store.upsertInferred("a", original)
+        val edited = original.copy(value = "学习", expiresAtDate = "2026-10-23")
+        store.edit("a", edited)
+        store.upsertInferred("a", original)
+        assertEquals("学习", store.read("a").tags.single().value)
+        assertEquals(SoftMemorySource.UserConfirmed, store.read("a").tags.single().source)
+        assertEquals("2026-10-23", store.read("a").tags.single().expiresAtDate)
+        store.revoke("a", "work")
+        store.upsertInferred("a", original)
+        assertTrue(store.read("a").tags.single().revoked)
+        assertTrue(store.read("b").tags.isEmpty())
     }
 }

@@ -170,6 +170,7 @@ fun FortuneCard(
             title = title,
             onDismiss = { detailOpen = false },
             detailContext = resolvedDetailContext,
+            contentIncludesEvidence = true,
             onAskMystic = askMystic?.let { submitDetail ->
                 { selectedDetail ->
                     detailOpen = false
@@ -361,11 +362,11 @@ fun ElementBalance(counts: Map<Element, Int>) {
 
 @Composable
 fun PillarCard(chart: BaziChart) {
-    pillarRow(chart)
+    PillarRow(chart)
 }
 
 @Composable
-private fun pillarRow(chart: BaziChart) {
+private fun PillarRow(chart: BaziChart) {
     val pillars = listOf(
         "年" to chart.yearPillar,
         "月" to chart.monthPillar,

@@ -34,6 +34,20 @@ import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class FortuneDetailPageTest {
+
+    @Test
+    fun scenario_selection_requires_a_real_click_and_keeps_the_original_cards() {
+        var selected = com.xuanji.app.domain.action.ActionScenario.Any
+        val plan = DailyActionPlan("2026-10-13", "scenario-test", null, emptyList(), emptyList(), emptyList(), emptyList(), ConfidenceLevel.Low, "离线参考")
+        compose.setContent {
+            MaterialTheme { DailyActionSection(plan = plan, onScenarioChange = { selected = it }) }
+        }
+        compose.onNodeWithTag("daily-action-scenario").performClick()
+        compose.onNodeWithText("在家").performClick()
+        assertEquals(com.xuanji.app.domain.action.ActionScenario.Home, selected)
+        compose.onNodeWithTag("daily-action-card-吃什么").assertExists()
+        compose.onNodeWithTag("daily-action-card-做什么").assertExists()
+    }
     @get:Rule
     val compose = createComposeRule()
 
@@ -170,9 +184,9 @@ class FortuneDetailPageTest {
         compose.onNodeWithText("不合适").assertExists()
         compose.onNodeWithText("换一个").assertExists()
         compose.onNodeWithText("撤销上次换选").assertExists()
-        compose.onNodeWithText("换一个").performClick()
+        compose.onNodeWithText("换一个").performScrollTo().performClick()
         assertEquals(Triple("meal", "mushroom-chicken-rice", ActionFeedbackKind.Replaced), recordedFeedback)
-        compose.onNodeWithText("撤销上次换选").performClick()
+        compose.onNodeWithText("撤销上次换选").performScrollTo().performClick()
         assertEquals("meal" to "older-meal", undoneReplacement)
 
         compose.onNodeWithText("查看做什么详情 ›").performScrollTo().performClick()
@@ -223,7 +237,10 @@ class FortuneDetailPageTest {
         val saved = runBlocking { store.list("synthetic-profile") }
         assertEquals(ReadingFavoriteDataState.Ready, saved.state)
         assertEquals(1, saved.entries.size)
-        assertEquals("当前周期适合稳步推进。", saved.entries.single().body)
+        assertEquals(
+            "标记：76分\n当前周期适合稳步推进。\n依据：事业维度",
+            saved.entries.single().body
+        )
 
         compose.onNodeWithTag("fortune-detail-toggle-favorite").performClick()
         compose.waitForIdle()

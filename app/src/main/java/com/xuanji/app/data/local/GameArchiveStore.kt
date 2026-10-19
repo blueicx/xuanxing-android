@@ -14,18 +14,26 @@ import kotlinx.coroutines.flow.first
  * same way as the companion visit memory, and only [GameSave] / [GameRecord] cross this
  * boundary: board data, never character commentary.
  */
-class GameArchiveStore(private val context: Context) {
+interface XiangqiSaveBackupStore {
+    suspend fun load(profileKey: String): GameSave?
+    suspend fun save(profileKey: String, save: GameSave)
+    suspend fun hasStored(profileKey: String): Boolean = load(profileKey) != null
+}
+
+class GameArchiveStore(private val context: Context) : XiangqiSaveBackupStore {
 
     private val gson = Gson()
 
-    suspend fun load(profileKey: String): GameSave? =
+    override suspend fun load(profileKey: String): GameSave? =
         read(saveKey(profileKey))?.let { json ->
             runCatching { gson.fromJson(json, GameSave::class.java) }.getOrNull()
         }
 
-    suspend fun save(profileKey: String, save: GameSave) {
+    override suspend fun save(profileKey: String, save: GameSave) {
         write(saveKey(profileKey), gson.toJson(save))
     }
+
+    override suspend fun hasStored(profileKey: String): Boolean = read(saveKey(profileKey)) != null
 
     suspend fun loadRecord(profileKey: String): GameRecord =
         read(recordKey(profileKey))?.let { json ->

@@ -47,6 +47,7 @@ internal fun FortuneDetailPage(
     onDismiss: () -> Unit,
     detailContext: MysticDetailContext? = null,
     favoriteType: String = "fortune",
+    contentIncludesEvidence: Boolean = false,
     onAskMystic: ((MysticDetailContext) -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit
 ) {
@@ -127,7 +128,7 @@ internal fun FortuneDetailPage(
                 )
                 Spacer(Modifier.height(6.dp))
                 Text(
-                    text = "本页完整展示该板块现有内容，不改变分类、结果或计算口径。",
+                        text = "展开阅读具体解释与计算依据。",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -142,12 +143,20 @@ internal fun FortuneDetailPage(
                 ) {
                     Spacer(Modifier.height(2.dp))
                     Text(
-                        text = "原版内容 · 完整展示",
+                        text = "具体解释",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     content()
+                    detailContext?.let { detail ->
+                        if (!contentIncludesEvidence && detail.evidence.isNotBlank()) {
+                            Text("依据", style = MaterialTheme.typography.titleMedium)
+                            Text(detail.evidence, style = MaterialTheme.typography.bodySmall)
+                        }
+                        RelatedLearningTerms("${detail.title} ${detail.result} ${detail.evidence}")
+                    }
+                    detailContext?.let { SaveReadingSnapshotAction(it) }
                 }
                 if (detailContext != null && (onAskMystic != null || (favoriteStore != null && !profileKey.isNullOrBlank()))) {
                     Spacer(Modifier.height(10.dp))

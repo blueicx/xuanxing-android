@@ -13,6 +13,20 @@ import org.junit.Test
 
 class LifeProfilePlannerTest {
     private val planner = LifeProfilePlanner()
+    @Test fun career_and_color_details_are_concrete_and_sourced_without_changing_scores() {
+        val result = planner.plan(input(emptyList()))
+        assertTrue(result.careerClusters.all { it.typicalTasks.size >= 2 && it.skills.size >= 2 && it.trialActivity.isNotBlank() && it.workEnvironment.isNotBlank() })
+        assertTrue(result.colorPalette.all { it.applications.keys.containsAll(listOf("穿搭", "桌面", "房间")) })
+        assertEquals(100, result.evidence.sumOf { it.contribution })
+    }
+    @Test fun explicit_region_conditions_are_separate_from_cultural_match_and_do_not_infer_cost() {
+        val initial = planner.plan(input(emptyList()))
+        val filtered = planner.plan(input(emptyList()).copy(regionPreference = RegionPreference(climate = "凉爽", rhythm = "舒缓", budget = "低预算")))
+        assertTrue(filtered.regionCandidates.all { it.preferenceExplanation.contains("预算资料未提供") })
+        assertTrue(filtered.regionCandidates.all { it.preferenceExplanation.contains("凉爽") && it.preferenceExplanation.contains("舒缓") })
+        assertEquals(initial.careerClusters, filtered.careerClusters)
+        assertEquals(initial.regionCandidates.map { it.score }, filtered.regionCandidates.map { it.score })
+    }
 
     @Test
     fun no_test_records_produce_low_confidence_and_explicit_missing_inputs() {

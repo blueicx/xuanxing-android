@@ -1,4 +1,5 @@
 package com.xuanji.app.ui.divination
+import androidx.compose.runtime.mutableFloatStateOf
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -144,9 +145,9 @@ private fun opposite(g: String): String = mapOf(
 @Composable
 private fun CompassCard() {
     val context = LocalContext.current
-    var azimuth by remember { mutableStateOf(0f) }
+    var azimuth by remember { mutableFloatStateOf(0f) }
     var hasSensor by remember { mutableStateOf(true) }
-    var manual by remember { mutableStateOf(0f) }
+    var manual by remember { mutableFloatStateOf(0f) }
 
     DisposableEffect(Unit) {
         val sm = context.getSystemService(Context.SENSOR_SERVICE) as? SensorManager

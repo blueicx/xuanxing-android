@@ -62,13 +62,7 @@ object Numerology {
     private fun digitSum(n: Int): Int = n.toString().sumOf { it.digitToInt() }
 
     /** 累减至 1-9，保留 11/22/33 大师数 */
-    private fun reduce(n: Int): Int {
-        var v = n
-        while (v > 9 && v != 11 && v != 22 && v != 33) {
-            v = v.toString().sumOf { it.digitToInt() }
-        }
-        return v
-    }
+    private fun reduce(n: Int): Int = NumerologyReduction.reduce(n)
 
     // ========== 完整五数算法（含姓名，用户版） ==========
 

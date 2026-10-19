@@ -2,6 +2,7 @@ package com.xuanji.app.domain.game
 
 import com.google.gson.Gson
 import com.google.gson.JsonObject
+import com.google.gson.JsonArray
 import com.google.gson.JsonParser
 import com.xuanji.app.domain.MysticCharacterId
 
@@ -22,7 +23,7 @@ sealed interface CompanionGameProgressState {
 }
 
 object CompanionGameProgressCodec {
-    const val VERSION = 1
+    const val VERSION = 5
     private val gson = Gson()
 
     fun encode(envelope: CompanionGameProgressEnvelope): String = gson.toJson(envelope)
@@ -32,13 +33,16 @@ object CompanionGameProgressCodec {
         return runCatching {
             val root = JsonParser.parseString(json).asJsonObject
             val version = root.get("version")?.asInt ?: return null
-            if (version != VERSION) return null
+            if (version !in 1..VERSION) return null
+            val gameId = root.get("gameId")?.asString.orEmpty()
+            val stateJson = root.get("stateJson")?.asString.orEmpty()
+            val migratedState = migrateState(gameId, stateJson, version)
             CompanionGameProgressEnvelope(
-                version,
+                VERSION,
                 root.get("profileKey")?.asString.orEmpty(),
                 root.get("characterId")?.asString.orEmpty(),
-                root.get("gameId")?.asString.orEmpty(),
-                root.get("stateJson")?.asString.orEmpty(),
+                gameId,
+                migratedState,
                 root.get("updatedAt")?.asLong ?: 0L
             ).takeIf { it.profileKey.isNotBlank() && it.characterId.isNotBlank() && it.gameId.isNotBlank() && it.stateJson.isNotBlank() }
         }.getOrNull()
@@ -51,14 +55,33 @@ object CompanionGameProgressCodec {
     }
 
     fun decodeState(envelope: CompanionGameProgressEnvelope): CompanionGameProgressState? = runCatching {
+        if (envelope.version != VERSION) return null
         when (envelope.gameId) {
-            "poetry_chain" -> CompanionGameProgressState.Poetry(gson.fromJson(envelope.stateJson, PoetryChainState::class.java))
-            "star_map_observation" -> CompanionGameProgressState.StarMap(gson.fromJson(envelope.stateJson, StarMapState::class.java))
-            "silkroad_route" -> CompanionGameProgressState.SilkRoad(gson.fromJson(envelope.stateJson, SilkRoadState::class.java))
+            "poetry_chain" -> gson.fromJson(envelope.stateJson, PoetryChainState::class.java).takeIf(PoetryChainEngine::isValidState)?.let(CompanionGameProgressState::Poetry)
+            "star_map_observation" -> gson.fromJson(envelope.stateJson, StarMapState::class.java).takeIf(StarMapPuzzleEngine::isValidState)?.let(CompanionGameProgressState::StarMap)
+            "silkroad_route" -> gson.fromJson(envelope.stateJson, SilkRoadState::class.java).takeIf(SilkRoadRouteEngine::isValidState)?.let(CompanionGameProgressState::SilkRoad)
             else -> null
         }
     }.getOrNull()
 
     fun envelope(profileKey: String, characterId: MysticCharacterId, state: CompanionGameProgressState, now: Long): CompanionGameProgressEnvelope =
         CompanionGameProgressEnvelope(VERSION, profileKey, characterId.key, state.gameId, encodeState(state), now)
+
+    private fun migrateState(gameId: String, stateJson: String, version: Int): String {
+        val state = JsonParser.parseString(stateJson).asJsonObject
+        if (gameId == "poetry_chain" && version < 3 && (!state.has("undoHistory") || state.get("undoHistory").isJsonNull)) {
+            state.add("undoHistory", JsonArray())
+        }
+        if (gameId == "poetry_chain") {
+            if (version < 3 && !state.has("levelCountAtStart")) state.addProperty("levelCountAtStart", 5)
+            require(state.has("levelCountAtStart") && !state.get("levelCountAtStart").isJsonNull)
+        }
+        if (gameId == "silkroad_route") {
+            if (version < 5 && !state.has("plannedPath")) state.add("plannedPath", JsonArray())
+            require(state.has("plannedPath") && !state.get("plannedPath").isJsonNull)
+            if (version < 4 && !state.has("missionId")) state.addProperty("missionId", "silk-01")
+            require(state.has("missionId") && !state.get("missionId").isJsonNull)
+        }
+        return state.toString()
+    }
 }

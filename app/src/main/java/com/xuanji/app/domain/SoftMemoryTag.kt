@@ -5,6 +5,7 @@ import com.google.gson.JsonElement
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
 import java.text.Normalizer
+import java.time.LocalDate
 
 enum class SoftMemorySource(val wire: String) {
     Inferred("inferred"),
@@ -20,8 +21,16 @@ data class SoftMemoryTag(
     val source: SoftMemorySource,
     val createdAt: String,
     val lastSeenAt: String,
-    val revoked: Boolean = false
-)
+    val revoked: Boolean = false,
+    val expiresAtDate: String? = null
+) {
+    fun isExpiredOn(date: LocalDate = LocalDate.now()): Boolean =
+        expiresAtDate?.let { expiry -> runCatching { LocalDate.parse(expiry).isBefore(date) }.getOrDefault(true) } ?: false
+
+    fun withLifetime(days: Long?, today: LocalDate = LocalDate.now()): SoftMemoryTag = copy(
+        expiresAtDate = days?.coerceIn(1, 3650)?.let { today.plusDays(it).toString() }
+    )
+}
 
 data class SoftMemoryTagDecodeResult(
     val tags: List<SoftMemoryTag> = emptyList(),
@@ -29,7 +38,7 @@ data class SoftMemoryTagDecodeResult(
 )
 
 object SoftMemoryTagCodec {
-    const val VERSION = 1
+    const val VERSION = 2
     const val MAX_TAGS = 20
     private const val MAX_TEXT = 80
 
@@ -50,6 +59,7 @@ object SoftMemoryTagCodec {
             item.addProperty("createdAt", clean(tag.createdAt, 32))
             item.addProperty("lastSeenAt", clean(tag.lastSeenAt, 32))
             item.addProperty("revoked", tag.revoked)
+            tag.expiresAtDate?.let { item.addProperty("expiresAtDate", clean(it, 10)) }
             array.add(item)
         }
         root.add("tags", array)
@@ -83,8 +93,12 @@ object SoftMemoryTagCodec {
             val source = SoftMemorySource.entries.firstOrNull { it.wire == item.stringMember("source") }
             val createdAt = item.stringMember("createdAt")
             val lastSeenAt = item.stringMember("lastSeenAt")
+            val expiryRaw = if (version >= 2) item.stringMember("expiresAtDate") else ""
+            val expiresAt = expiryRaw.takeIf(String::isNotBlank)?.let { expiry ->
+                runCatching { LocalDate.parse(expiry).toString() }.getOrNull()
+            }
             if (id.isBlank() || key.isBlank() || label.isBlank() || value.isBlank() || source == null ||
-                createdAt.isBlank() || lastSeenAt.isBlank()
+                createdAt.isBlank() || lastSeenAt.isBlank() || (expiryRaw.isNotBlank() && expiresAt == null)
             ) {
                 unreadable = true
                 null
@@ -97,7 +111,8 @@ object SoftMemoryTagCodec {
                     source = source,
                     createdAt = clean(createdAt, 32),
                     lastSeenAt = clean(lastSeenAt, 32),
-                    revoked = item.booleanMember("revoked")
+                    revoked = item.booleanMember("revoked"),
+                    expiresAtDate = expiresAt
                 )
             }
         }.distinctBy { it.id }.takeLast(MAX_TAGS)

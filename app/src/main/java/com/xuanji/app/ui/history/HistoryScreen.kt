@@ -33,12 +33,22 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.xuanji.app.data.model.HistoryEvent
 import com.xuanji.app.data.local.ReadingFavoriteStore
+import com.xuanji.app.data.local.ActionFeedbackDataStore
+import com.xuanji.app.data.local.DataStorePreferenceBridge
+import com.xuanji.app.data.local.LocalReviewTimelineRepository
+import com.xuanji.app.domain.LocalReviewFilter
+import com.xuanji.app.domain.LocalReviewItem
+import com.xuanji.app.domain.LocalReviewPeriod
+import com.xuanji.app.domain.LocalReviewSource
+import com.xuanji.app.domain.LocalReviewSnapshot
+import com.xuanji.app.domain.LocalReviewTimeline
 import com.xuanji.app.di.AppModule
 import com.xuanji.app.domain.ReadingFavorite
 import com.xuanji.app.domain.ReadingFavoriteDataState
@@ -51,16 +61,26 @@ import com.xuanji.app.ui.viewmodel.HistoryViewModel
 import com.xuanji.app.ui.components.FortuneDetailPage
 import com.xuanji.app.ui.xuanjiViewModel
 import java.time.LocalDate
+import java.time.Instant
+import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import kotlinx.coroutines.launch
 
 @Composable
-fun HistoryScreen() {
+fun HistoryScreen(initialRecordDate: String? = null) {
     val viewModel = xuanjiViewModel { HistoryViewModel(AppModule.historyRepository) }
     val events by viewModel.events.collectAsStateWithLifecycle()
     val profile by AppModule.repository.userProfileFlow.collectAsStateWithLifecycle(initialValue = null)
     val baziFull by AppModule.repository.baziFullFlow.collectAsStateWithLifecycle(initialValue = null)
     val favoriteProfileKey = remember(baziFull) { baziFull?.let { "bazi|${it.chart.display}" } }
+    val actionProfileKey = remember(profile) { profile?.let(AppModule.actionRepository::profileKey) }
+    val localContext = LocalContext.current
+    val reviewTimelineRepository = remember(localContext) {
+        LocalReviewTimelineRepository(
+            AppModule.readingFavoriteStore,
+            ActionFeedbackDataStore(DataStorePreferenceBridge(localContext))
+        )
+    }
     val today = LocalDate.now()
     val todayStr = today.format(DateTimeFormatter.ofPattern("M月d日"))
 
@@ -136,7 +156,130 @@ fun HistoryScreen() {
         SameDayWorks.forDate(sameDayDate).forEach { SameDayWorkCard(it) }
 
         Spacer(Modifier.height(8.dp))
+        AppModule.dailyLifeStore?.let { store -> DailyLifePanel(store, actionProfileKey, initialRecordDate,
+            loadWeeklyMealPool = { actionProfileKey?.let { AppModule.actionRepository.loadMealPool(it) } }) }
+        LocalReviewTimelineSection(reviewTimelineRepository, favoriteProfileKey, actionProfileKey)
         ReadingFavoritesSection(AppModule.readingFavoriteStore, favoriteProfileKey)
+    }
+}
+
+@Composable
+fun LocalReviewTimelineSection(
+    repository: LocalReviewTimelineRepository,
+    favoriteProfileKey: String?,
+    actionProfileKey: String?
+) {
+    var filter by rememberSaveable { mutableStateOf(LocalReviewFilter.All) }
+    var period by rememberSaveable { mutableStateOf(LocalReviewPeriod.Week) }
+    var snapshot by remember { mutableStateOf(LocalReviewSnapshot(emptyList(), ReadingFavoriteDataState.Missing, true)) }
+    var loaded by remember { mutableStateOf(false) }
+    LaunchedEffect(repository, favoriteProfileKey, actionProfileKey) {
+        loaded = false
+        snapshot = runCatching { repository.load(favoriteProfileKey, actionProfileKey, LocalReviewFilter.All) }
+            .getOrElse { LocalReviewSnapshot(emptyList(), ReadingFavoriteDataState.Corrupt, false) }
+        loaded = true
+    }
+    val summaryDate = LocalDate.now()
+    val summary = remember(snapshot.items, period, summaryDate) {
+        LocalReviewTimeline.summarize(snapshot.items, period, summaryDate)
+    }
+    val visibleItems = remember(snapshot.items, filter) {
+        snapshot.items.filter { item ->
+            when (filter) {
+                LocalReviewFilter.All -> true
+                LocalReviewFilter.Favorites -> item.source == LocalReviewSource.Favorite
+                LocalReviewFilter.ActionFeedback -> item.source != LocalReviewSource.Favorite
+            }
+        }
+    }
+
+    Column(
+        Modifier.fillMaxWidth().testTag("local-review-timeline"),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Text("近期选择", style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.primary)
+        Text(
+            "只回顾你主动收藏的快照与行动反馈；不读取聊天内容，也不推断性格。",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Row(
+            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            listOf(LocalReviewPeriod.Week to "本周", LocalReviewPeriod.Month to "本月").forEach { (choice, label) ->
+                FilterChip(
+                    selected = period == choice,
+                    onClick = { period = choice },
+                    modifier = Modifier.testTag("local-review-period-${choice.name.lowercase()}"),
+                    label = { Text(label) }
+                )
+            }
+        }
+        Card(Modifier.fillMaxWidth().testTag("local-review-period-summary")) {
+            Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                Text(summary.label, style = MaterialTheme.typography.titleSmall)
+                Text(
+                    "收藏 ${summary.favorites} · 采纳 ${summary.acceptedActions} · 不合适 ${summary.notSuitableActions} · 换掉 ${summary.replacedActions}",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+                if (summary.total == 0) Text("这个周期还没有主动记录。", style = MaterialTheme.typography.bodySmall)
+            }
+        }
+        Row(
+            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            listOf(
+                LocalReviewFilter.All to "全部",
+                LocalReviewFilter.Favorites to "收藏",
+                LocalReviewFilter.ActionFeedback to "行动反馈"
+            ).forEach { (choice, label) ->
+                FilterChip(
+                    selected = filter == choice,
+                    onClick = { filter = choice },
+                    modifier = Modifier.testTag("local-review-filter-${choice.name.lowercase()}"),
+                    label = { Text(label) }
+                )
+            }
+        }
+        when {
+            !loaded -> Text("正在读取本地回顾…", style = MaterialTheme.typography.bodyMedium)
+            visibleItems.isEmpty() -> Text(
+                "还没有主动收藏或行动反馈。",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.testTag("local-review-empty")
+            )
+            else -> visibleItems.forEach { item -> LocalReviewItemCard(item) }
+        }
+        if (!snapshot.feedbackAvailable) {
+            Text("行动反馈暂时无法读取；其他可用记录仍保留。", style = MaterialTheme.typography.labelSmall)
+        }
+        if (snapshot.favoriteState in setOf(ReadingFavoriteDataState.Corrupt, ReadingFavoriteDataState.UnsupportedVersion, ReadingFavoriteDataState.ProfileMismatch)) {
+            Text("收藏快照无法加入回顾；原始数据保持不变。", style = MaterialTheme.typography.labelSmall)
+        }
+    }
+}
+
+@Composable
+private fun LocalReviewItemCard(item: LocalReviewItem) {
+    val sourceLabel = when (item.source) {
+        LocalReviewSource.Favorite -> "主动收藏"
+        LocalReviewSource.AcceptedAction -> "已采纳"
+        LocalReviewSource.NotSuitableAction -> "标记不合适"
+        LocalReviewSource.ReplacedAction -> "换过一项"
+    }
+    val timestamp = runCatching {
+        Instant.ofEpochMilli(item.createdAt).atZone(ZoneId.systemDefault())
+            .format(DateTimeFormatter.ofPattern("M月d日 HH:mm"))
+    }.getOrDefault("时间未知")
+    Card(Modifier.fillMaxWidth().testTag("local-review-item-${item.id}")) {
+        Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+            Text(item.title, style = MaterialTheme.typography.titleSmall)
+            Text("$sourceLabel · $timestamp", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+            Text(item.summary, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
     }
 }
 
@@ -305,7 +448,11 @@ fun ReadingFavoritesSection(store: ReadingFavoriteStore, profileKey: String?) {
         ) {
             Text("只读快照 · ${favoriteTypeLabel(favorite.type)}")
             Text(listOf(favorite.mode, favorite.period, favorite.dateKey).filter(String::isNotBlank).joinToString(" · "))
-            Text(favorite.body, style = MaterialTheme.typography.bodyLarge)
+            Text(
+                favorite.body,
+                style = MaterialTheme.typography.bodyLarge,
+                modifier = Modifier.testTag("reading-favorite-snapshot-body")
+            )
             if (favorite.evidence.isNotBlank()) {
                 Text("保存时的依据", style = MaterialTheme.typography.titleSmall)
                 Text(favorite.evidence, style = MaterialTheme.typography.bodyMedium)

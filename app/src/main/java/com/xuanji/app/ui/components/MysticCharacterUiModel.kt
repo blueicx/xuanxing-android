@@ -119,8 +119,9 @@ internal fun MysticCharacterGallery(
     LaunchedEffect(selectedId) {
         if (pagerState.currentPage != selectedIndex) pagerState.animateScrollToPage(selectedIndex)
     }
-    LaunchedEffect(pagerState.currentPage) {
-        profiles.getOrNull(pagerState.currentPage)?.let { profile ->
+    // Programmatic handoffs pass intermediate pages; those are not user selections.
+    LaunchedEffect(pagerState.settledPage) {
+        profiles.getOrNull(pagerState.settledPage)?.let { profile ->
             if (profile.id != selectedId) onSelected(profile.id)
         }
     }

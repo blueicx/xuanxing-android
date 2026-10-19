@@ -423,7 +423,7 @@ fun Modifier.cardDragReorder(
 ): Modifier {
     val currentController by rememberUpdatedState(controller)
     val dragOffset = remember(cardId) { mutableFloatStateOf(0f) }
-    var lastLayoutTop by remember(cardId) { mutableStateOf(Float.NaN) }
+    var lastLayoutTop by remember(cardId) { mutableFloatStateOf(Float.NaN) }
     val previewTarget by rememberUpdatedState(currentController.previewOffset(cardId))
     val animatedPreview by animateFloatAsState(
         targetValue = previewTarget,

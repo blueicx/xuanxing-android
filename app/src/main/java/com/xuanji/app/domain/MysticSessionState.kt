@@ -12,7 +12,8 @@ data class MysticSessionState(
     val memoryNotes: List<MysticMemoryNote> = emptyList(),
     val messages: List<MysticMessage> = emptyList(),
     val nextTurnId: Long = 0L,
-    val requestState: MysticRequestState = MysticRequestState.Idle
+    val requestState: MysticRequestState = MysticRequestState.Idle,
+    val interaction: MysticInteractionState = MysticInteractionState()
 )
 
 enum class MysticMessageRole { User, Mystic, System }
@@ -35,6 +36,7 @@ sealed interface MysticRequestState {
 }
 
 sealed interface MysticEvent {
+    data class UpdateInteraction(val token: Long, val state: MysticInteractionState) : MysticEvent
     data class Input(val text: String) : MysticEvent
     data class Reply(val token: Long, val turn: MysticTurn) : MysticEvent
     data class Remember(val note: MysticMemoryNote) : MysticEvent
@@ -57,6 +59,7 @@ sealed interface MysticEvent {
 
 /** Pure reducer shared by UI and future providers. Stale replies are dropped by token check. */
 fun reduce(state: MysticSessionState, event: MysticEvent): MysticSessionState = when (event) {
+    is MysticEvent.UpdateInteraction -> if (event.token == state.sessionToken && event.state.valid()) state.copy(interaction = event.state) else state
     is MysticEvent.Input -> state.copy(
         pendingInput = event.text.trim().take(200).ifBlank { null }
     )
@@ -89,6 +92,7 @@ fun reduce(state: MysticSessionState, event: MysticEvent): MysticSessionState = 
         )
     )
     MysticEvent.Clear -> state.copy(
+        interaction = MysticInteractionState(),
         sessionToken = state.sessionToken + 1,
         pendingInput = null,
         recentTurns = emptyList(),

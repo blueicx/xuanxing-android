@@ -1,4 +1,5 @@
 package com.xuanji.app.ui.divination
+import androidx.compose.runtime.mutableIntStateOf
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -29,7 +30,7 @@ import java.time.LocalDate
 @Composable
 fun IfaScreen() {
     var question by rememberSaveable { mutableStateOf("") }
-    var askCount by rememberSaveable { mutableStateOf(0) }
+    var askCount by rememberSaveable { mutableIntStateOf(0) }
     val today = LocalDate.now()
 
     Column(

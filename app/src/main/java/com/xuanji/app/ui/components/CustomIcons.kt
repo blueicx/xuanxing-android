@@ -519,8 +519,8 @@ val CommonDivinationIcon: ImageVector by lazy {
 fun RegionBadge(
     icon: ImageVector,
     color: Color,
-    sizeDp: Dp = 40.dp,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    sizeDp: Dp = 40.dp
 ) {
     Box(modifier = modifier.size(sizeDp), contentAlignment = Alignment.Center) {
         Canvas(Modifier.matchParentSize()) {

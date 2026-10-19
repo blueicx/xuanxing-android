@@ -214,7 +214,7 @@ private fun TarotCardFan(cards: List<DrawnTarot>, flipProgress: Float) {
                         .fillMaxSize()
                         .clip(RoundedCornerShape(8.dp))
                         .background(
-                            BrushFromTwo(Color(0xFF2A1F4A), Color(0xFF1A1230))
+                            brushFromTwo(Color(0xFF2A1F4A), Color(0xFF1A1230))
                         )
                         .border(1.5.dp, Color(0xFFE9D8A6).copy(alpha = 0.7f), RoundedCornerShape(8.dp)),
                     contentAlignment = Alignment.Center
@@ -236,7 +236,7 @@ private fun TarotCardFan(cards: List<DrawnTarot>, flipProgress: Float) {
                             .graphicsLayer { rotationY = -rotation }
                             .clip(RoundedCornerShape(8.dp))
                             .background(
-                                BrushFromTwo(Color(0xFF3A2F5C), Color(0xFF2A1F4A))
+                                brushFromTwo(Color(0xFF3A2F5C), Color(0xFF2A1F4A))
                             )
                             .border(1.5.dp, Color(0xFFB69CFF), RoundedCornerShape(8.dp)),
                         contentAlignment = Alignment.Center
@@ -291,8 +291,7 @@ private fun TarotCardFan(cards: List<DrawnTarot>, flipProgress: Float) {
     }
 }
 
-@Composable
-private fun BrushFromTwo(a: Color, b: Color): androidx.compose.ui.graphics.Brush =
+private fun brushFromTwo(a: Color, b: Color): androidx.compose.ui.graphics.Brush =
     androidx.compose.ui.graphics.Brush.verticalGradient(listOf(a, b))
 
 /** 每张牌的专属图案符号：大阿尔卡纳按牌义、小阿尔卡纳按花色+牌级。 */

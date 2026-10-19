@@ -7,6 +7,26 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class FoodPreferenceStoreTest {
+    @Test fun practical_preferences_roundtrip_and_legacy_v1_keeps_unrestricted_defaults() = runTest {
+        val bridge = FakePreferenceBridge()
+        val store = FoodPreferenceStore(bridge)
+        val value = FoodPreference(availableEquipment = emptySet(), maxCookingDifficulty = com.xuanji.app.domain.action.CookingDifficulty.Easy,
+            lunchboxOnly = true, prioritizePantry = true)
+        store.save("p", value)
+        assertEquals(value, store.read("p"))
+        bridge.values[store.memoryKey("legacy")] = """{"version":1,"profileKeyDigest":"${FoodPreferenceStore.fingerprint("legacy")}","preference":{"vegetarian":true}}"""
+        assertEquals(FoodPreference(vegetarian = true), store.read("legacy"))
+        val json = com.google.gson.JsonParser.parseString(bridge.values.getValue(store.memoryKey("p"))).asJsonObject
+        json.getAsJsonObject("preference").add("availableEquipment", com.google.gson.JsonParser.parseString("[\"UnknownDevice\"]"))
+        bridge.values[store.memoryKey("p")] = json.toString()
+        assertTrue(store.readSnapshot("p").unreadable)
+        json.addProperty("version", 999)
+        bridge.values[store.memoryKey("p")] = json.toString()
+        assertTrue(store.readSnapshot("p").unreadable)
+        json.add("profileKeyDigest", com.google.gson.JsonObject())
+        bridge.values[store.memoryKey("p")] = json.toString()
+        assertTrue(store.readSnapshot("p").unreadable)
+    }
     private class FakePreferenceBridge : PreferenceBridge {
         val values = linkedMapOf<String, String>()
         val deleted = mutableListOf<String>()

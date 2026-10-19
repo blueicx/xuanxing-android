@@ -7,6 +7,7 @@ import com.xuanji.app.data.local.foodPreferenceStore
 import com.xuanji.app.data.local.DataStorePreferenceBridge
 import com.xuanji.app.data.local.ReadingFavoriteStore
 import com.xuanji.app.data.local.ActionFeedbackDataStore
+import com.xuanji.app.data.local.ActionConstraintStore
 import com.xuanji.app.data.repository.ActionRepository
 import com.xuanji.app.data.repository.HistoryRepository
 import com.xuanji.app.data.repository.LiuYaoRepository
@@ -28,10 +29,16 @@ class XuanjiApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         installCrashLogger()
+        // Finish interrupted restore before repositories start observing persisted records.
+        val restoreRecovered = kotlinx.coroutines.runBlocking(Dispatchers.IO) {
+            runCatching { com.xuanji.app.data.local.LocalRestoreTransaction(DataStorePreferenceBridge(this@XuanjiApplication)).recover() }.getOrDefault(false)
+        }
+        if (!restoreRecovered) Log.w("Xuanji", "Local restore journal is invalid; restore is blocked, existing data retained.")
         val favoriteStore = ReadingFavoriteStore(DataStorePreferenceBridge(this))
         val actionFeedbackStore = ActionFeedbackDataStore(DataStorePreferenceBridge(this))
         val repository = FortuneRepository(this, favoriteStore)
         val testRecordRepository = TestRecordRepository(this)
+        val dailyLifeStore = com.xuanji.app.data.local.DailyLifeStore(DataStorePreferenceBridge(this))
         AppModule.init(
             repository,
             HistoryRepository(this),
@@ -43,9 +50,12 @@ class XuanjiApplication : Application() {
                 repository,
                 testRecordRepository,
                 foodPreferenceStore(),
-                feedbackStore = actionFeedbackStore
+                feedbackStore = actionFeedbackStore,
+                activityPreferenceStore = ActionConstraintStore(DataStorePreferenceBridge(this)),
+                dailyLifeStore = dailyLifeStore
             ),
-            favoriteStore
+            favoriteStore,
+            dailyLifeStore
         )
 
         // 出生信息默认空白（不预填任何生日），由用户自行填写。
@@ -58,6 +68,23 @@ class XuanjiApplication : Application() {
                     ReminderScheduler.cancel(this@XuanjiApplication)
                 }
             }
+        }
+        applicationScope.launch {
+            val store = AppModule.dailyLifeStore ?: return@launch
+            var previousKey: String? = null
+            var observedProfile = false
+            kotlinx.coroutines.flow.combine(repository.userProfileFlow, store.revision) { profile, _ -> profile }
+                .collect { profile ->
+                    val key = profile?.let(AppModule.actionRepository::profileKey)
+                    if (observedProfile && key != previousKey) {
+                        com.xuanji.app.daily.AgendaReminderScheduler.cancelSnoozes(this@XuanjiApplication)
+                    }
+                    previousKey = key
+                    observedProfile = true
+                    val preferences = key?.let { store.load(it) }?.takeIf { it.readable }?.reminders
+                        ?: com.xuanji.app.domain.ReminderPreferences()
+                    com.xuanji.app.daily.AgendaReminderScheduler.schedule(this@XuanjiApplication, key, preferences)
+                }
         }
     }
 

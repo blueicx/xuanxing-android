@@ -26,20 +26,14 @@ object NumerologyCycles {
         val personalMonth = reduce(personalYear + month)
         val personalDay = reduce(personalMonth + day)
         return listOf(
-            NumerologyCycle("个人年", personalYear, "$birthMonth+$birthDay+$year", text(personalYear)),
-            NumerologyCycle("个人月", personalMonth, "$personalYear+$month", text(personalMonth)),
-            NumerologyCycle("个人日", personalDay, "$personalMonth+$day", text(personalDay)),
-            NumerologyCycle("出生年根数", birthYear, "${profile.birthYear} → $birthYear", text(birthYear))
+            NumerologyCycle("个人年", personalYear, "出生月 ${NumerologyReduction.explain(profile.birthMonth)}；出生日 ${NumerologyReduction.explain(profile.birthDay)}；当前年 ${NumerologyReduction.explain(date.year)}；$birthMonth+$birthDay+$year=${NumerologyReduction.explain(birthMonth + birthDay + year)}", text(personalYear)),
+            NumerologyCycle("个人月", personalMonth, "当前月 ${NumerologyReduction.explain(date.monthValue)}；$personalYear+$month=${NumerologyReduction.explain(personalYear + month)}", text(personalMonth)),
+            NumerologyCycle("个人日", personalDay, "当前日 ${NumerologyReduction.explain(date.dayOfMonth)}；$personalMonth+$day=${NumerologyReduction.explain(personalMonth + day)}", text(personalDay)),
+            NumerologyCycle("出生年根数", birthYear, NumerologyReduction.explain(profile.birthYear), text(birthYear))
         )
     }
 
-    private fun reduce(value: Int): Int {
-        var result = value.toString().filter(Char::isDigit).sumOf { it.digitToInt() }
-        while (result > 9 && result !in setOf(11, 22, 33)) {
-            result = result.toString().sumOf { it.digitToInt() }
-        }
-        return result
-    }
+    private fun reduce(value: Int): Int = NumerologyReduction.reduce(value)
 
     private fun text(number: Int): String = when (number) {
         1 -> "启动与自我负责：适合定一个可完成的起点。"

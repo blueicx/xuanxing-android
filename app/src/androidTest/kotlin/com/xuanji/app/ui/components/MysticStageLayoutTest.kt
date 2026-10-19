@@ -10,6 +10,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.unit.dp
 import androidx.compose.material3.Text
 import androidx.compose.runtime.mutableStateOf
@@ -25,6 +26,42 @@ import org.junit.runner.RunWith
 class MysticStageLayoutTest {
     @get:Rule
     val compose = createComposeRule()
+
+    @Test fun system_back_collapses_the_drawer_before_closing_the_stage() {
+        var closed = false
+        lateinit var back: androidx.activity.OnBackPressedDispatcher
+        val character = MysticCharacterCatalog.byId(MysticCharacterId.MoHeng)
+        compose.setContent {
+            val owner = androidx.activity.compose.LocalOnBackPressedDispatcherOwner.current
+            androidx.compose.runtime.SideEffect { back = owner!!.onBackPressedDispatcher }
+            MysticStageLayout(character, character.legacySkinId,
+                androidx.compose.ui.graphics.Color.DarkGray, androidx.compose.ui.graphics.Color.Yellow, 0f,
+                onCharacterSelected = {}, onConversation = {}, onStartGame = {}, onClose = { closed = true }) { Text("合成返回测试") }
+        }
+        compose.onNodeWithText("进入对话").performClick()
+        compose.runOnIdle { back.onBackPressed() }
+        compose.onNodeWithTag("stage-drawer-peek").assertExists()
+        assertTrue(!closed)
+        compose.runOnIdle { back.onBackPressed() }
+        assertTrue(closed)
+    }
+
+    @Test fun expanded_drawer_survives_saved_instance_recreation() {
+        val restoration = StateRestorationTester(compose)
+        val character = MysticCharacterCatalog.byId(MysticCharacterId.MoHeng)
+        restoration.setContent {
+            MysticStageLayout(character, character.legacySkinId,
+                androidx.compose.ui.graphics.Color.DarkGray, androidx.compose.ui.graphics.Color.Yellow, 0f,
+                onCharacterSelected = {}, onConversation = {}, onStartGame = {}, onClose = {}) {
+                Text("合成恢复消息")
+            }
+        }
+        compose.onNodeWithText("进入对话").performClick()
+        compose.onNodeWithTag("stage-drawer-expanded").assertExists()
+        restoration.emulateSavedInstanceStateRestore()
+        compose.onNodeWithTag("stage-drawer-expanded").assertExists()
+        compose.onNodeWithText("合成恢复消息").assertExists()
+    }
 
     @Test
     fun every_character_uses_the_same_accessible_stage_layers() {

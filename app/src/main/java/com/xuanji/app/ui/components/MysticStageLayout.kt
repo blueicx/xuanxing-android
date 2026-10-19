@@ -1,5 +1,7 @@
 package com.xuanji.app.ui.components
 
+import androidx.activity.compose.BackHandler
+
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -47,6 +49,8 @@ import com.xuanji.app.domain.MysticCharacterId
 import com.xuanji.app.domain.MysticCharacterProfile
 import com.xuanji.app.domain.MysticDrawerState
 import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.mapSaver
 
 /**
  * Unified full-screen stage. Every role goes through the same five layers:
@@ -63,11 +67,13 @@ fun MysticStageLayout(
     onConversation: () -> Unit,
     onStartGame: () -> Unit,
     onClose: () -> Unit,
+    drawerStateOverride: MysticDrawerState? = null,
+    onDrawerStateChanged: (MysticDrawerState) -> Unit = {},
     content: @Composable () -> Unit
 ) {
     val reducedMotion = rememberReducedMotion()
     val phase by if (reducedMotion) {
-        androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(0f) }
+        androidx.compose.runtime.remember { androidx.compose.runtime.mutableFloatStateOf(0f) }
     } else {
         rememberInfiniteTransition(label = "stageMotion").animateFloat(
             initialValue = 0f,
@@ -81,11 +87,25 @@ fun MysticStageLayout(
     val assetSpec = MysticVisualAssetCatalog.forCharacter(character)
     val gold = Color(scene.accentColorArgb)
     var specialtiesOpen by remember(character.id) { mutableStateOf(false) }
-    val drawerStates = remember { mutableStateMapOf<MysticCharacterId, MysticDrawerState>() }
-    val drawerState = drawerStates[character.id] ?: MysticDrawerState.Peek
+    val drawerStates = rememberSaveable(saver = mapSaver(
+        save = { states: androidx.compose.runtime.snapshots.SnapshotStateMap<MysticCharacterId, MysticDrawerState> ->
+            states.entries.associate { it.key.key to it.value.name }
+        },
+        restore = { saved -> mutableStateMapOf<MysticCharacterId, MysticDrawerState>().apply {
+            saved.forEach { (key, value) ->
+                val id = MysticCharacterId.entries.firstOrNull { it.key == key }
+                val state = MysticDrawerState.entries.firstOrNull { it.name == value }
+                if (id != null && state != null) put(id, state)
+            }
+        } }
+    )) { mutableStateMapOf<MysticCharacterId, MysticDrawerState>() }
+    val drawerState = drawerStateOverride ?: drawerStates[character.id] ?: MysticDrawerState.Peek
 
-    fun expandDrawer() { drawerStates[character.id] = MysticDrawerState.Expanded }
-    fun collapseDrawer() { drawerStates[character.id] = MysticDrawerState.Peek }
+    fun expandDrawer() { drawerStates[character.id] = MysticDrawerState.Expanded; onDrawerStateChanged(MysticDrawerState.Expanded) }
+    fun collapseDrawer() { drawerStates[character.id] = MysticDrawerState.Peek; onDrawerStateChanged(MysticDrawerState.Peek) }
+    BackHandler {
+        if (drawerState == MysticDrawerState.Expanded) collapseDrawer() else onClose()
+    }
 
     Surface(
         Modifier.fillMaxSize(),

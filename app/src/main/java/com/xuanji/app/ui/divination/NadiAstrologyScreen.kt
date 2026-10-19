@@ -1,4 +1,5 @@
 package com.xuanji.app.ui.divination
+import androidx.compose.runtime.mutableIntStateOf
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -40,7 +41,7 @@ fun NadiAstrologyScreen() {
     val profile by AppModule.repository.userProfileFlow.collectAsStateWithLifecycle(initialValue = null)
     var fingerprint by rememberSaveable { mutableStateOf("") }
     var autoFingerprint by rememberSaveable { mutableStateOf<String?>(null) }  // 自动生成的指纹
-    var autoTry by rememberSaveable { mutableStateOf(0) }                       // 换指纹的尝试序号
+    var autoTry by rememberSaveable { mutableIntStateOf(0) }                       // 换指纹的尝试序号
     var partnerFingerprint by rememberSaveable { mutableStateOf("") }
 
     // 根据出生日期确定性生成指纹（不依赖手动输入，离线可复现）

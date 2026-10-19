@@ -7,7 +7,8 @@ sealed interface ValidationResult {
 
 /** Local guard for optional provider text. It never lets a provider invent app facts or conclusions. */
 object DialogueReplyValidator {
-    private val SCORE_PATTERN = Regex("(?<!\\d)(\\d{1,3})\\s*分")
+    // A duration is not a chart score; retain score validation for standalone 分.
+    private val SCORE_PATTERN = Regex("(?<!\\d)(\\d{1,3})\\s*分(?!\\s*钟)")
     private val MEMORY_CUES = listOf("我记得你", "你之前说过", "你一直都", "长期记忆显示")
 
     fun validate(text: String, context: DialogueContext): ValidationResult {

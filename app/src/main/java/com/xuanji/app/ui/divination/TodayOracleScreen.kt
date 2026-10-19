@@ -1,4 +1,5 @@
 package com.xuanji.app.ui.divination
+import androidx.compose.runtime.mutableIntStateOf
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -47,7 +48,7 @@ fun TodayOracleScreen() {
     }
     val randomResult = remember { mutableStateOf<TodayOracle.OracleResult?>(null) }
     val reaction = remember { mutableStateOf<TodayOracle.OracleReaction?>(null) }
-    val extraToken = remember { mutableStateOf(0) }
+    val extraToken = remember { mutableIntStateOf(0) }
     val shown = dailyState.value
 
     Column(
@@ -90,7 +91,7 @@ fun TodayOracleScreen() {
                     val draw = TodayOracle.randomDraw()
                     randomResult.value = draw
                     reaction.value = TodayOracle.manualReaction(draw)
-                    extraToken.value += 1
+                    extraToken.intValue += 1
                 },
                 modifier = Modifier.fillMaxWidth()
             ) {
@@ -104,7 +105,7 @@ fun TodayOracleScreen() {
                     SectionTitle("手动彩蛋 · 不改今日签")
                     Spacer(Modifier.height(8.dp))
                     TodayObserverBubble(
-                        sourceKey = "manual-${extraToken.value}",
+                        sourceKey = "manual-${extraToken.intValue}",
                         draw = extra,
                         reaction = reaction
                     )

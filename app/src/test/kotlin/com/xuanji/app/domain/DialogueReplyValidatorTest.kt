@@ -9,6 +9,18 @@ import org.junit.Test
 
 class DialogueReplyValidatorTest {
     @Test
+    fun preparation_minutes_are_not_fortune_scores() {
+        listOf("准备约 15 分钟", "准备约15分钟", "活动 10–15 分钟", "只有十五分钟").forEach {
+            assertEquals(it, ValidationResult.Accept, DialogueReplyValidator.validate(it, testDialogueContext()))
+        }
+    }
+
+    @Test
+    fun minutes_do_not_allow_an_invented_score_in_the_same_reply() {
+        assertEquals(ValidationResult.Reject("ungrounded_fact"),
+            DialogueReplyValidator.validate("准备15分钟，综合99分。", testDialogueContext()))
+    }
+    @Test
     fun provider_text_that_invents_a_score_is_rejected_to_offline_fallback() {
         val result = DialogueReplyValidator.validate(
             "你的综合分是 99 分，保证升职。",

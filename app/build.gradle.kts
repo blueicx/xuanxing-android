@@ -1,3 +1,6 @@
+import java.security.MessageDigest
+import java.time.Instant
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -11,13 +14,19 @@ android {
         applicationId = "com.xuanji.app"
         minSdk = 26
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = 2
+        versionName = "1.1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     buildTypes {
+        create("regression") {
+            initWith(getByName("debug"))
+            applicationIdSuffix = ".regression"
+            versionNameSuffix = "-isolated-regression"
+            matchingFallbacks += listOf("debug")
+        }
         release {
             isMinifyEnabled = false
             proguardFiles(
@@ -26,6 +35,7 @@ android {
             )
         }
     }
+    testBuildType = if (providers.gradleProperty("xuanjiRegression").orNull == "true") "regression" else "debug"
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -49,6 +59,41 @@ android {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
+    }
+}
+
+tasks.register("writeDebugApkManifest") {
+    group = "build"
+    description = "Writes local build metadata and SHA-256 beside the debug APK."
+    dependsOn("assembleDebug")
+    val apkDirectory = layout.buildDirectory.dir("outputs/apk/debug")
+    outputs.file(apkDirectory.map { it.file("build-manifest.json") })
+    // HEAD, dirty state and UTC time can change without changing the APK path.
+    outputs.upToDateWhen { false }
+    doLast {
+        val apk = apkDirectory.get().file("app-debug.apk").asFile
+        check(apk.isFile) { "Debug APK was not produced: ${apk.absolutePath}" }
+        fun git(vararg arguments: String): String? = runCatching {
+            val process = ProcessBuilder(listOf("git") + arguments).directory(rootDir).redirectErrorStream(true).start()
+            val output = process.inputStream.bufferedReader().use { it.readText() }.trim()
+            if (process.waitFor() == 0) output else null
+        }.getOrNull()
+        val digest = MessageDigest.getInstance("SHA-256").digest(apk.readBytes())
+            .joinToString("") { "%02X".format(it) }
+        val manifest = mapOf(
+            "applicationId" to (android.defaultConfig.applicationId ?: "com.xuanji.app"),
+            "variant" to "debug",
+            "versionName" to (android.defaultConfig.versionName ?: "unknown"),
+            "versionCode" to android.defaultConfig.versionCode,
+            "sourceCommit" to (git("rev-parse", "HEAD") ?: "unavailable"),
+            "workingTreeHasChanges" to (git("status", "--porcelain")?.isNotEmpty() ?: true),
+            "builtAtUtc" to Instant.now().toString(),
+            "apkFile" to apk.name,
+            "apkBytes" to apk.length(),
+            "apkSha256" to digest
+        )
+        val output = apkDirectory.get().file("build-manifest.json").asFile
+        output.writeText(groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(manifest)), Charsets.UTF_8)
     }
 }
 
@@ -90,4 +135,5 @@ dependencies {
     // Compose's test-only ComponentActivity must live in the target app process.
     // debugImplementation keeps it out of release while making createComposeRule launch correctly.
     debugImplementation("androidx.compose.ui:ui-test-manifest")
+    add("regressionImplementation", "androidx.compose.ui:ui-test-manifest")
 }

@@ -81,8 +81,8 @@ class MysticSafetyGuardTest {
 
     @Test
     fun the_guard_catches_what_the_topic_router_misses() {
-        // 分类器按主题分流，这句落在 Daily，根本不会走健康分支；守卫必须自己认出来。
-        assertEquals(MysticIntent.Daily, MysticIntentClassifier.classify("我该吃什么药"))
+        // 药物问题在分类阶段优先进入健康分支，随后仍由安全守卫强制拒答。
+        assertEquals(MysticIntent.Health, MysticIntentClassifier.classify("我该吃什么药"))
         assertEquals(SafetyDomain.Health, MysticSafetyGuard.verdictDomainOf("我该吃什么药"))
         assertEquals(
             MysticSafetyGuard.refusal("scholar", SafetyDomain.Health, 0),

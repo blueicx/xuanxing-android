@@ -1,4 +1,5 @@
 package com.xuanji.app.ui.profile
+import androidx.compose.runtime.mutableIntStateOf
 
 import android.app.DatePickerDialog
 import android.app.TimePickerDialog
@@ -53,6 +54,10 @@ import com.xuanji.app.data.local.ConversationMemoryStore
 import com.xuanji.app.data.local.DataStorePreferenceBridge
 import com.xuanji.app.data.local.MysticCharacterSessionStore
 import com.xuanji.app.data.local.ActionFeedbackDataStore
+import com.xuanji.app.data.local.CompanionGameProgressStore
+import com.xuanji.app.data.local.GameArchiveStore
+import com.xuanji.app.data.local.LocalBackupProfileKeys
+import com.xuanji.app.data.local.LocalDataBackupRepository
 import com.xuanji.app.data.local.softMemoryTagStore
 import com.xuanji.app.di.AppModule
 import com.xuanji.app.domain.ChinaLocations
@@ -70,6 +75,8 @@ import com.xuanji.app.domain.MysticPrivacyExport
 import com.xuanji.app.domain.MysticPrivacyExportCodec
 import com.xuanji.app.domain.MysticPrivacyFavorite
 import com.xuanji.app.domain.privacyFingerprint
+import com.xuanji.app.domain.SoftMemoryTag
+import com.xuanji.app.ui.components.MysticSoftMemoryPanel
 import java.time.LocalDate
 import kotlinx.coroutines.launch
 
@@ -88,7 +95,21 @@ fun ProfileScreen() {
     val characterSessionStore = remember { MysticCharacterSessionStore(localBridge) }
     val conversationMemoryStore = remember { ConversationMemoryStore(localBridge) }
     val softMemoryStore = remember { context.softMemoryTagStore() }
+    var softMemoryTags by remember(favoritesProfileKey) { mutableStateOf(emptyList<SoftMemoryTag>()) }
+    var softMemoryStatus by remember(favoritesProfileKey) { mutableStateOf("") }
     val actionFeedbackStore = remember { ActionFeedbackDataStore(localBridge) }
+    val localBackupRepository = remember(context) {
+        LocalDataBackupRepository(
+            favoriteStore = AppModule.readingFavoriteStore,
+            feedbackStore = actionFeedbackStore,
+            gameProgressStore = CompanionGameProgressStore(localBridge),
+            xiangqiStore = GameArchiveStore(context),
+            atomicBridge = localBridge,
+            dailyLifeStore = AppModule.dailyLifeStore,
+            foodPreferenceStore = com.xuanji.app.data.local.FoodPreferenceStore(localBridge),
+            activityPreferenceStore = com.xuanji.app.data.local.ActionConstraintStore(localBridge)
+        )
+    }
     val locations = remember { ChinaLocations.load(context) }
 
     // 出生信息默认空白（由用户自行填写），避免预填他人/作者生日
@@ -97,9 +118,9 @@ fun ProfileScreen() {
     var birthDay by rememberSaveable { mutableStateOf<Int?>(null) }
     var birthHour by rememberSaveable { mutableStateOf<Int?>(null) }
     var birthMinute by rememberSaveable { mutableStateOf<Int?>(null) }
-    var provinceIndex by rememberSaveable { mutableStateOf(-1) }
-    var cityIndex by rememberSaveable { mutableStateOf(-1) }
-    var districtIndex by rememberSaveable { mutableStateOf(-1) }
+    var provinceIndex by rememberSaveable { mutableIntStateOf(-1) }
+    var cityIndex by rememberSaveable { mutableIntStateOf(-1) }
+    var districtIndex by rememberSaveable { mutableIntStateOf(-1) }
     var locationDialog by rememberSaveable { mutableStateOf<String?>(null) }
     var gender by rememberSaveable { mutableStateOf<String?>(null) }
     var showClearProfileDialog by rememberSaveable { mutableStateOf(false) }
@@ -111,6 +132,13 @@ fun ProfileScreen() {
 
     LaunchedEffect(Unit) {
         networkContextEnabled = externalConsentStore.read().networkEnabled
+    }
+    LaunchedEffect(favoritesProfileKey) {
+        val key = favoritesProfileKey
+        if (key != null) runCatching { softMemoryStore.read(key) }.onSuccess {
+            softMemoryTags = it.tags
+            if (it.unreadable) softMemoryStatus = "记忆数据暂不可读，原数据保留。"
+        }.onFailure { softMemoryStatus = "暂时无法读取本地记忆。" }
     }
 
     val selectedLocation = if (
@@ -285,6 +313,7 @@ fun ProfileScreen() {
                             }
                         }
                     }
+                    ProfileDataReadinessCard(currentProfile)
                     Button(
                         onClick = {
                             val y = birthYear ?: return@Button
@@ -398,7 +427,15 @@ fun ProfileScreen() {
                         FoodPreferenceEditor(
                             preference = actionState.preference,
                             onSave = actionViewModel::savePreference,
-                            onClear = actionViewModel::clearPreference
+                            onClear = actionViewModel::clearPreference,
+                            unreadable = actionState.preferenceUnreadable
+                        )
+                        Spacer(Modifier.height(16.dp))
+                        ActivityPreferenceEditor(
+                            preference = actionState.activityPreference,
+                            unreadable = actionState.activityPreferenceUnreadable,
+                            onSave = actionViewModel::saveActivityPreference,
+                            onClear = actionViewModel::clearActivityPreference
                         )
                     }
                 }
@@ -482,13 +519,68 @@ fun ProfileScreen() {
                     Spacer(Modifier.height(12.dp))
                     ExternalContextCard(networkEnabled = networkContextEnabled)
                     Spacer(Modifier.height(12.dp))
+                    LocalBackupPanel(
+                        repository = localBackupRepository,
+                        profileKeys = LocalBackupProfileKeys(
+                            favoriteProfileKey = favoritesProfileKey.orEmpty(),
+                            localProfileKey = actionState.profileKey.orEmpty()
+                        )
+                    )
+                    AppModule.dailyLifeStore?.let { DailyLifePrivacyPanel(it, actionState.profileKey) }
+                    Spacer(Modifier.height(12.dp))
+                    Text("记忆管理", style = MaterialTheme.typography.titleMedium)
+                    Text("仅管理当前出生档案的本地软标签。推断标签默认 30 天后过期，你可以编辑、撤回或清除。", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    if (softMemoryTags.none { !it.revoked } && favoritesProfileKey != null) {
+                        Text("当前档案没有可管理的软标签。", style = MaterialTheme.typography.bodySmall)
+                    }
+                    MysticSoftMemoryPanel(
+                        tags = softMemoryTags,
+                        showExpired = true,
+                        editable = true,
+                        onEdit = { tag ->
+                            val key = favoritesProfileKey
+                            if (key != null) scope.launch {
+                                val result = runCatching { softMemoryStore.edit(key, tag) }
+                                result.onSuccess { snapshot ->
+                                    softMemoryTags = snapshot.tags
+                                    softMemoryStatus = when (snapshot.unreadable) {
+                                        true -> "记忆数据无法安全修改。"
+                                        false -> "记忆已更新。"
+                                    }
+                                }.onFailure { softMemoryStatus = "保存失败，原记忆保留。" }
+                            }
+                        },
+                        onRevoke = { id ->
+                            val key = favoritesProfileKey
+                            if (key != null) scope.launch {
+                                runCatching { softMemoryStore.revoke(key, id) }.onSuccess {
+                                    softMemoryTags = it.tags
+                                    softMemoryStatus = when (it.unreadable) {
+                                        true -> "记忆数据无法安全修改，原数据保留。"
+                                        false -> "已撤回该记忆。"
+                                    }
+                                }.onFailure { softMemoryStatus = "撤回失败，原记忆保留。" }
+                            }
+                        },
+                        onClear = {
+                            val key = favoritesProfileKey
+                            if (key != null) scope.launch {
+                                runCatching { softMemoryStore.clear(key) }.onSuccess { softMemoryTags = emptyList(); softMemoryStatus = "已清除当前档案的软记忆。" }
+                                    .onFailure { softMemoryStatus = "清除失败，原记忆保留。" }
+                            }
+                        }
+                    )
+                    if (favoritesProfileKey.isNullOrBlank()) Text("保存出生档案后可管理对应的软记忆。", style = MaterialTheme.typography.bodySmall)
+                    if (softMemoryStatus.isNotBlank()) Text(softMemoryStatus, style = MaterialTheme.typography.labelSmall)
+                    Spacer(Modifier.height(12.dp))
                     OutlinedButton(
                         enabled = !actionState.profileKey.isNullOrBlank(),
                         onClick = {
                             val key = actionState.profileKey ?: return@OutlinedButton
                             scope.launch {
-                                val memory = runCatching { conversationMemoryStore.load(key) }.getOrNull()
-                                val tags = runCatching { softMemoryStore.read(key).tags }.getOrDefault(emptyList())
+                                val companionProfileKey = favoritesProfileKey ?: key
+                                val memory = runCatching { conversationMemoryStore.load(companionProfileKey) }.getOrNull()
+                                val tags = runCatching { softMemoryStore.read(companionProfileKey).tags }.getOrDefault(emptyList())
                                 val feedbackCount = runCatching { actionFeedbackStore.list(key, 100).size }.getOrDefault(0)
                                 val favoriteSnapshot = favoritesProfileKey?.let { profileKey ->
                                     runCatching { AppModule.readingFavoriteStore.list(profileKey) }.getOrNull()
@@ -496,11 +588,11 @@ fun ProfileScreen() {
                                 val favorites = favoriteSnapshot?.entries.orEmpty()
                                 val exported = MysticPrivacyExportCodec.encode(
                                     MysticPrivacyExport(
-                                        profileFingerprint = privacyFingerprint(key),
+                                        profileFingerprint = privacyFingerprint(companionProfileKey),
                                         exportedDateKey = LocalDate.now().toString(),
-                                        characterSessionSnapshot = runCatching { characterSessionStore.raw(key) }.getOrNull(),
+                                        characterSessionSnapshot = runCatching { characterSessionStore.raw(companionProfileKey) }.getOrNull(),
                                         longTermMemory = memory?.entries.orEmpty().map { "${it.dateKey}|${it.kind.wire}|${it.text}" },
-                                        softMemoryLabels = tags.map { "${it.key}|${it.value}|${it.source.name}" },
+                                        softMemoryLabels = tags.map { "${it.key}|${it.value}|${it.source.name}|${it.expiresAtDate.orEmpty()}" },
                                         actionFeedbackCount = feedbackCount,
                                         readingFavoriteCount = favorites.size,
                                         readingFavorites = favorites.map { favorite ->

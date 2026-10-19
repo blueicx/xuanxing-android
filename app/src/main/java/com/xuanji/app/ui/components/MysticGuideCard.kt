@@ -1,10 +1,13 @@
 package com.xuanji.app.ui.components
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableIntStateOf
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.border
 import androidx.compose.foundation.rememberScrollState
@@ -34,14 +37,12 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -56,15 +57,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
-import androidx.datastore.preferences.core.edit
-import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.google.gson.Gson
 import com.xuanji.app.data.model.BaziFull
 import com.xuanji.app.data.model.CompositeDailyFortune
 import com.xuanji.app.data.local.ConversationMemoryStore
 import com.xuanji.app.data.local.DataStorePreferenceBridge
-import com.xuanji.app.data.local.dataStore
 import com.xuanji.app.data.local.MysticCharacterSessionStore
 import com.xuanji.app.data.local.CompanionGameProgressStore
 import com.xuanji.app.data.local.softMemoryTagStore
@@ -90,9 +87,7 @@ import com.xuanji.app.domain.reduce
 import com.xuanji.app.domain.reduceCharacterSession
 import com.xuanji.app.domain.MysticOpeningCheckin
 import com.xuanji.app.domain.MysticOpeningOption
-import com.xuanji.app.domain.MysticGuestCameo
 import com.xuanji.app.domain.MysticGuestChoice
-import com.xuanji.app.domain.MysticGuestExit
 import com.xuanji.app.domain.MysticRhythmCheckin
 import com.xuanji.app.domain.MysticSkin
 import com.xuanji.app.domain.MysticVisitMemory
@@ -104,8 +99,6 @@ import com.xuanji.app.domain.SoftMemorySource
 import com.xuanji.app.domain.SoftMemoryTag
 import com.xuanji.app.domain.DefaultMysticDialogueAnalyzer
 import com.xuanji.app.domain.MysticMemoryNote as DomainMysticMemoryNote
-import com.xuanji.app.domain.MysticMessage
-import com.xuanji.app.domain.MysticMessageRole
 import com.xuanji.app.domain.MysticCompanionAction
 import com.xuanji.app.domain.MysticCompanionActionRouter
 import com.xuanji.app.domain.MysticGameContextFactory
@@ -115,175 +108,21 @@ import com.xuanji.app.domain.CompanionGameFavoriteFactory
 import com.xuanji.app.domain.ReadingFavoriteDataState
 import com.xuanji.app.domain.action.DailyActionPlan
 import com.xuanji.app.domain.action.LifeProfile
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.ensureActive
+import androidx.compose.runtime.DisposableEffect
 import kotlinx.coroutines.launch
-import java.security.MessageDigest
+import java.time.LocalDate
 
-private data class MysticTurn(
-    val key: String,
-    val question: String,
-    val answer: String,
-    val reaction: String = "",
-    val kind: String = "ask",
-    val aside: MysticGuestCameo? = null,
-    val asidePrompt: String = "",
-    val asideChoice: String = "",
-    val asideReply: String = "",
-    val asideExit: MysticGuestExit? = null,
-    val asideWrapup: String = ""
-)
-
-private data class MysticMemoryNote(
-    val id: String,
-    val text: String
-)
-
-/** Rehydrates the rich transcript from the persisted, provider-agnostic message log. */
-private fun restoreCharacterThread(messages: List<MysticMessage>): List<MysticTurn> {
-    val restored = mutableListOf<MysticTurn>()
-    var pendingUser: MysticMessage? = null
-    messages.takeLast(20).forEach { message ->
-        when (message.role) {
-            MysticMessageRole.User -> {
-                if (pendingUser != null) {
-                    restored += MysticTurn(
-                        key = "restored-user-${pendingUser!!.turnId}",
-                        question = pendingUser!!.text,
-                        answer = "这句已记下；上一轮回复没有完整保存。",
-                        kind = "restored"
-                    )
-                }
-                pendingUser = message
-            }
-            MysticMessageRole.Mystic -> {
-                val user = pendingUser
-                restored += MysticTurn(
-                    key = "restored-${message.turnId}",
-                    question = user?.text ?: "角色回复",
-                    answer = message.text,
-                    kind = "restored"
-                )
-                pendingUser = null
-            }
-            MysticMessageRole.System -> {
-                restored += MysticTurn(
-                    key = "restored-system-${message.turnId}",
-                    question = "角色交接",
-                    answer = message.text,
-                    kind = "handoff"
-                )
-            }
-        }
-    }
-    pendingUser?.let { user ->
-        restored += MysticTurn(
-            key = "restored-user-${user.turnId}",
-            question = user.text,
-            answer = "这句已记下；回复仍可重新提问。",
-            kind = "restored"
-        )
-    }
-    return restored.takeLast(5)
-}
-
-/** 记忆列表里那条是哪个动作；穷举写，新增种类时编译期就得补。 */
-private fun recollectionKindLabel(kind: RecollectionKind): String = when (kind) {
-    RecollectionKind.USER_INPUT -> "原话"
-    RecollectionKind.USER_CHOICE -> "选择"
-    RecollectionKind.SETTLED_GAME_RESULT -> "终局"
-}
-
-private data class StoredMysticVisit(
-    val dateKey: String = "",
-    val topicKey: String = "",
-    val action: String = ""
-)
-
-private class MysticVisitStore(private val context: android.content.Context) {
-    private val gson = Gson()
-
-    suspend fun read(profileKey: String): MysticVisitMemory {
-        val preferences = context.dataStore.data.first()
-        val stored = preferences[stringPreferencesKey("mystic_visit_${fingerprint(profileKey)}")]
-            ?.let { json ->
-                runCatching { gson.fromJson(json, StoredMysticVisit::class.java) }.getOrNull()
-            }
-        return MysticVisitMemory(
-            lastDateKey = stored?.dateKey.orEmpty(),
-            lastTopicKey = stored?.topicKey.orEmpty(),
-            lastAction = stored?.action.orEmpty()
-        )
-    }
-
-    suspend fun save(profileKey: String, memory: MysticVisitMemory) {
-        val key = stringPreferencesKey("mystic_visit_${fingerprint(profileKey)}")
-        context.dataStore.edit { preferences ->
-            preferences[key] = gson.toJson(
-                StoredMysticVisit(
-                    dateKey = canonicalDate(memory.lastDateKey),
-                    topicKey = memory.lastTopicKey,
-                    action = memory.lastAction
-                )
-            )
-        }
-    }
-
-    private fun fingerprint(value: String): String =
-        MessageDigest.getInstance("SHA-256").digest(value.toByteArray())
-            .joinToString("") { "%02x".format(it) }
-
-    private fun canonicalDate(value: String): String {
-        val parts = value.split("-")
-        if (parts.size != 3) return value
-        val year = parts[0].toIntOrNull() ?: return value
-        val month = parts[1].toIntOrNull() ?: return value
-        val day = parts[2].toIntOrNull() ?: return value
-        return "$year-$month-$day"
-    }
-}
-
-private class MysticCompanionState(initialMode: String, initialTopic: String) {
-    var mode by mutableStateOf(initialMode)
-    var topic by mutableStateOf(initialTopic)
-    var interactionCarryoverOption by mutableStateOf<String?>(null)
-    var pendingHandoff by mutableStateOf<String?>(null)
-    var pendingHandoffEcho by mutableStateOf<String?>(null)
-    var rhythmAnswered by mutableStateOf(false)
-    var completedRhythmKey by mutableStateOf<String?>(null)
-    var guestCameo by mutableStateOf<MysticGuestCameo?>(null)
-    var guestExit by mutableStateOf<MysticGuestExit?>(null)
-    var selectedGuestChoice by mutableStateOf("")
-    var guestReply by mutableStateOf("")
-    var guestQuestion by mutableStateOf("")
-    var pendingGuest by mutableStateOf(false)
-    var guestChoiceCarryoverKey by mutableStateOf<String?>(null)
-    var pendingGuestChoiceEcho by mutableStateOf<String?>(null)
-    var memoryNotes by mutableStateOf(emptyList<MysticMemoryNote>())
-    /** User-authored notes are shared across character threads; generated replies are not. */
-    var sharedMemoryNotes by mutableStateOf(emptyList<DomainMysticMemoryNote>())
-    var memorySequence by mutableStateOf(0)
-    var memoryExpanded by mutableStateOf(false)
-    var skinId by mutableStateOf("")
-    var activeCharacterId by mutableStateOf<MysticCharacterId?>(null)
-    val characterThreads = mutableMapOf<MysticCharacterId, SnapshotStateList<MysticTurn>>()
-    val characterSessionStates = mutableStateMapOf<MysticCharacterId, MysticSessionState>()
-
-    fun threadFor(characterId: MysticCharacterId): SnapshotStateList<MysticTurn> =
-        characterThreads.getOrPut(characterId) { mutableStateListOf() }
-
-    fun sessionFor(characterId: MysticCharacterId): MysticSessionState =
-        characterSessionStates[characterId] ?: MysticSessionState()
-}
-
-private val mysticCompanionStates = mutableMapOf<String, MysticCompanionState>()
 
 private fun mysticCompanionState(
     key: String,
     fortune: CompositeDailyFortune
-): MysticCompanionState = mysticCompanionStates.getOrPut(key) {
+): MysticCompanionState {
+    // remember owns this scope. Once disposed, only the revocable DataStore record may restore it.
+    require(key.isNotBlank())
     val topic = "composite"
-    MysticCompanionState(MysticGuideGenerator.suggestedMode(topic, fortune), topic).also {
+    return MysticCompanionState(MysticGuideGenerator.suggestedMode(topic, fortune), topic).also {
         it.skinId = MysticGuideGenerator.defaultMysticSkin(it.mode, fortune).id
     }
 }
@@ -301,7 +140,8 @@ fun MysticGuideCard(
     onStageCostumeConsumed: () -> Unit = {},
     stageActionRequest: String? = null,
     stageDetailContext: MysticDetailContext? = null,
-    onStageActionConsumed: () -> Unit = {}
+    onStageActionConsumed: () -> Unit = {},
+    onRequestCharacterHandoff: ((MysticCharacterId, MysticDetailContext) -> Unit)? = null
 ) {
     val records by AppModule.testRecordRepository.records.collectAsStateWithLifecycle(initialValue = emptyList())
     val context = LocalContext.current
@@ -350,11 +190,35 @@ fun MysticGuideCard(
         memoryExpanded = false
     }
     val latestTest = records.maxByOrNull { it.date }
+    var sessionState by remember(visitProfile, characterId) { mutableStateOf(companion.sessionFor(characterId)) }
+    var characterSessionsLoaded by remember(visitProfile) { mutableStateOf(false) }
+    fun currentInteraction() = sessionState.interaction.forDate(fortune.dateKey)
+    fun updateInteraction(transform: (com.xuanji.app.domain.MysticInteractionState) -> com.xuanji.app.domain.MysticInteractionState) {
+        if (!characterSessionsLoaded) return
+        sessionState = reduce(sessionState, MysticEvent.UpdateInteraction(sessionState.sessionToken, transform(currentInteraction())))
+    }
     var dailyActionPlan by remember(visitProfile, fortune.dateKey) { mutableStateOf<DailyActionPlan?>(null) }
     var lifeProfile by remember(visitProfile) { mutableStateOf<LifeProfile?>(null) }
-    var routedAction by remember(characterId) { mutableStateOf<MysticCompanionAction?>(null) }
-    LaunchedEffect(visitProfile, fortune.dateKey) {
-        dailyActionPlan = runCatching { AppModule.actionRepository.loadToday() }.getOrNull()
+    var routedAction by MysticInteractionProperty(
+        read = { currentInteraction().restoreAction(dailyActionPlan, lifeProfile) },
+        write = { action -> updateInteraction { it.withAction(action) } }
+    )
+    var temporaryConditions by MysticInteractionProperty(
+        read = { currentInteraction().conditions }, write = { value -> updateInteraction { it.copy(conditions = value) } }
+    )
+    var referenceCategory by MysticInteractionProperty(
+        read = { currentInteraction().referenceCategory }, write = { value -> updateInteraction { it.copy(referenceCategory = value) } }
+    )
+    var currentReferenceId by MysticInteractionProperty(
+        read = { currentInteraction().referenceId }, write = { value -> updateInteraction { it.copy(referenceId = value) } }
+    )
+    var temporaryStatus by remember(characterId) { mutableStateOf<String?>(null) }
+    var actionRequestSequence by remember(characterId) { mutableLongStateOf(0L) }
+    LaunchedEffect(visitProfile, characterId, fortune.dateKey, temporaryConditions, characterSessionsLoaded) {
+        if (!characterSessionsLoaded) return@LaunchedEffect
+        val restoredPlan = runCatching { AppModule.actionRepository.loadToday(java.time.LocalDate.parse(fortune.dateKey), temporaryConditions) }.getOrNull()
+        if (!isActive) return@LaunchedEffect
+        dailyActionPlan = restoredPlan
         lifeProfile = runCatching { AppModule.actionRepository.loadLifeProfile() }.getOrNull()
     }
     val guide = remember(mode, topic, bazi, fortune, latestTest, companion.skinId) {
@@ -362,8 +226,6 @@ fun MysticGuideCard(
     }
     val dialogueEngine = remember { DefaultMysticDialogueEngine() }
     val dialogueProvider: DialogueProvider = remember { OfflineDialogueProvider(dialogueEngine) }
-    var sessionState by remember(characterId) { mutableStateOf(companion.sessionFor(characterId)) }
-    var characterSessionsLoaded by remember(visitProfile) { mutableStateOf(false) }
     LaunchedEffect(visitProfile) {
         val restored = runCatching { characterSessionStore.load(visitProfile) }.getOrNull()
         if (restored != null) {
@@ -384,7 +246,7 @@ fun MysticGuideCard(
         if (!characterSessionsLoaded) return@LaunchedEffect
         val snapshot = com.xuanji.app.domain.MysticCharacterSessionState(
             activeCharacterId = characterId,
-            sessions = MysticCharacterId.entries.associateWith { companion.sessionFor(it) },
+            sessions = MysticCharacterId.entries.associateWith { if (it == characterId) sessionState else companion.sessionFor(it) },
             sharedMemoryNotes = companion.sharedMemoryNotes
         )
         runCatching { characterSessionStore.save(visitProfile, snapshot) }
@@ -426,8 +288,15 @@ fun MysticGuideCard(
     var gameReply by remember { mutableStateOf("") }
     var gameInputEcho by remember { mutableStateOf<String?>(null) }
     var gameThinking by remember { mutableStateOf(false) }
+    val boardWork = remember(coroutineScope) { com.xuanji.app.domain.game.BoardWorkRunner(coroutineScope) }
+    DisposableEffect(visitProfile, characterId, boardWork) {
+        onDispose { boardWork.cancel(); gameThinking = false }
+    }
     var gameViewPly by remember { mutableStateOf<Int?>(null) }
-    var companionGameId by remember(characterId) { mutableStateOf<String?>(null) }
+    var companionGameId by MysticInteractionProperty(
+        read = { currentInteraction().gameId?.takeUnless { it == "xiangqi" } },
+        write = { value -> updateInteraction { it.copy(gameId = value, actionKey = if (value == null && it.actionKey == "game") "" else it.actionKey) } }
+    )
     val gameArchiveStore = remember(context) { com.xuanji.app.data.local.GameArchiveStore(context) }
     val companionGameProgressStore = remember(context) {
         CompanionGameProgressStore(DataStorePreferenceBridge(context))
@@ -504,7 +373,9 @@ fun MysticGuideCard(
         }
     }
     var selectedFollowUp by remember(guide) { mutableStateOf("") }
-    var evidenceOpen by remember(guide) { mutableStateOf(false) }
+    var evidenceOpen by MysticInteractionProperty(
+        read = { currentInteraction().evidenceOpen }, write = { value -> updateInteraction { it.copy(evidenceOpen = value) } }
+    )
     val conversation = companion.threadFor(characterId)
     val expandedBubbles = remember(characterId) { mutableStateMapOf<String, Boolean>() }
     var arrivalVisible by remember(guide) { mutableStateOf(false) }
@@ -518,10 +389,10 @@ fun MysticGuideCard(
     var selectedRhythm by remember(guide) { mutableStateOf<String?>(null) }
     var pendingRhythm by remember(guide) { mutableStateOf<String?>(null) }
     var customQuestion by remember(guide) { mutableStateOf("") }
-    var interactionCount by remember(guide) { mutableStateOf(0) }
-    var customCount by remember(guide) { mutableStateOf(0) }
+    var interactionCount by remember(guide) { mutableIntStateOf(0) }
+    var customCount by remember(guide) { mutableIntStateOf(0) }
     val askCounts = remember(guide) { mutableStateMapOf<String, Int>() }
-    var interactionRound by remember(guide) { mutableStateOf(0) }
+    var interactionRound by remember(guide) { mutableIntStateOf(0) }
     var selectedInteraction by remember(guide, interactionRound) { mutableStateOf<MysticInteractionOption?>(null) }
     var selectedClarifier by remember(guide) { mutableStateOf<String?>(null) }
     var pendingClarify by remember(guide) { mutableStateOf<MysticClarifierOption?>(null) }
@@ -666,7 +537,8 @@ fun MysticGuideCard(
             value = analysis.entities["topic_label"] ?: topicKey,
             source = SoftMemorySource.Inferred,
             createdAt = fortune.dateKey,
-            lastSeenAt = fortune.dateKey
+            lastSeenAt = fortune.dateKey,
+            expiresAtDate = runCatching { LocalDate.parse(fortune.dateKey).plusDays(30).toString() }.getOrNull()
         )
         coroutineScope.launch {
             val updated = runCatching { softMemoryStore.upsertInferred(visitProfile, tag) }.getOrNull()
@@ -707,12 +579,16 @@ fun MysticGuideCard(
      */
     fun driveGame(
         echo: String? = null,
-        action: (com.xuanji.app.domain.game.GameSessionState) -> com.xuanji.app.domain.game.GameDialogueBridge.Result
+        action: suspend (com.xuanji.app.domain.game.GameSessionState) -> com.xuanji.app.domain.game.GameDialogueBridge.Result
     ) {
         if (gameThinking) return
         gameThinking = true
         gameViewPly = null
-        coroutineScope.launch(kotlinx.coroutines.Dispatchers.Default) {
+        val initialBoard = gameSession
+        boardWork.launch(onFinished = { gameThinking = false }, onError = {
+            gameReply = "棋局计算暂时未完成，已落子局面保留，可重试。"
+        }) {
+            val ticket = this
             suspend fun fulfil(
                 result: com.xuanji.app.domain.game.GameDialogueBridge.Result
             ): com.xuanji.app.domain.game.GameDialogueBridge.Result = when (result.archive) {
@@ -722,7 +598,7 @@ fun MysticGuideCard(
                         savedAt = System.currentTimeMillis()
                     )
                     if (runCatching { gameArchiveStore.save(visitProfile, save) }.isSuccess) {
-                        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) { gameArchive = save }
+                        ticket.publish { gameArchive = save }
                         result
                     } else {
                         result.copy(reply = "本机存储不可用，这一局没能保存。")
@@ -735,7 +611,7 @@ fun MysticGuideCard(
                 null -> result
             }
             suspend fun publish(result: com.xuanji.app.domain.game.GameDialogueBridge.Result) {
-                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                ticket.publish {
                     if (result.event is com.xuanji.app.domain.game.GameEvent.Start) {
                         gameRecordedToken = null
                     }
@@ -744,13 +620,15 @@ fun MysticGuideCard(
                     if (echo != null && (result.event != null || result.grounded)) gameInputEcho = echo
                 }
             }
-            var result = fulfil(action(gameSession))
+            var result = fulfil(action(initialBoard))
+            kotlinx.coroutines.currentCoroutineContext().ensureActive()
             publish(result)
-            while (result.awaitEngine && isActive) {
+            while (result.awaitEngine && kotlinx.coroutines.currentCoroutineContext().isActive) {
                 result = gameBridge.engineReply(result.state)
                 publish(result)
             }
             val settled = gameBridge.settledResult(result.state)
+            kotlinx.coroutines.currentCoroutineContext().ensureActive()
             val token = result.state.sessionToken
             if (settled != null && gameRecordedToken != token) {
                 gameRecordedToken = token
@@ -761,21 +639,46 @@ fun MysticGuideCard(
                 )
                 val updated = runCatching { gameArchiveStore.record(visitProfile, settled) }.getOrNull()
                 if (updated != null) {
-                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) { gameRecord = updated }
+                    ticket.publish { gameRecord = updated }
                 }
             }
-            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) { gameThinking = false }
         }
     }
 
     fun runGameText(text: String, echo: String = text) {
-        driveGame(echo) { gameBridge.handle(it, text) }
+        driveGame(echo) { gameBridge.handle(it, text, kotlinx.coroutines.currentCoroutineContext()) }
     }
 
     fun submitPanelInput(text: String) {
         // Game path first: board-game intents bypass the generic pendingCustom reply so
         // character game commentary never mixes with fortune template wording.
         val cleanText = text.trim().take(200)
+        actionRequestSequence++
+        val conditions = com.xuanji.app.domain.TemporaryActionConditions.parse(cleanText)
+        if (conditions.active) {
+            val token = sessionState.sessionToken
+            val sequence = actionRequestSequence
+            coroutineScope.launch {
+                val budget = if (conditions.cheaper) dailyActionPlan?.meals?.firstOrNull()?.estimatedPriceCents?.let { (it - 500).coerceAtLeast(100) } else null
+                val next = temporaryConditions.merge(conditions.copy(maxBudgetCents = conditions.maxBudgetCents ?: budget))
+                val recalculated = AppModule.actionRepository.loadToday(java.time.LocalDate.parse(fortune.dateKey), next)
+                if (token != sessionState.sessionToken || sequence != actionRequestSequence) return@launch
+                temporaryConditions = next
+                dailyActionPlan = recalculated
+                referenceCategory = if (conditions.excludedIngredients.isNotEmpty() || conditions.maxBudgetCents != null || conditions.cheaper) "meal"
+                    else if (referenceCategory == "outing") "outing" else "activity"
+                currentReferenceId = com.xuanji.app.domain.MysticReferenceResolver.fromPlan(recalculated, referenceCategory).firstOrNull()?.id
+                routedAction = recalculated?.let { when (referenceCategory) {
+                    "meal" -> MysticCompanionAction.ShowTodayMeal(it)
+                    "outing" -> MysticCompanionAction.ShowTodayOuting(it)
+                    else -> MysticCompanionAction.ShowTodayActivity(it)
+                } }
+                temporaryStatus = "本次条件已用于重新筛选；长期偏好尚未改动。"
+                customQuestion = cleanText
+                submitCustom()
+            }
+            return
+        }
         if (MysticGameProgressQuestion.isResumeRequest(cleanText)) {
             val requestedCharacterId = characterId
             val requestToken = sessionState.sessionToken
@@ -799,14 +702,38 @@ fun MysticGuideCard(
             submitCustom()
             return
         }
+        com.xuanji.app.domain.MysticReferenceResolver.requestedIndex(cleanText)?.let { index ->
+            currentReferenceId = com.xuanji.app.domain.MysticReferenceResolver.fromPlan(dailyActionPlan, referenceCategory).getOrNull(index - 1)?.id
+            val selectedPlan = com.xuanji.app.domain.MysticReferenceResolver.selectPlan(dailyActionPlan, referenceCategory, currentReferenceId)
+            routedAction = selectedPlan?.let { selected -> when (referenceCategory) {
+                "meal" -> MysticCompanionAction.ShowTodayMeal(selected)
+                "activity" -> MysticCompanionAction.ShowTodayActivity(selected)
+                "outing" -> MysticCompanionAction.ShowTodayOuting(selected)
+                else -> null
+            } }
+            customQuestion = cleanText
+            submitCustom()
+            return
+        }
         val action = MysticCompanionActionRouter.route(
             cleanText,
             dailyActionPlan,
             lifeProfile,
-            gameArchive != null
+            gameArchive != null,
+            referenceCategory,
+            currentReferenceId
         )
         if (action != null) {
             routedAction = action
+            referenceCategory = when (action) {
+                is MysticCompanionAction.ShowTodayMeal -> "meal"
+                is MysticCompanionAction.ShowTodayActivity -> "activity"
+                is MysticCompanionAction.ShowTodayOuting -> "outing"
+                else -> referenceCategory
+            }
+            if (action is MysticCompanionAction.ShowTodayMeal || action is MysticCompanionAction.ShowTodayActivity || action is MysticCompanionAction.ShowTodayOuting) {
+                currentReferenceId = com.xuanji.app.domain.MysticReferenceResolver.fromPlan(dailyActionPlan, referenceCategory).firstOrNull()?.id
+            }
             when (action) {
                 MysticCompanionAction.ShowEvidence -> evidenceOpen = true
                 MysticCompanionAction.ResumeXiangqi -> runGameText("继续棋局")
@@ -857,6 +784,47 @@ fun MysticGuideCard(
         onStageActionConsumed()
     }
 
+    fun resetCurrentThread() {
+        actionRequestSequence++
+        sessionState = reduce(sessionState, MysticEvent.Clear)
+        pendingCustomDetailContext = null
+        conversation.clear()
+        selectedFollowUp = ""
+        selectedInteraction = null
+        interactionCarryoverOption = null
+        askCounts.clear()
+        pendingFollowUp = null
+        pendingInteraction = null
+        pendingHandoff = null
+        pendingHandoffEcho = null
+        pendingCustom = null
+        pendingOpening = null
+        openingAnswered = false
+        selectedRhythm = null
+        pendingRhythm = null
+        completedRhythmKey = null
+        rhythmAnswered = false
+        guestCameo = null
+        guestExit = null
+        guestChoiceCarryoverKey = null
+        pendingGuestChoiceEcho = null
+        memoryNotes = emptyList()
+        memorySequence = 0
+        memoryExpanded = false
+        selectedGuestChoice = ""
+        guestReply = ""
+        guestQuestion = ""
+        pendingGuest = false
+        customQuestion = ""
+        selectedClarifier = null
+        pendingClarify = null
+        presenceOverride = null
+        pendingAsideTurnKey = null
+        pendingAsideActionTurnKey = null
+        companion.characterSessionStates[characterId] = sessionState
+        coroutineScope.launch { runCatching { characterSessionStore.clearCharacter(visitProfile, characterId) } }
+    }
+
     fun revokeSoftTag(id: String) {
         coroutineScope.launch {
             val updated = runCatching { softMemoryStore.revoke(visitProfile, id) }.getOrNull()
@@ -867,11 +835,12 @@ fun MysticGuideCard(
     fun clearSoftMemory() {
         coroutineScope.launch {
             runCatching { softMemoryStore.clear(visitProfile) }
-            softMemoryTags = emptyList()
+                .onSuccess { softMemoryTags = emptyList() }
         }
     }
 
     fun cancelPanelReply() {
+        actionRequestSequence++
         val pending = sessionState.requestState as? com.xuanji.app.domain.MysticRequestState.Pending ?: return
         pendingCustom = null
         pendingCustomDetailContext = null
@@ -1400,7 +1369,11 @@ fun MysticGuideCard(
             dailyActionPlan = dailyActionPlan,
             lifeProfile = lifeProfile,
             detailContext = pendingCustomDetailContext,
-            gameContext = gameContext
+            gameContext = gameContext,
+            temporaryConditions = temporaryConditions,
+            referenceCandidates = com.xuanji.app.domain.MysticReferenceResolver.fromPlan(dailyActionPlan, referenceCategory),
+            currentReferenceId = currentReferenceId,
+            referenceCategory = referenceCategory
         )
         val providerResult = dialogueProvider.complete(
             DialogueRequest(dialogueContext, question, requestToken)
@@ -1618,7 +1591,7 @@ fun MysticGuideCard(
     )
     val skins = remember(mode) { MysticGuideGenerator.mysticSkins(mode) }
     var skinIndex by remember(mode, fortune) {
-        mutableStateOf(skins.indexOf(MysticGuideGenerator.defaultMysticSkin(mode, fortune)))
+        mutableIntStateOf(skins.indexOf(MysticGuideGenerator.defaultMysticSkin(mode, fortune)))
     }
     var skinSource by remember(mode, fortune) { mutableStateOf("daily") }
     LaunchedEffect(skinIndex) {
@@ -1658,7 +1631,8 @@ fun MysticGuideCard(
     }
 
     if (immersive) {
-        Box(Modifier.fillMaxSize()) {
+        androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxSize()) {
+            val availableControlHeight = maxHeight
             Column(
                 Modifier
                     .fillMaxSize()
@@ -1731,11 +1705,12 @@ fun MysticGuideCard(
                 Modifier
                     .align(Alignment.BottomCenter)
                     .fillMaxWidth()
+                    .heightIn(max = availableControlHeight)
                     .background(Color(0xFF0D0817).copy(alpha = 0.97f))
                     .padding(start = 8.dp, end = 8.dp, top = 8.dp, bottom = 18.dp),
                 color = Color.Transparent
             ) {
-                Column {
+                Column(Modifier.verticalScroll(rememberScrollState())) {
                     companionGameId?.let { gameId ->
                         CompanionGameCard(
                             gameId = gameId,
@@ -1874,10 +1849,43 @@ fun MysticGuideCard(
                     routedAction?.let { action ->
                         MysticCompanionActionCard(
                             action = action,
-                            evidenceLines = guide.evidence,
+                            evidenceLines = com.xuanji.app.domain.MysticReferenceResolver.evidenceLines(
+                                dailyActionPlan, referenceCategory, currentReferenceId, temporaryConditions, guide.evidence),
                             onDismiss = { routedAction = null },
                             modifier = Modifier.fillMaxWidth()
                         )
+                    }
+                    temporaryStatus?.let { Text(it, style = MaterialTheme.typography.labelSmall) }
+                    if (temporaryConditions.active) {
+                        OutlinedButton(onClick = {
+                            val key = dailyActionPlan?.profileKey ?: return@OutlinedButton
+                            coroutineScope.launch {
+                                temporaryStatus = runCatching {
+                                    val old = AppModule.actionRepository.readFoodPreference(key)
+                                    AppModule.actionRepository.saveFoodPreference(key, temporaryConditions.apply(old))
+                                    val activity = AppModule.actionRepository.readActivityPreference(key)
+                                    AppModule.actionRepository.saveActivityPreference(key, activity.copy(
+                                        indoorOnly = temporaryConditions.indoorOnly ?: activity.indoorOnly,
+                                        maxDurationMinutes = temporaryConditions.maxMinutes ?: activity.maxDurationMinutes
+                                    ))
+                                }.fold({ "已按你的选择保存为此档案的偏好。" }, { "偏好保存未完成，请重试；临时条件仍可使用。" })
+                            }
+                        }) { Text("保存为偏好") }
+                    }
+                    onRequestCharacterHandoff?.let { handoff ->
+                        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            MysticCharacterCatalog.all.filter { it.id != characterId }.forEach { target ->
+                                OutlinedButton(onClick = {
+                                    val latest = sessionState.recentTurns.lastOrNull()
+                                    val detail = MysticDetailContext(mode = "角色交接", period = "今日", dateKey = fortune.dateKey,
+                                        title = latest?.question ?: "当前问题", result = latest?.answer.orEmpty(),
+                                        evidence = guide.evidence.joinToString("；"), sourceStatus = "当前会话交接摘要",
+                                        algorithmVersion = com.xuanji.app.domain.MysticEvidenceBuilder.ALGORITHM_VERSION)
+                                    cancelPanelReply()
+                                    handoff(target.id, detail)
+                                }) { Text("转交${target.displayName}") }
+                            }
+                        }
                     }
                     MysticConversationPanel(
                         state = sessionState,
@@ -2330,15 +2338,7 @@ fun MysticGuideCard(
                                 )
                             }
                             OutlinedButton(
-                                onClick = {
-                                    sessionState = MysticSessionState()
-                                    companion.characterSessionStates[characterId] = sessionState
-                                    companion.threadFor(characterId).clear()
-                                    memoryNotes = emptyList()
-                                    coroutineScope.launch {
-                                        runCatching { characterSessionStore.clearCharacter(visitProfile, characterId) }
-                                    }
-                                },
+                                onClick = ::resetCurrentThread,
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .heightIn(min = 48.dp)
@@ -2559,41 +2559,7 @@ fun MysticGuideCard(
                                 pendingAsideTurnKey != null
                             ) {
                                 Surface(
-                                    onClick = {
-                                        conversation.clear()
-                                        selectedFollowUp = ""
-                                        selectedInteraction = null
-                                        interactionCarryoverOption = null
-                                        askCounts.clear()
-                                        pendingFollowUp = null
-                                        pendingInteraction = null
-                                        pendingHandoff = null
-                                        pendingHandoffEcho = null
-                                        pendingCustom = null
-                                        pendingOpening = null
-                                        openingAnswered = false
-                                        selectedRhythm = null
-                                        pendingRhythm = null
-                                        completedRhythmKey = null
-                                        rhythmAnswered = false
-                                        guestCameo = null
-                                        guestExit = null
-                                        guestChoiceCarryoverKey = null
-                                        pendingGuestChoiceEcho = null
-                                        memoryNotes = emptyList()
-                                        memorySequence = 0
-                                        memoryExpanded = false
-                                        selectedGuestChoice = ""
-                                        guestReply = ""
-                                        guestQuestion = ""
-                                        pendingGuest = false
-                                        customQuestion = ""
-                                        selectedClarifier = null
-                                        pendingClarify = null
-                                        presenceOverride = null
-                                        pendingAsideTurnKey = null
-                                        pendingAsideActionTurnKey = null
-                                    },
+                                    onClick = ::resetCurrentThread,
                                     color = Color.Transparent
                                 ) {
                                     Text(
@@ -3099,55 +3065,6 @@ fun MysticGuideCard(
                     }
                 }
             }
-        }
-    }
-}
-
-@Composable
-private fun MysticStageSpeech(
-    text: String,
-    accent: Color
-) {
-    Surface(
-        shape = RoundedCornerShape(topStart = 4.dp, topEnd = 16.dp, bottomStart = 16.dp, bottomEnd = 16.dp),
-        color = accent.copy(alpha = 0.13f)
-    ) {
-        Text(
-            text,
-            modifier = Modifier.padding(horizontal = 13.dp, vertical = 10.dp),
-            style = MaterialTheme.typography.bodySmall,
-            lineHeight = 21.sp,
-            color = Color(0xFFEFE6D7)
-        )
-    }
-}
-
-@Composable
-private fun MysticPersonaButton(
-    title: String,
-    subtitle: String,
-    selected: Boolean,
-    accent: Color,
-    modifier: Modifier = Modifier,
-    onClick: () -> Unit
-) {
-    Surface(
-        modifier = modifier,
-        onClick = onClick,
-        shape = RoundedCornerShape(14.dp),
-        color = if (selected) accent.copy(alpha = 0.18f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.38f)
-    ) {
-        Column(
-            Modifier.fillMaxWidth().padding(vertical = 10.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(2.dp)
-        ) {
-            Text(title, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurface)
-            Text(
-                subtitle,
-                style = MaterialTheme.typography.labelSmall,
-                color = if (selected) accent else MaterialTheme.colorScheme.onSurfaceVariant
-            )
         }
     }
 }

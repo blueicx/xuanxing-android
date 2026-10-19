@@ -13,6 +13,7 @@ data class FoodPreferenceSnapshot(
 
 class FoodPreferenceStore(private val bridge: PreferenceBridge) {
     private val gson = Gson()
+    suspend fun hasStored(profileKey: String): Boolean = bridge.read(memoryKey(profileKey)) != null
 
     suspend fun read(profileKey: String): FoodPreference = readSnapshot(profileKey).preference
 
@@ -22,11 +23,11 @@ class FoodPreferenceStore(private val bridge: PreferenceBridge) {
             ?: return FoodPreferenceSnapshot(unreadable = true)
         if (!parsed.isJsonObject) return FoodPreferenceSnapshot(unreadable = true)
         val root = parsed.asJsonObject
-        val digest = root.get("profileKeyDigest")?.asString.orEmpty()
-        if (digest != fingerprint(profileKey)) return FoodPreferenceSnapshot(unreadable = true)
         return runCatching {
-            val preference = gson.fromJson(root.get("preference"), FoodPreference::class.java)
-            FoodPreferenceSnapshot(preference = preference ?: FoodPreference())
+            require(root.get("profileKeyDigest")?.asString == fingerprint(profileKey))
+            require(root.get("version")?.asInt in 1..VERSION)
+            val preference = com.xuanji.app.domain.action.FoodPreferenceCodec.decode(root.get("preference"))
+            FoodPreferenceSnapshot(preference = preference)
         }.getOrElse { FoodPreferenceSnapshot(unreadable = true) }
     }
 
@@ -61,7 +62,7 @@ class FoodPreferenceStore(private val bridge: PreferenceBridge) {
     fun memoryKey(profileKey: String): String = KEY_PREFIX + fingerprint(profileKey)
 
     companion object {
-        const val VERSION = 1
+        const val VERSION = 2
         const val MAX_EXCLUDED = 12
         const val KEY_PREFIX = "food_preference_"
 

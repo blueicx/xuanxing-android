@@ -10,15 +10,16 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import com.xuanji.app.domain.MysticCompanionAction
 
 @Composable
 fun MysticCompanionActionCard(
     action: MysticCompanionAction,
-    evidenceLines: List<String> = emptyList(),
     onDismiss: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    evidenceLines: List<String> = emptyList()
 ) {
     val title = when (action) {
         is MysticCompanionAction.ShowTodayMeal -> "今天吃什么"
@@ -28,7 +29,7 @@ fun MysticCompanionActionCard(
         MysticCompanionAction.ShowEvidence -> "这条回答的依据"
         else -> return
     }
-    Surface(modifier.fillMaxWidth(), color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = .72f)) {
+    Surface(modifier.fillMaxWidth().testTag("companion-action-card"), color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = .72f)) {
         Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text(title, style = MaterialTheme.typography.titleSmall)
             when (action) {
@@ -40,17 +41,23 @@ fun MysticCompanionActionCard(
                         Text("替代：${meal.substitute} · 约 ${meal.prepMinutes ?: 0} 分钟 · ${meal.estimatedPriceCents?.let { "约 ¥${it / 100.0}" } ?: "预算未设"}")
                         Text("外卖搜索：${meal.deliveryKeywords.joinToString("、")}")
                         Text("依据：${meal.evidence.take(3).joinToString("；") { it.label }}", style = MaterialTheme.typography.labelSmall)
+                        AddToAgendaAction(
+                            meal.title, "meal", action.plan.dateKey, meal.ingredients, meal.candidateKey,
+                            estimatedPriceCentsPerPortion = meal.estimatedPriceCents
+                        )
                     } else Text("当前偏好过滤掉了全部候选，请调整饮食偏好。")
                 }
                 is MysticCompanionAction.ShowTodayActivity -> action.plan.activities.firstOrNull()?.let { item ->
                     Text(item.title, style = MaterialTheme.typography.titleMedium)
                     Text("建议：${item.bestPeriod} · ${item.durationMinutes.first}-${item.durationMinutes.last} 分钟")
                     Text("依据：${item.evidence.take(3).joinToString("；") { it.label }}", style = MaterialTheme.typography.labelSmall)
+                    AddToAgendaAction(item.title, "activity", action.plan.dateKey, emptyList(), item.candidateKey)
                 }
                 is MysticCompanionAction.ShowTodayOuting -> action.plan.outings.firstOrNull()?.let { item ->
                     Text("${item.cityLabel} · ${item.placeType}", style = MaterialTheme.typography.titleMedium)
                     Text(item.reason)
                     Text("依据：${item.evidence.take(3).joinToString("；") { it.label }}", style = MaterialTheme.typography.labelSmall)
+                    AddToAgendaAction(item.placeType, "outing", action.plan.dateKey, emptyList(), item.candidateKey)
                 }
                 is MysticCompanionAction.ShowLifeProfile -> {
                     action.profile.careerClusters.firstOrNull()?.let { Text("职业方向：${it.label} · ${it.score} 分") }

@@ -11,13 +11,18 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextClearance
 import androidx.compose.ui.test.performTextInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.xuanji.app.data.local.PreferenceBridge
 import com.xuanji.app.data.local.ReadingFavoriteStore
+import com.xuanji.app.data.local.ActionFeedbackDataStore
+import com.xuanji.app.data.local.LocalReviewTimelineRepository
 import com.xuanji.app.domain.ReadingFavorite
+import com.xuanji.app.domain.action.ActionFeedback
+import com.xuanji.app.domain.action.ActionFeedbackKind
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -54,7 +59,8 @@ class ReadingFavoritesInteractionTest {
         compose.onNodeWithText("丝路路线").assertExists()
         compose.onNodeWithTag("reading-favorite-read-action-1").performClick()
         compose.onNodeWithText("只读快照 · 今日行动").assertExists()
-        compose.onNodeWithText("敦煌驿站与路线选择。", useUnmergedTree = true).assertExists()
+        compose.onNodeWithTag("reading-favorite-snapshot-body")
+            .assertTextEquals("敦煌驿站与路线选择。")
 
         compose.onNodeWithText("‹ 返回").performClick()
         compose.onNodeWithTag("reading-favorite-search").performTextClearance()
@@ -84,6 +90,38 @@ class ReadingFavoritesInteractionTest {
         compose.onNodeWithTag("reading-favorite-confirm-clear").performClick()
         compose.onNodeWithText("还没有收藏", substring = true).assertExists()
         assertEquals(null, runBlocking { bridge.read(store.key("profile-a")) })
+    }
+
+    @Test
+    fun local_review_timeline_filters_only_explicit_favorites_and_action_feedback() {
+        val bridge = MemoryBridge()
+        val favoriteStore = ReadingFavoriteStore(bridge)
+        val feedbackStore = ActionFeedbackDataStore(bridge)
+        runBlocking {
+            favoriteStore.upsert("profile-a", favorite("timeline-favorite", "周运快照", "只读保存结果。", "fortune"))
+            feedbackStore.append("profile-a", ActionFeedback(
+                id = "meal-feedback", dateKey = "2026-10-03", category = "meal", candidateKey = "oat-berry",
+                kind = ActionFeedbackKind.Accepted, createdAtEpochMs = 20L
+            ))
+        }
+        compose.setContent {
+            MaterialTheme {
+                Column(Modifier.verticalScroll(rememberScrollState())) {
+                    LocalReviewTimelineSection(
+                        LocalReviewTimelineRepository(favoriteStore, feedbackStore),
+                        favoriteProfileKey = "profile-a",
+                        actionProfileKey = "profile-a"
+                    )
+                }
+            }
+        }
+
+        compose.onNodeWithText("近期选择").assertExists()
+        compose.onNodeWithText("周运快照").assertExists()
+        compose.onNodeWithText("采纳了行动建议").assertExists()
+        compose.onNodeWithTag("local-review-filter-actionfeedback").performClick()
+        compose.onNodeWithText("采纳了行动建议").assertExists()
+        compose.onNodeWithText("周运快照").assertDoesNotExist()
     }
 
     private fun show(store: ReadingFavoriteStore) {

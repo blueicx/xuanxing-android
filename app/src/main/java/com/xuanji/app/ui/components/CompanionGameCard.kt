@@ -1,12 +1,16 @@
 package com.xuanji.app.ui.components
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -36,6 +40,7 @@ import com.xuanji.app.domain.game.PoetryChainState
 import com.xuanji.app.domain.game.SilkRoadEvent
 import com.xuanji.app.domain.game.SilkRoadRouteEngine
 import com.xuanji.app.domain.game.SilkRoadState
+import com.xuanji.app.domain.game.SilkRoadMissionCatalog
 import com.xuanji.app.domain.game.StarMapEvent
 import com.xuanji.app.domain.game.StarMapPuzzleEngine
 import com.xuanji.app.domain.game.StarMapState
@@ -46,9 +51,10 @@ import kotlinx.coroutines.launch
 fun CompanionGameCard(
     gameId: String,
     characterId: MysticCharacterId,
-    profileKey: String = "",
     onClose: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    profileKey: String = "",
+    progressStoreOverride: CompanionGameProgressStore? = null
 ) {
     val profile = CompanionGameCatalog.byId(gameId) ?: return
     if (profile.characterId != characterId) return
@@ -57,10 +63,12 @@ fun CompanionGameCard(
     val favoriteStore = LocalReadingFavoriteStore.current
     val favoriteProfileKey = LocalReadingFavoriteProfileKey.current ?: profileKey
     val readingMetadata = LocalMysticReadingMetadata.current
-    val progressStore = remember(context) { CompanionGameProgressStore(DataStorePreferenceBridge(context)) }
-    var poetry by remember(gameId, characterId) { mutableStateOf(PoetryChainState()) }
-    var starMap by remember(gameId, characterId) { mutableStateOf(StarMapPuzzleEngine.initial()) }
-    var route by remember(gameId, characterId) { mutableStateOf(SilkRoadState()) }
+    val progressStore = progressStoreOverride ?: remember(context) { CompanionGameProgressStore(DataStorePreferenceBridge(context)) }
+    var poetry by remember(gameId, characterId, profileKey) { mutableStateOf(PoetryChainState()) }
+    var starMap by remember(gameId, characterId, profileKey) { mutableStateOf(StarMapPuzzleEngine.initial()) }
+    var route by remember(gameId, characterId, profileKey) { mutableStateOf(SilkRoadState()) }
+    var pendingMission by remember(gameId, characterId, profileKey) { mutableStateOf<String?>(null) }
+    var progressNotice by remember(gameId, characterId, profileKey) { mutableStateOf("") }
     var progressLoaded by remember(gameId, characterId, profileKey) { mutableStateOf(false) }
     var favoriteNotice by remember(gameId, characterId, profileKey) { mutableStateOf("") }
 
@@ -77,12 +85,30 @@ fun CompanionGameCard(
 
     fun persist(state: CompanionGameProgressState) {
         if (!progressLoaded || profileKey.isBlank()) return
-        scope.launch { runCatching { progressStore.save(profileKey, characterId, state) } }
+        scope.launch {
+            progressNotice = if (runCatching { progressStore.save(profileKey, characterId, state) }.isSuccess)
+                "进度已保存到本机。" else "保存失败；当前进度仅在本次界面中保留。"
+        }
     }
 
     fun clearProgress() {
         if (profileKey.isBlank()) return
         scope.launch { runCatching { progressStore.clear(profileKey, characterId, gameId) } }
+    }
+
+    pendingMission?.let { id ->
+        val mission = SilkRoadMissionCatalog.find(id)
+        if (mission != null) AlertDialog(
+            onDismissRequest = { pendingMission = null },
+            title = { Text("开始「${mission.title}」？") },
+            text = { Text("当前丝路任务进度将被新任务替换。${mission.explanation}") },
+            confirmButton = { TextButton(onClick = {
+                route = SilkRoadRouteEngine.reduce(route, SilkRoadEvent.SelectMission(id))
+                persist(CompanionGameProgressState.SilkRoad(route))
+                pendingMission = null
+            }, modifier = Modifier.testTag("silkroad-confirm-mission")) { Text("开始新任务") } },
+            dismissButton = { TextButton(onClick = { pendingMission = null }) { Text("保留当前进度") } }
+        )
     }
 
     fun saveFinishedSummary(summary: String) {
@@ -139,50 +165,124 @@ fun CompanionGameCard(
             when (gameId) {
                 "poetry_chain" -> {
                     val prompt = PoetryChainEngine.prompt(poetry)
-                    Text("接下一句：${prompt.line}", style = MaterialTheme.typography.bodyMedium)
-                    prompt.options.forEach { option ->
-                        OutlinedButton(
-                            onClick = {
-                                poetry = PoetryChainEngine.reduce(poetry, PoetryChainEvent.Choose(option))
-                                persist(CompanionGameProgressState.Poetry(poetry))
-                            },
-                            enabled = progressLoaded && !poetry.completed,
-                            modifier = Modifier.fillMaxWidth()
-                        ) { Text(option) }
+                    if (!poetry.completed) {
+                        Text("第 ${poetry.promptIndex + 1} / ${poetry.levelCountAtStart} 题 · 接下一句：${prompt.line}", style = MaterialTheme.typography.bodyMedium)
+                        Text("出处：${prompt.source}", style = MaterialTheme.typography.labelSmall)
+                        prompt.options.forEachIndexed { index, option ->
+                            OutlinedButton(
+                                onClick = {
+                                    poetry = PoetryChainEngine.reduce(poetry, PoetryChainEvent.Choose(option))
+                                    persist(CompanionGameProgressState.Poetry(poetry))
+                                },
+                                enabled = progressLoaded,
+                                modifier = Modifier.fillMaxWidth().testTag("poetry-option-$index")
+                            ) { Text(option) }
+                        }
+                        Text("提示：${prompt.hint}", style = MaterialTheme.typography.labelSmall)
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            OutlinedButton(
+                                onClick = {
+                                    poetry = PoetryChainEngine.reduce(poetry, PoetryChainEvent.Hint)
+                                    persist(CompanionGameProgressState.Poetry(poetry))
+                                }, enabled = progressLoaded, modifier = Modifier.testTag("poetry-hint")
+                            ) { Text("再看提示") }
+                            OutlinedButton(
+                                onClick = {
+                                    poetry = PoetryChainEngine.reduce(poetry, PoetryChainEvent.Undo)
+                                    persist(CompanionGameProgressState.Poetry(poetry))
+                                }, enabled = progressLoaded && poetry.undoHistory.isNotEmpty(), modifier = Modifier.testTag("poetry-undo")
+                            ) { Text("撤销一步") }
+                        }
                     }
                     Text("得分 ${poetry.score} · ${poetry.feedback.ifBlank { "选择一条符合韵脚的自有短句" }}", style = MaterialTheme.typography.labelSmall)
                     if (poetry.completed) {
-                        OutlinedButton(onClick = {
-                            val result = PoetryChainEngine.result(poetry)
-                            saveFinishedSummary("诗句接龙完成：${poetry.promptIndex} 题，得分 ${result.score}；来源为自有短句库。")
-                        }, modifier = Modifier.testTag("companion-game-favorite")) { Text("收藏本局摘要") }
+                        val result = PoetryChainEngine.result(poetry)
+                        Text(result.summary, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.testTag("poetry-result-summary"))
+                        OutlinedButton(onClick = { saveFinishedSummary(result.summary) }, modifier = Modifier.testTag("companion-game-favorite")) { Text("收藏本局摘要") }
                         OutlinedButton(onClick = { poetry = PoetryChainState(); clearProgress() }, enabled = progressLoaded) { Text("重新开始") }
                     }
                 }
                 "star_map_observation" -> {
+                    val puzzle = StarMapPuzzleEngine.puzzle(starMap)
+                    Text("第 ${starMap.puzzleIndex + 1} / ${StarMapPuzzleEngine.puzzleCount} 题 · ${puzzle.start} → ${puzzle.target}", style = MaterialTheme.typography.titleSmall)
                     Text("当前位置：${starMap.current}", style = MaterialTheme.typography.bodyMedium)
-                    StarMapPuzzleEngine.options(starMap).forEach { node ->
-                        OutlinedButton(
-                            onClick = {
-                                starMap = StarMapPuzzleEngine.reduce(starMap, StarMapEvent.Move(node))
-                                persist(CompanionGameProgressState.StarMap(starMap))
-                            },
-                            enabled = progressLoaded && !starMap.completed,
-                            modifier = Modifier.fillMaxWidth()
-                        ) { Text("观测 $node") }
+                    Text("路径：${starMap.path.joinToString(" → ")}", style = MaterialTheme.typography.labelSmall)
+                    if (!starMap.completed) {
+                        StarMapPuzzleEngine.options(starMap).forEachIndexed { index, node ->
+                            OutlinedButton(
+                                onClick = {
+                                    starMap = StarMapPuzzleEngine.reduce(starMap, StarMapEvent.Move(node))
+                                    persist(CompanionGameProgressState.StarMap(starMap))
+                                },
+                                enabled = progressLoaded,
+                                modifier = Modifier.fillMaxWidth().testTag("starmap-option-$index")
+                            ) { Text("观测 $node") }
+                        }
+                        Text("提示：${puzzle.hint}", style = MaterialTheme.typography.labelSmall)
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            OutlinedButton(
+                                onClick = {
+                                    starMap = StarMapPuzzleEngine.reduce(starMap, StarMapEvent.Hint)
+                                    persist(CompanionGameProgressState.StarMap(starMap))
+                                }, enabled = progressLoaded, modifier = Modifier.testTag("starmap-hint")
+                            ) { Text("显示提示") }
+                            OutlinedButton(
+                                onClick = {
+                                    starMap = StarMapPuzzleEngine.reduce(starMap, StarMapEvent.Undo)
+                                    persist(CompanionGameProgressState.StarMap(starMap))
+                                }, enabled = progressLoaded && starMap.path.size > 1, modifier = Modifier.testTag("starmap-undo")
+                            ) { Text("撤销连线") }
+                        }
                     }
-                    Text("路径：${starMap.path.joinToString(" → ")} · ${starMap.feedback}", style = MaterialTheme.typography.labelSmall)
+                    Text(starMap.feedback.ifBlank { "${puzzle.start} 起步，按连线逐步抵达目标。" }, style = MaterialTheme.typography.labelSmall)
                     if (starMap.completed) {
                         val result = StarMapPuzzleEngine.result(starMap)
+                        Text(result.summary, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.testTag("starmap-result-summary"))
                         OutlinedButton(
-                            onClick = { saveFinishedSummary("星图逻辑题完成：${result.path.joinToString(" → ")}；${result.rulesLabel}。") },
+                            onClick = { saveFinishedSummary(result.summary) },
                             modifier = Modifier.testTag("companion-game-favorite")
                         ) { Text("收藏本局摘要") }
-                        OutlinedButton(onClick = { starMap = StarMapPuzzleEngine.initial(); clearProgress() }, enabled = progressLoaded) { Text("重新观测") }
+                        if (StarMapPuzzleEngine.hasNextPuzzle(starMap)) {
+                            OutlinedButton(
+                                onClick = {
+                                    starMap = StarMapPuzzleEngine.reduce(starMap, StarMapEvent.NextPuzzle)
+                                    persist(CompanionGameProgressState.StarMap(starMap))
+                                }, enabled = progressLoaded, modifier = Modifier.testTag("starmap-next-level")
+                            ) { Text("下一题") }
+                        }
+                        OutlinedButton(
+                            onClick = {
+                                starMap = StarMapPuzzleEngine.reduce(starMap, StarMapEvent.RestartPuzzle)
+                                persist(CompanionGameProgressState.StarMap(starMap))
+                            }, enabled = progressLoaded, modifier = Modifier.testTag("starmap-restart-level")
+                        ) { Text("重玩本题") }
+                        OutlinedButton(onClick = { starMap = StarMapPuzzleEngine.initial(); clearProgress() }, enabled = progressLoaded) { Text("从第一题重开") }
                     }
                 }
                 "silkroad_route" -> {
+                    SilkRoadMap(route, progressLoaded) { event ->
+                        route = SilkRoadRouteEngine.reduce(route, event)
+                        persist(CompanionGameProgressState.SilkRoad(route))
+                    }
+                    val mission = SilkRoadMissionCatalog.find(route.missionId)
+                    Text("任务：${mission?.title.orEmpty()} · 目标${route.target}", style = MaterialTheme.typography.titleSmall)
+                    Text(mission?.explanation.orEmpty(), style = MaterialTheme.typography.labelSmall)
+                    Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        SilkRoadMissionCatalog.all.forEach { task ->
+                            OutlinedButton(onClick = { pendingMission = task.id }, enabled = progressLoaded && task.id != route.missionId,
+                                modifier = Modifier.testTag("silkroad-mission-${task.id}")) { Text(task.title) }
+                        }
+                    }
                     Text("${route.current} · 剩余 ${route.daysLeft} 天 / ${route.budgetLeft} 点资源", style = MaterialTheme.typography.bodyMedium)
+                    if (route.path.size > 1 || route.failed) {
+                        OutlinedButton(
+                            onClick = {
+                                route = SilkRoadRouteEngine.reduce(route, SilkRoadEvent.Undo)
+                                persist(CompanionGameProgressState.SilkRoad(route))
+                            }, enabled = progressLoaded && (route.path.size > 1 || route.failed),
+                            modifier = Modifier.testTag("silkroad-undo")
+                        ) { Text("撤销上一步") }
+                    }
                     SilkRoadRouteEngine.destinations(route).forEach { city ->
                         OutlinedButton(
                             onClick = {
@@ -193,19 +293,27 @@ fun CompanionGameCard(
                             modifier = Modifier.fillMaxWidth()
                         ) { Text("前往${city.label}（${city.days}天·${city.cost}资源）") }
                     }
-                    Text("路线：${route.path.joinToString(" → ")} · ${route.feedback}", style = MaterialTheme.typography.labelSmall)
+                    Text(
+                        "路线：${route.path.joinToString(" → ")} · ${route.feedback}",
+                        style = MaterialTheme.typography.labelSmall,
+                        modifier = Modifier.testTag("silkroad-route-path")
+                    )
+                    SilkRoadRouteEngine.replay(route).forEachIndexed { index, leg ->
+                        Text(
+                            "第 ${index + 1} 段 ${leg.from} → ${leg.to} · ${leg.days} 天 / ${leg.cost} 资源 · 累计 ${leg.daysSpent} 天 / ${leg.budgetSpent} 资源",
+                            style = MaterialTheme.typography.labelSmall,
+                            modifier = Modifier.testTag("silkroad-replay-leg-$index")
+                        )
+                    }
                     if (route.completed || route.failed) {
                         val result = SilkRoadRouteEngine.result(route)
                         val ending = if (result.completed) "完成" else "结束，未抵达目标"
+                        Text(result.summary, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.testTag("silkroad-result-summary"))
                         OutlinedButton(
-                            onClick = {
-                                saveFinishedSummary(
-                                    "丝路路线规划$ending：${result.path.joinToString(" → ")}；剩余 ${result.daysLeft} 天、${result.budgetLeft} 点资源。${result.rulesLabel}。"
-                                )
-                            },
+                            onClick = { saveFinishedSummary(result.summary.ifBlank { "丝路路线规划$ending。${result.rulesLabel}。" }) },
                             modifier = Modifier.testTag("companion-game-favorite")
                         ) { Text("收藏本局摘要") }
-                        OutlinedButton(onClick = { route = SilkRoadState(); clearProgress() }, enabled = progressLoaded) { Text("重新规划") }
+                        OutlinedButton(onClick = { route = SilkRoadRouteEngine.initial(route.missionId); persist(CompanionGameProgressState.SilkRoad(route)) }, enabled = progressLoaded) { Text("重新规划") }
                     }
                 }
                 else -> {
@@ -219,6 +327,7 @@ fun CompanionGameCard(
             if (favoriteNotice.isNotBlank()) {
                 Text(favoriteNotice, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.secondary)
             }
+            if (progressNotice.isNotBlank()) Text(progressNotice, style = MaterialTheme.typography.labelSmall)
         }
     }
 }

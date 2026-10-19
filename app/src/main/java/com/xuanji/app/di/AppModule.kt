@@ -11,6 +11,8 @@ import com.xuanji.app.data.local.ReadingFavoriteStore
 
 /** 轻量级依赖容器（单例 Repository） */
 object AppModule {
+    var dailyLifeStore: com.xuanji.app.data.local.DailyLifeStore? = null
+        private set
     lateinit var repository: FortuneRepository
         private set
     lateinit var historyRepository: HistoryRepository
@@ -36,7 +38,8 @@ object AppModule {
         referenceRepository: ReferenceRepository,
         testRecordRepository: TestRecordRepository,
         actionRepository: ActionRepository,
-        readingFavoriteStore: ReadingFavoriteStore
+        readingFavoriteStore: ReadingFavoriteStore,
+        dailyLifeStore: com.xuanji.app.data.local.DailyLifeStore? = null
     ) {
         this.repository = repository
         this.historyRepository = historyRepository
@@ -46,5 +49,6 @@ object AppModule {
         this.testRecordRepository = testRecordRepository
         this.actionRepository = actionRepository
         this.readingFavoriteStore = readingFavoriteStore
+        this.dailyLifeStore = dailyLifeStore
     }
 }

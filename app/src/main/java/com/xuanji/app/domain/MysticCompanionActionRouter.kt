@@ -20,10 +20,13 @@ object MysticCompanionActionRouter {
         input: String,
         dailyActionPlan: DailyActionPlan?,
         lifeProfile: LifeProfile?,
-        hasXiangqiArchive: Boolean
+        hasXiangqiArchive: Boolean,
+        referenceCategory: String = "",
+        referenceId: String? = null
     ): MysticCompanionAction? {
         val clean = input.trim().take(200)
         if (clean.isBlank()) return null
+        if (MysticAgendaCommand.isRequest(clean)) return MysticAgendaCommand.route(clean, dailyActionPlan, referenceCategory, referenceId)
         if (clean.contains("继续棋局") || clean.contains("恢复棋局")) {
             return MysticCompanionAction.ResumeXiangqi.takeIf { hasXiangqiArchive }
         }
@@ -32,10 +35,8 @@ object MysticCompanionActionRouter {
         if (game == "xiangqi" && (clean.contains("继续") || clean.contains("恢复"))) {
             return MysticCompanionAction.ResumeXiangqi.takeIf { hasXiangqiArchive }
         }
-        if (clean.contains("解释") || clean.contains("依据") || clean.contains("怎么算") || clean.contains("来源")) {
-            return MysticCompanionAction.ShowEvidence
-        }
-        return when (MysticIntentClassifier.classify(clean)) {
+        val intent = MysticIntentClassifier.classify(clean)
+        when (intent) {
             MysticIntent.Why -> MysticCompanionAction.ShowEvidence
             MysticIntent.TodayMeal -> dailyActionPlan?.let(MysticCompanionAction::ShowTodayMeal)
             MysticIntent.TodayActivity -> dailyActionPlan?.let(MysticCompanionAction::ShowTodayActivity)
@@ -43,6 +44,10 @@ object MysticCompanionActionRouter {
             MysticIntent.LifeProfile -> lifeProfile?.let(MysticCompanionAction::ShowLifeProfile)
             MysticIntent.Greeting, MysticIntent.Smalltalk -> MysticCompanionAction.OpenConversation
             else -> null
+        }?.let { return it }
+        if (clean in setOf("解释", "解释一下", "解释刚才", "解释刚才那项", "解释这个结果") || clean.startsWith("解释刚才")) {
+            return MysticCompanionAction.ShowEvidence
         }
+        return null
     }
 }

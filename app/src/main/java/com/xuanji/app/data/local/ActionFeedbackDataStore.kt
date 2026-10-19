@@ -18,6 +18,16 @@ class ActionFeedbackDataStore(private val bridge: PreferenceBridge) {
             .take(limit.coerceAtLeast(0))
     }
 
+    /** Backup/restore preflight: never silently replaces a malformed explicit-feedback list. */
+    suspend fun isHealthy(profileKey: String): Boolean {
+        if (profileKey.isBlank()) return false
+        val raw = bridge.read(key(profileKey)) ?: return true
+        return runCatching {
+            val entries = gson.fromJson<List<ActionFeedback>>(raw, type) ?: return@runCatching false
+            entries.size <= 100 && entries.all { it.id.isNotBlank() && it.dateKey.isNotBlank() && it.candidateKey.isNotBlank() }
+        }.getOrDefault(false)
+    }
+
     suspend fun append(profileKey: String, feedback: ActionFeedback) {
         val current = list(profileKey, 100).asReversed().toMutableList()
         current.removeAll { it.id == feedback.id }

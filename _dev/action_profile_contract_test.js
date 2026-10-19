@@ -44,4 +44,4 @@ assert.ok(repositorySource.includes('feedbackStore?.list(profileKey)'), 'reposit
 assert.ok(applicationSource.includes('feedbackStore = actionFeedbackStore'), 'application must wire persistent action feedback into the repository');
 assert.ok(cardSource.includes('Text("换一个")') && cardSource.includes('Text("撤销上次换选")'), 'daily-action details must expose replacement and undo');
 assert.ok(profileSource.includes('清除本机行动反馈') && profileSource.includes('确认清除本机行动反馈'), 'current-profile action feedback must have a visible, confirmed clear action');
-console.log(`action/profile contract: PASS (${contract.mealCandidates.length} meals, offline, deterministic ranking, reversible feedback)`);
+console.log(`action/profile contract: PASS (${contract.mealCandidates.length} legacy meal fixtures retained; expanded catalog verified separately; offline, deterministic ranking, reversible feedback)`);

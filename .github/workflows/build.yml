@@ -2,7 +2,7 @@ name: Build Debug APK
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "main", "codex/reading-expansion" ]
   pull_request:
     branches: [ "main" ]
 
@@ -43,18 +43,65 @@ jobs:
       - name: Verify dialogue contract
         run: node _dev/dialogue_contract_test.js
 
+      - name: Verify dialogue relevance matrix contract
+        run: node _dev/dialogue_relevance_contract_test.js
+
+      - name: Verify authentic systems contract
+        run: node _dev/authentic_systems_contract_test.js
+
       - name: Verify unified stage contract
         run: node _dev/unified_stage_contract_test.js
 
+      - name: Verify action and life profile contract
+        run: node _dev/action_profile_contract_test.js
+
+      - name: Verify reading favorites contract
+        run: node _dev/reading_favorites_contract_test.js
+
+      - name: Verify X3 shell contract
+        run: node _dev/xuanji_v14_shell_contract_test.js
+
+      - name: Verify full expansion contract
+        run: node _dev/full_expansion_contract_test.js
+
+      - name: Verify isolated application recovery contract
+        run: node _dev/application_recovery_contract_test.js
+
+      - name: Verify offline region comparison contract
+        run: node _dev/region_comparison_contract_test.js
+
       - name: Build debug APK
-        run: ./gradlew testDebugUnitTest lintDebug assembleDebug assembleDebugAndroidTest --no-daemon
+        run: ./gradlew testDebugUnitTest lintDebug writeDebugApkManifest assembleDebugAndroidTest --no-daemon
+
+      - name: Record build provenance
+        run: |
+          git rev-parse HEAD > app/build/outputs/apk/debug/source-commit.txt
+          cp app/build/outputs/apk/debug/output-metadata.json app/build/outputs/apk/debug/build-metadata.json
+          sha256sum app/build/outputs/apk/debug/app-debug.apk > app/build/outputs/apk/debug/SHA256SUMS
+
+      - name: Upload JVM and lint reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: x3-unit-and-lint-results
+          path: |
+            app/build/test-results/testDebugUnitTest/**
+            app/build/reports/tests/testDebugUnitTest/**
+            app/build/reports/lint-results-debug.*
+          if-no-files-found: ignore
+          retention-days: 14
 
       - name: Upload APK artifact
         if: success()
         uses: actions/upload-artifact@v4
         with:
           name: xuanxing-debug-apk
-          path: app/build/outputs/apk/debug/app-debug.apk
+          path: |
+            app/build/outputs/apk/debug/app-debug.apk
+            app/build/outputs/apk/debug/SHA256SUMS
+            app/build/outputs/apk/debug/source-commit.txt
+            app/build/outputs/apk/debug/build-metadata.json
+            app/build/outputs/apk/debug/build-manifest.json
           retention-days: 30
 
   android-ui-tests:
@@ -64,6 +111,11 @@ jobs:
     steps:
       - name: Checkout sources
         uses: actions/checkout@v4
+
+      - name: Set up Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
@@ -86,9 +138,10 @@ jobs:
           api-level: 34
           arch: x86_64
           target: google_apis
-          script: >-
+          script: |
             ./gradlew connectedDebugAndroidTest --no-daemon
-            -Pandroid.testInstrumentationRunnerArguments.class=com.xuanji.app.ui.components.MysticDialogueEndToEndTest
+            ./gradlew -PxuanjiRegression=true :app:assembleRegression :app:assembleRegressionAndroidTest --no-daemon
+            XUANJI_ADB_PORT=5037 node _dev/isolated_application_recovery.js --auto
 
       - name: Upload instrumented test results
         if: always()
@@ -98,5 +151,6 @@ jobs:
           path: |
             app/build/outputs/androidTest-results/connected/**
             app/build/reports/androidTests/connected/**
+            work/.dispatch-backup/20261014-application-recovery/**
           if-no-files-found: ignore
           retention-days: 14

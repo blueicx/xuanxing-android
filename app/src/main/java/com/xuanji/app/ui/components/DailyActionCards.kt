@@ -15,6 +15,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.AlertDialog
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -32,6 +33,7 @@ import androidx.compose.ui.unit.dp
 import com.xuanji.app.domain.action.ActionEvidence
 import com.xuanji.app.domain.action.ActionSource
 import com.xuanji.app.domain.action.ActionFeedbackKind
+import com.xuanji.app.domain.action.ActionScenario
 import com.xuanji.app.domain.action.ActivitySuggestion
 import com.xuanji.app.domain.action.ConfidenceLevel
 import com.xuanji.app.domain.action.DailyActionPlan
@@ -51,7 +53,8 @@ data class DailyActionCardModel(
     val boundary: String,
     val alternatives: List<String> = emptyList(),
     val detailFields: List<DailyActionDetailField> = emptyList(),
-    val evidenceDetails: List<DailyActionEvidenceDetail> = emptyList()
+    val evidenceDetails: List<DailyActionEvidenceDetail> = emptyList(),
+    val estimatedPriceCentsPerPortion: Int? = null
 ) {
     companion object {
         fun from(plan: DailyActionPlan): List<DailyActionCardModel> = listOf(
@@ -75,6 +78,8 @@ data class DailyActionCardModel(
                 plan.meals.firstOrNull()?.let { meal ->
                     buildList {
                         add(DailyActionDetailField("菜名", meal.title))
+                        add(DailyActionDetailField("做法条件", "${meal.difficulty.label} · ${meal.requiredEquipment.joinToString("、") { it.label }.ifBlank { "无需加热设备" }} · ${if (meal.lunchboxSuitable) "便当形式；储运需自行核对" else "非便当目录"}"))
+                        if (meal.steps.isNotEmpty()) add(DailyActionDetailField("简明步骤", meal.steps.mapIndexed { index, step -> "${index + 1}. $step" }.joinToString("\n")))
                         meal.ingredients.takeIf { it.isNotEmpty() }?.let {
                             add(DailyActionDetailField("主要食材", it.joinToString("、")))
                         }
@@ -98,7 +103,8 @@ data class DailyActionCardModel(
                         }
                     }
                 }.orEmpty(),
-                plan.meals.firstOrNull()?.evidence.orEmpty().map(ActionEvidence::toDailyActionEvidenceDetail)
+                plan.meals.firstOrNull()?.evidence.orEmpty().map(ActionEvidence::toDailyActionEvidenceDetail),
+                estimatedPriceCentsPerPortion = plan.meals.firstOrNull()?.estimatedPriceCents
             ),
             DailyActionCardModel(
                 title = "做什么",
@@ -178,14 +184,16 @@ private fun ActionSource.label(): String = when (this) {
 @Composable
 fun DailyActionSection(
     plan: DailyActionPlan?,
+    modifier: Modifier = Modifier,
     onFeedback: (category: String, candidateKey: String, kind: ActionFeedbackKind) -> Unit = { _, _, _ -> },
     onUndoReplacement: (category: String, candidateKey: String) -> Unit = { _, _ -> },
-    modifier: Modifier = Modifier
+    onScenarioChange: ((ActionScenario) -> Unit)? = null
 ) {
     if (plan == null) return
     val cards = DailyActionCardModel.from(plan)
     var selectedDetailTitle by rememberSaveable(plan.profileKey, plan.dateKey) { mutableStateOf<String?>(null) }
     var feedbackStatus by rememberSaveable(plan.profileKey, plan.dateKey) { mutableStateOf<String?>(null) }
+    var scenarioOpen by rememberSaveable(plan.profileKey, plan.dateKey) { mutableStateOf(false) }
     FortuneCard(modifier = modifier, cardId = "daily-action", title = "今日行动") {
         Text(
             "五行 + 星座 + 今日盘面 + ${if (plan.cityKey == null) "季节" else "城市标签"} · ${plan.confidence.label()}",
@@ -193,6 +201,11 @@ fun DailyActionSection(
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         Spacer(Modifier.height(10.dp))
+        if (onScenarioChange != null) {
+            TextButton(onClick = { scenarioOpen = true }, modifier = Modifier.testTag("daily-action-scenario")) {
+                Text("今日情境：${scenarioLabel(plan.constraints.scenario)}")
+            }
+        }
         cards.forEachIndexed { index, card ->
             ActionCard(
                 card = card,
@@ -205,6 +218,24 @@ fun DailyActionSection(
         }
         Spacer(Modifier.height(10.dp))
         Text(plan.disclaimer, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+
+    if (scenarioOpen && onScenarioChange != null) {
+        AlertDialog(
+            onDismissRequest = { scenarioOpen = false },
+            title = { Text("选择今日情境") },
+            text = {
+                Column {
+                    Text("仅用于本次行动筛选，不自动写入长期偏好。")
+                    ActionScenario.entries.forEach { scenario ->
+                        TextButton(onClick = { scenarioOpen = false; onScenarioChange(scenario) }) {
+                            Text(scenarioLabel(scenario))
+                        }
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { scenarioOpen = false }) { Text("取消") } }
+        )
     }
 
     selectedDetailTitle?.let { title ->
@@ -243,6 +274,14 @@ fun DailyActionSection(
             )
         }
     }
+}
+
+private fun scenarioLabel(scenario: ActionScenario): String = when (scenario) {
+    ActionScenario.Any -> "不限"
+    ActionScenario.Home -> "在家"
+    ActionScenario.Work -> "上班"
+    ActionScenario.Weekend -> "周末"
+    ActionScenario.ShortOnTime -> "时间紧"
 }
 
 @Composable
@@ -336,6 +375,7 @@ private fun DailyActionDetailPage(
         onDismiss = onDismiss,
         detailContext = detailContext,
         favoriteType = "action",
+        contentIncludesEvidence = true,
         onAskMystic = askMystic?.let { submitDetail ->
             { selectedDetail ->
                 onDismiss()
@@ -363,6 +403,14 @@ private fun DailyActionDetailPage(
                 Text(field.value, style = MaterialTheme.typography.bodyLarge)
             }
         }
+        AddToAgendaAction(
+            title = card.detailFields.firstOrNull { it.label in setOf("菜名", "活动建议", "场所类型") }?.value ?: card.summary,
+            category = card.category,
+            dateKey = dateKey,
+            ingredients = card.detailFields.firstOrNull { it.label == "主要食材" }?.value?.split("、").orEmpty(),
+            candidateKey = card.candidateKey.orEmpty(),
+            estimatedPriceCentsPerPortion = card.estimatedPriceCentsPerPortion
+        )
         Text("匹配依据", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
         if (card.why.isEmpty()) {
             Text("当前结果没有单独列出的匹配依据。", style = MaterialTheme.typography.bodySmall)

@@ -24,7 +24,10 @@ class MysticCharacterSessionStore(private val bridge: PreferenceBridge) {
             ?: MysticCharacterId.ShenYanzhou
         val normalized = current.copy(
             activeCharacterId = fallback,
-            sessions = MysticCharacterId.entries.associateWith { remaining[it] ?: com.xuanji.app.domain.MysticSessionState() }
+            sessions = MysticCharacterId.entries.associateWith {
+                if (it == characterId) com.xuanji.app.domain.reduce(current.session(it), com.xuanji.app.domain.MysticEvent.Clear)
+                else remaining[it] ?: com.xuanji.app.domain.MysticSessionState()
+            }
         )
         save(profileKey, normalized)
     }

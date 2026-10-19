@@ -1,7 +1,10 @@
 # 玄机 App · 全球玄学体系补全总览
 
-构建状态：**BUILD SUCCESSFUL**（clean + assembleDebug 全量通过，APK 16MB）
-真机验证：**待设备重连**（Galaxy S25 已掉线，需物理重插并重新授权 USB 调试；当前无法截图验证）
+2026-10-19：现实推荐条件、库存优先、主动日记与周月回顾已接入；当前架构与协议见[系统概览](docs/SYSTEMS_OVERVIEW.md)。Debug 版本 1.1.0（2），总计划仍有未完成项；本轮用户已授权自动门禁后安装与推送，以下“未安装”描述是历史状态。
+
+2026-10-16：日常安排/库存、软记忆有效期、备份迁移和构建清单的当前实现与门禁见[日常扩充交接](docs/superpowers/handoffs/2026-10-16-everyday-expansion-handoff.md)。以下体系清单继续作为历史说明。
+
+本文件保留早期体系补全记录，不作为当前构建或设备状态。最新架构以 [系统概览](docs/SYSTEMS_OVERVIEW.md) 和 [会话与工程交接](docs/superpowers/handoffs/2026-10-15-thread-safety-and-lint.md) 为准。待安装 APK 与哈希以最新交接为准；本轮只验证隔离模拟器，没有连接或安装手机。
 
 角色舞台状态：**已统一场景实现，设备视觉待复测**（四角色固定走同一五层舞台；JVM/Compose 编译门禁可执行，真机/TalkBack/Logcat 仍需单独验收）
 
@@ -25,7 +28,7 @@
 ## 共用基础
 - `GuaCommons.kt`：八卦/六十四卦名/五行生克复用层（梅花易数等使用）
 - 复用 `ZodiacCalculator.calculateNatalChart` 的已验证本命星盘（七政四余、古典占星、人类图）
-- 需生日的体系统一从 `AppModule.repository.userProfileFlow` 读取（默认生日已写入：2004-01-05 08:56 江苏宜兴）
+- 需生日的体系统一从 `AppModule.repository.userProfileFlow` 读取；出生信息默认空白，由用户主动填写。
 
 ## 明确的近似说明（已写入各屏「说明」）
 - 行星为平黄经近似、奇门为简化飞布（未拆补置闰）、人类图为离线简化映射、资料卡体系仅作文化介绍不含测算。全部标注「仅供文化娱乐参考」。

@@ -16,6 +16,110 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class DailyActionPlannerTest {
+    @Test fun practical_filters_apply_to_daily_pool_and_substitutes_without_changing_cultural_scores() {
+        val planner = DailyActionPlanner()
+        val baseline = planner.mealPool(input()).associateBy { it.candidateKey }
+        val restricted = planner.mealPool(input(preference = FoodPreference(
+            availableEquipment = emptySet(), maxCookingDifficulty = CookingDifficulty.Easy, lunchboxOnly = true
+        )))
+        assertTrue(restricted.isNotEmpty())
+        restricted.forEach { meal ->
+            assertTrue(meal.requiredEquipment.isEmpty())
+            assertEquals(CookingDifficulty.Easy, meal.difficulty)
+            assertTrue(meal.lunchboxSuitable)
+            assertEquals(baseline.getValue(meal.candidateKey).score, meal.score)
+            meal.substituteCandidateKey?.let { key -> assertTrue(restricted.any { it.candidateKey == key }) }
+        }
+    }
+
+    @Test fun pantry_priority_is_explicit_excludes_expired_or_zero_stock_and_preserves_score() {
+        val planner = DailyActionPlanner()
+        val base = input()
+        val original = planner.mealPool(base).associateBy { it.candidateKey }
+        val stock = listOf(
+            com.xuanji.app.domain.PantryItem("番茄", quantity = "1", expiresOn = base.date.toString()),
+            com.xuanji.app.domain.PantryItem("鸡蛋", quantity = "0"),
+            com.xuanji.app.domain.PantryItem("面条", expiresOn = base.date.minusDays(1).toString())
+        )
+        assertEquals(planner.mealPool(base), planner.mealPool(base.copy(pantry = stock)))
+        val ranked = planner.mealPool(base.copy(preference = FoodPreference(prioritizePantry = true), pantry = stock))
+        assertTrue(ranked.first().ingredients.contains("番茄"))
+        ranked.forEach { meal ->
+            assertEquals(original.getValue(meal.candidateKey).score, meal.score)
+            assertTrue(meal.evidence.filter { it.key == "pantry-priority" }.all { it.contribution == 0 && !it.label.contains("鸡蛋") && !it.label.contains("面条") })
+        }
+    }
+
+    @Test fun weekly_pool_uses_identical_filters_scores_and_substitutes_as_daily() {
+        val planner = DailyActionPlanner()
+        val input = input(preference = FoodPreference(vegetarian = true, excludedIngredients = setOf("豆腐"), allergens = setOf("鸡蛋"), maxPrepMinutes = 20))
+        val pool = planner.mealPool(input)
+        assertTrue(pool.isNotEmpty())
+        assertTrue(pool.none { it.ingredients.any { ingredient -> ingredient.contains("豆腐") || ingredient.contains("鸡蛋") } })
+        assertTrue(pool.all { it.prepMinutes!! <= 20 })
+        pool.forEach { assertEquals(it.score, it.evidence.sumOf(ActionEvidence::contribution)) }
+        planner.plan(input).meals.forEach { daily -> assertEquals(daily, pool.first { it.slot == daily.slot }) }
+        val week = WeeklyMealPlanner.plan(input.profileKey, input.date, pool)
+        assertTrue(week.meals.all { it.meal in pool })
+    }
+
+    @Test
+    fun expanded_catalog_has_unique_complete_records_in_each_slot() {
+        assertEquals(64, ActionCatalog.meals.size)
+        MealSlot.entries.forEach { slot -> assertEquals(16, ActionCatalog.meals.count { it.slot == slot }) }
+        assertEquals(64, ActionCatalog.meals.map { it.key }.toSet().size)
+        assertTrue(ActionCatalog.meals.all { it.steps.isNotEmpty() && it.steps.all(String::isNotBlank) })
+        assertEquals(32, ActionCatalog.activities.size)
+        assertEquals(16, ActionCatalog.outings.size)
+        assertEquals(24, CityProfileCatalog.profiles.size)
+        assertTrue(ActionCatalog.meals.map { it.prepMinutes }.toSet().size > 4)
+        assertTrue(ActionCatalog.meals.map { it.estimatedPriceCents }.toSet().size > 4)
+    }
+
+    @Test
+    fun temporary_scenario_limits_short_actions_and_home_has_no_outings() {
+        val home = DailyActionPlanner().plan(input(constraints = ActionConstraints(scenario = ActionScenario.Home)))
+        assertTrue(home.activities.all { it.indoor })
+        assertTrue(home.outings.isEmpty())
+        val short = DailyActionPlanner().plan(input(constraints = ActionConstraints(scenario = ActionScenario.ShortOnTime)))
+        assertTrue(short.activities.isNotEmpty())
+        assertTrue(short.activities.all { it.durationMinutes.last <= 15 })
+    }
+
+    @Test
+    fun indoor_only_and_duration_limit_apply_to_displayed_activity() {
+        val plan = DailyActionPlanner().plan(input(constraints = ActionConstraints(indoorOnly = true, maxActivityMinutes = 30)))
+        assertTrue(plan.activities.isNotEmpty())
+        assertTrue(plan.activities.all { suggestion ->
+            val candidate = ActionCatalog.activities.single { it.key == suggestion.candidateKey }
+            candidate.key != "green-walk" && candidate.key != "water-rest" && suggestion.durationMinutes.last <= 30
+        })
+    }
+
+    @Test
+    fun evidence_contributions_sum_to_actual_candidate_score() {
+        val plan = DailyActionPlanner().plan(input())
+        plan.meals.forEach { assertEquals(it.score, it.evidence.sumOf(ActionEvidence::contribution)) }
+        plan.activities.forEach { assertEquals(it.score, it.evidence.sumOf(ActionEvidence::contribution)) }
+        plan.outings.forEach { assertEquals(it.score, it.evidence.sumOf(ActionEvidence::contribution)) }
+        assertEquals(4, plan.evidence.count { it.contribution > 0 })
+    }
+
+    @Test
+    fun substitutes_are_selected_from_eligible_catalog_not_unfiltered_names() {
+        val excluded = setOf("豆腐", "豆乳", "豆浆", "花生")
+        val plan = DailyActionPlanner().plan(input(preference = FoodPreference(vegetarian = true, excludedIngredients = excluded)))
+        plan.meals.forEach { meal ->
+            if (meal.substitute != "当前约束下无同餐次替代候选") {
+                val candidate = ActionCatalog.meals.single { it.title == meal.substitute }
+                assertTrue(candidate.vegetarian)
+                assertTrue(candidate.ingredients.none { ingredient -> excluded.any(ingredient::contains) })
+                assertEquals(meal.slot, candidate.slot)
+                assertTrue(meal.title != meal.substitute)
+            }
+        }
+    }
+
     @Test
     fun score_uses_fixed_weights_and_never_randomizes_the_main_result() {
         val first = StableScore.combine(100, 80, 60, 40)
@@ -71,6 +175,18 @@ class DailyActionPlannerTest {
         assertTrue(plan.meals.all { (it.estimatedPriceCents ?: 0) <= 3000 })
         assertTrue(plan.meals.all { (it.prepMinutes ?: 0) <= 10 })
         assertTrue(plan.activities.all { it.durationMinutes.first <= 30 })
+    }
+
+    @Test
+    fun explicitly_saved_activity_preferences_filter_actions_and_outings_without_randomness() {
+        val preference = ActivityPreference(EnergyLevel.Low, indoorOnly = true, maxDurationMinutes = 30)
+        val plan = DailyActionPlanner().plan(input(constraints = preference.toConstraints()))
+
+        assertTrue(plan.activities.isNotEmpty())
+        assertTrue(plan.activities.all { it.durationMinutes.first <= 30 })
+        assertTrue(plan.outings.isNotEmpty())
+        assertTrue(plan.outings.all { it.indoor == true })
+        assertEquals(preference.toConstraints(), plan.constraints)
     }
 
     @Test

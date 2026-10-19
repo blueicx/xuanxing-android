@@ -62,7 +62,11 @@ data class DialogueContext(
     /** Exact, already-rendered detail being discussed; not persisted as memory. */
     val detailContext: MysticDetailContext? = null,
     /** Minimal checkpoint for the current turn only; never copied into conversation memory. */
-    val gameContext: MysticGameContext? = null
+    val gameContext: MysticGameContext? = null,
+    val temporaryConditions: TemporaryActionConditions = TemporaryActionConditions(),
+    val referenceCandidates: List<MysticReference> = emptyList(),
+    val currentReferenceId: String? = null,
+    val referenceCategory: String = ""
 )
 
 /** Minimal, UI-independent turn record used when the dialogue engine is called off-screen. */
@@ -108,8 +112,19 @@ class DefaultMysticDialogueEngine : MysticDialogueEngine {
 
     override fun reply(context: DialogueContext, input: String): DialogueReply {
         val normalizedInput = input.trim().take(200)
-        val analysis = analyzer.analyze(normalizedInput, context)
-        val continuity = MysticDialogueContinuity.resolve(normalizedInput, context.recentTurns)
+        val currentConditions = TemporaryActionConditions.parse(normalizedInput)
+        val rawAnalysis = analyzer.analyze(normalizedInput, context)
+        val conditionedInput = if (currentConditions.active && rawAnalysis.intent in setOf(
+                MysticIntent.Chat, MysticIntent.Action, MysticIntent.Daily)) {
+            val lead = when {
+                currentConditions.excludedIngredients.isNotEmpty() || currentConditions.maxBudgetCents != null || currentConditions.cheaper -> "今天吃什么"
+                context.referenceCategory == "outing" -> "今天去哪玩"
+                else -> "今天做什么"
+            }
+            "$lead，$normalizedInput"
+        } else normalizedInput
+        val analysis = analyzer.analyze(conditionedInput, context)
+        val continuity = MysticDialogueContinuity.resolve(conditionedInput, context.recentTurns)
         val intent = analysis.intent
         val topicKey = analysis.topicKey ?: continuity.intent.topicKeyOrNull() ?: context.topicKey
         val gameCheckpointQuestion = MysticGameProgressQuestion.isProgressQuestion(normalizedInput) ||
@@ -118,7 +133,24 @@ class DefaultMysticDialogueEngine : MysticDialogueEngine {
             ?: MysticCharacterCatalog.all.firstOrNull { it.displayName == context.characterName }?.id
             ?: MysticCharacterId.ShenYanzhou
         val prefix = if (gameCheckpointQuestion) "" else MysticGuideGenerator.customAnswerPrefix(normalizedInput)
-        val draft = if (gameCheckpointQuestion) {
+        val referenceIndex = MysticReferenceResolver.requestedIndex(normalizedInput)
+        val requestedReference = referenceIndex?.let { context.referenceCandidates.getOrNull(it - 1) }
+            ?: context.referenceCandidates.firstOrNull { it.id == context.currentReferenceId }
+                ?.takeIf { normalizedInput.contains("刚才") || normalizedInput.contains("那项") || normalizedInput.contains("为什么") }
+        val draft = if (MysticAgendaCommand.isRequest(normalizedInput)) {
+            val action = MysticAgendaCommand.route(normalizedInput, context.dailyActionPlan, context.referenceCategory, context.currentReferenceId)
+            val title = when (action) {
+                is MysticCompanionAction.ShowTodayMeal -> action.plan.meals.firstOrNull()?.title
+                is MysticCompanionAction.ShowTodayActivity -> action.plan.activities.firstOrNull()?.title
+                is MysticCompanionAction.ShowTodayOuting -> action.plan.outings.firstOrNull()?.placeType
+                else -> null
+            }
+            if (title == null) "请先选一个真实的饮食、活动或地点候选，再加入今日安排；我还没有保存任何事项。"
+            else "可以把「$title」加入今日安排。请在下方卡片选择时间与备注，再点击保存；当前尚未写入日程。"
+        } else if (referenceIndex != null || requestedReference != null) {
+            requestedReference?.let { "${it.title}：${it.body}" + if (intent == MysticIntent.Why) "\n依据：${it.evidence}" else "" }
+                ?: "当前没有明确的第${referenceIndex}项。请先选择一个真实候选，或说明你指的是饮食、活动还是地点。"
+        } else if (gameCheckpointQuestion) {
             MysticGameContextAnswer.reply(
                 replyCharacterId,
                 context.gameContext,

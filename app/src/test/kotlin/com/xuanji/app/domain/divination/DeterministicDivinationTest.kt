@@ -7,6 +7,13 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class DeterministicDivinationTest {
+    @Test fun reduction_steps_reproduce_result_and_preserve_existing_master_values() {
+        assertEquals(listOf(1984, 22), NumerologyReduction.steps(1984))
+        listOf(11, 22, 33).forEach { assertEquals(listOf(it), NumerologyReduction.steps(it)) }
+        assertEquals(listOf(9999, 36, 9), NumerologyReduction.steps(9999))
+        assertEquals("1984 → 1+9+8+4=22（保留大师数）", NumerologyReduction.explain(1984))
+        assertEquals(0, NumerologyReduction.reduce(0))
+    }
     private val deck = (1..12).map { index ->
         TarotCard("牌$index", "Card $index", "minor", "权杖", "正位$index", "逆位$index")
     }
@@ -43,5 +50,8 @@ class DeterministicDivinationTest {
         val cycles = NumerologyCycles.calculate(profile, java.time.LocalDate.of(2026, 11, 22))
         assertEquals(4, cycles.size)
         assertTrue(cycles.all { it.calculation.isNotBlank() && it.interpretation.isNotBlank() })
+        val masters = NumerologyCycles.calculate(profile.copy(birthDay = 11), java.time.LocalDate.of(2009, 11, 11))
+        assertEquals(33, masters.first().number)
+        assertTrue(masters.first().calculation.contains("11+11+11"))
     }
 }

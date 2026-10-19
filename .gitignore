@@ -61,3 +61,10 @@ build_log.txt
 
 # Generated image / scratch artifacts
 generated-images/
+
+# Task-local emulator disk images (verification artifacts, not source)
+/work/.dispatch-backup/20261016-everyday-expansion/avd/
+
+# Local rollback copies and device evidence can contain private state. Keep on disk, never publish.
+/work/.dispatch-backup/
+/.superpowers/work/.dispatch-backup/

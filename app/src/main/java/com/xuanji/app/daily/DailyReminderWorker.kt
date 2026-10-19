@@ -5,7 +5,6 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
-import android.os.Build
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.core.app.NotificationCompat
 import androidx.work.CoroutineWorker
@@ -34,15 +33,12 @@ class DailyReminderWorker(context: Context, params: WorkerParameters) :
     private fun showNotification() {
         val ctx = applicationContext
         val channelId = "fortune_daily"
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(
-                channelId,
-                "每日运势",
-                NotificationManager.IMPORTANCE_DEFAULT
-            )
-            ctx.getSystemService(NotificationManager::class.java)
-                .createNotificationChannel(channel)
-        }
+        val channel = NotificationChannel(
+            channelId,
+            "每日运势",
+            NotificationManager.IMPORTANCE_DEFAULT
+        )
+        ctx.getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
         val intent = Intent(ctx, MainActivity::class.java)
         val pi = PendingIntent.getActivity(
             ctx,

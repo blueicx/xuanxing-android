@@ -200,14 +200,19 @@ sealed class Screen(val route: String, val label: String, val icon: androidx.com
  * 彻底消除「切回东方/西方时整屏重新构建导致的卡顿」。占卜 tab 内部保留独立的 NavHost 处理子页跳转。
  */
 @Composable
-fun XuanjiApp() {
+fun XuanjiApp(initialTab: String? = null, initialRecordDate: String? = null) {
     // 今日、排盘、探索、记录、我的；运势体系切换收在「今日」页内。
     var selectedTab by rememberSaveable { mutableStateOf(Screen.Today.route) }
+    LaunchedEffect(initialTab, initialRecordDate) {
+        if (initialTab == Screen.History.route) selectedTab = Screen.History.route
+    }
     val items = listOf(
         Screen.Today, Screen.Charts, Screen.Explore, Screen.History, Screen.Profile
     )
     val immersiveStageOpen = remember { mutableStateOf(false) }
     val mysticGuideVisible = remember { mutableStateOf(true) }
+    val activeProfile by AppModule.repository.userProfileFlow.collectAsStateWithLifecycle(initialValue = null)
+    val dailyLifeKey = activeProfile?.let(AppModule.actionRepository::profileKey)
 
     LaunchedEffect(Unit) {
         AppModule.repository.mysticGuideEnabledFlow.collect { enabled ->
@@ -217,7 +222,9 @@ fun XuanjiApp() {
 
     CompositionLocalProvider(
         LocalImmersiveStageOpen provides immersiveStageOpen,
-        LocalMysticGuideVisible provides mysticGuideVisible
+        LocalMysticGuideVisible provides mysticGuideVisible,
+        com.xuanji.app.ui.components.LocalDailyLifeStore provides AppModule.dailyLifeStore,
+        com.xuanji.app.ui.components.LocalDailyLifeProfileKey provides dailyLifeKey
     ) {
         Scaffold(
             // 底栏与页面同色，去掉 M3 默认的深灰容器，
@@ -256,9 +263,9 @@ fun XuanjiApp() {
                 KeepAliveTab(active = selectedTab == Screen.Today.route) { TodayFortuneHub() }
                 KeepAliveTab(active = selectedTab == Screen.Charts.route) { LifetimeChartHub() }
                 KeepAliveTab(active = selectedTab == Screen.Explore.route) {
-                    ExploreHub(onOpenToday = { selectedTab = Screen.Today.route })
+                    ExploreHub(onOpenToday = { selectedTab = Screen.Today.route }, onOpenTab = { selectedTab = it })
                 }
-                KeepAliveTab(active = selectedTab == Screen.History.route) { HistoryScreen() }
+                KeepAliveTab(active = selectedTab == Screen.History.route) { HistoryScreen(initialRecordDate) }
                 KeepAliveTab(active = selectedTab == Screen.Profile.route) { ProfileScreen() }
             }
         }
@@ -358,8 +365,16 @@ internal fun lifetimeChartTabs(): List<LifetimeChartTab> = listOf(
 )
 
 @Composable
-private fun ExploreHub(onOpenToday: () -> Unit) {
+private fun ExploreHub(onOpenToday: () -> Unit, onOpenTab: (String) -> Unit) {
     var selectedSection by rememberSaveable { mutableStateOf("divination") }
+    var requestedDivinationRoute by rememberSaveable { mutableStateOf<String?>(null) }
+    val bazi by AppModule.repository.baziFullFlow.collectAsStateWithLifecycle(initialValue = null)
+    var searchFavorites by remember(bazi) { mutableStateOf(emptyList<com.xuanji.app.domain.ReadingFavorite>()) }
+    LaunchedEffect(bazi, selectedSection) {
+        if (selectedSection == "learning") searchFavorites = bazi?.let {
+            AppModule.readingFavoriteStore.list("bazi|${it.chart.display}").entries
+        }.orEmpty()
+    }
     Column(Modifier.fillMaxSize()) {
         Column(
             Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 10.dp),
@@ -367,7 +382,7 @@ private fun ExploreHub(onOpenToday: () -> Unit) {
         ) {
             Text("探索", style = MaterialTheme.typography.headlineSmall)
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                listOf("divination" to "占卜体系", "tests" to "心理测试", "games" to "角色游戏")
+                listOf("divination" to "占卜体系", "tests" to "心理测试", "games" to "角色游戏", "learning" to "学习搜索")
                     .forEach { (key, label) ->
                         FilterChip(
                             selected = selectedSection == key,
@@ -379,8 +394,12 @@ private fun ExploreHub(onOpenToday: () -> Unit) {
         }
         Box(Modifier.weight(1f)) {
             when (selectedSection) {
-                "divination" -> DivinationRoot()
+                "divination" -> DivinationRoot(requestedDivinationRoute)
                 "tests" -> TestHubScreen()
+                "learning" -> com.xuanji.app.ui.components.LearningSearchPanel(searchFavorites) { route ->
+                    if (route.startsWith("divination/")) { requestedDivinationRoute = route; selectedSection = "divination" }
+                    else onOpenTab(route)
+                }
                 else -> ExploreGamesHub(onOpenToday = onOpenToday)
             }
         }
@@ -474,8 +493,13 @@ private fun KeepAliveTab(active: Boolean, content: @Composable () -> Unit) {
  * 因外层 KeepAliveTab 始终 compose，本 NavHost 的状态（所在子页）在切走再切回时得以保留。
  */
 @Composable
-private fun DivinationRoot() {
+private fun DivinationRoot(requestedRoute: String? = null) {
     val nav = rememberNavController()
+    LaunchedEffect(requestedRoute) {
+        if (requestedRoute in setOf("divination/tarot", "divination/rune", "divination/numerology", "divination/ziwei")) {
+            nav.navigate(requestedRoute!!) { launchSingleTop = true }
+        }
+    }
     BackHandler(enabled = nav.previousBackStackEntry != null) {
         nav.popBackStack()
     }

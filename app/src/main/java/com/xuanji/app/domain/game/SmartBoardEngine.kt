@@ -2,6 +2,9 @@ package com.xuanji.app.domain.game
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
+import kotlin.coroutines.CoroutineContext
 
 /**
  * Pure-Kotlin alpha-beta search engine. Real game tree search over [XiangqiRules]
@@ -11,10 +14,12 @@ import kotlinx.coroutines.withContext
  * Search convention: [evaluate] and every node score are from the ROOT side's
  * perspective; maximizing nodes are root-side turns, minimizing nodes are the opponent.
  */
-class SmartBoardEngine(private val difficulty: String = NORMAL) : BoardEngine {
+class SmartBoardEngine(private val difficulty: String = NORMAL, private val onNodeVisited: (() -> Unit)? = null) : BoardEngine {
 
     override suspend fun bestMove(position: BoardPosition, color: PlayerColor, token: Long): EngineResult =
         withContext(Dispatchers.Default) {
+            val searchContext = currentCoroutineContext()
+            searchContext.ensureActive()
             // never move on a settled position (mate/stalemate/draw): the reducer refuses
             // such moves with game_over, so answering NoMove keeps the contract honest
             when (XiangqiRules.outcome(position)) {
@@ -26,14 +31,17 @@ class SmartBoardEngine(private val difficulty: String = NORMAL) : BoardEngine {
             val legal = XiangqiRules.legalMoves(position, color)
             if (legal.isEmpty()) return@withContext EngineResult.NoMove("no_legal_move")
             val depth = depthOf(difficulty)
+            val budget = SearchBudget(nodeLimitOf(difficulty))
             var bestMove: BoardMove? = null
             var bestScore = Int.MIN_VALUE
             var alpha = Int.MIN_VALUE + 1
             val beta = Int.MAX_VALUE
             val ordered = legal.sortedByDescending { moveScoreHint(position, it) }
             for (move in ordered) {
+                searchContext.ensureActive()
+                if (budget.exhausted) break
                 val applied = XiangqiRules.apply(position, move) as? RuleResult.Applied ?: continue
-                val score = alphabeta(applied.position, depth - 1, alpha, beta, color.opponentSide(), color)
+                val score = alphabeta(applied.position, depth - 1, alpha, beta, color.opponentSide(), color, searchContext, budget)
                 if (score > bestScore) {
                     bestScore = score
                     bestMove = move
@@ -50,8 +58,15 @@ class SmartBoardEngine(private val difficulty: String = NORMAL) : BoardEngine {
         alpha: Int,
         beta: Int,
         sideToMove: PlayerColor,
-        rootColor: PlayerColor
+        rootColor: PlayerColor,
+        searchContext: CoroutineContext,
+        budget: SearchBudget
     ): Int {
+        searchContext.ensureActive()
+        if (budget.exhausted) return evaluate(position, rootColor)
+        budget.visited++
+        onNodeVisited?.invoke()
+        searchContext.ensureActive()
         val outcome = XiangqiRules.outcome(position)
         when (outcome) {
             is GameOutcome.Checkmate ->
@@ -64,7 +79,7 @@ class SmartBoardEngine(private val difficulty: String = NORMAL) : BoardEngine {
             GameOutcome.InProgress -> Unit
             is GameOutcome.Check -> Unit
         }
-        if (depth == 0) return evaluate(position, rootColor)
+        if (depth == 0 || budget.exhausted) return evaluate(position, rootColor)
         val moves = XiangqiRules.legalMoves(position, sideToMove)
         if (moves.isEmpty()) {
             // no moves while not mated/stalemated cannot happen, but stay safe
@@ -75,8 +90,10 @@ class SmartBoardEngine(private val difficulty: String = NORMAL) : BoardEngine {
         var a = alpha
         var b = beta
         for (move in moves.sortedByDescending { moveScoreHint(position, it) }.take(18)) {
+            searchContext.ensureActive()
+            if (budget.exhausted) break
             val applied = XiangqiRules.apply(position, move) as? RuleResult.Applied ?: continue
-            val score = alphabeta(applied.position, depth - 1, a, b, sideToMove.opponentSide(), rootColor)
+            val score = alphabeta(applied.position, depth - 1, a, b, sideToMove.opponentSide(), rootColor, searchContext, budget)
             if (maximizing) {
                 if (score > best) best = score
                 if (best > a) a = best
@@ -87,6 +104,11 @@ class SmartBoardEngine(private val difficulty: String = NORMAL) : BoardEngine {
             if (a >= b) break
         }
         return best
+    }
+
+    /** Counts nodes, not elapsed time: selection stays deterministic across devices. */
+    private class SearchBudget(val limit: Int, var visited: Int = 0) {
+        val exhausted get() = visited >= limit
     }
 
     /** Material + crossed-pawn/cannon-position evaluation, always from rootColor's view. */
@@ -131,6 +153,11 @@ class SmartBoardEngine(private val difficulty: String = NORMAL) : BoardEngine {
     }
 
     companion object {
+        fun nodeLimitOf(difficulty: String): Int = when (difficulty) {
+            EASY -> 128
+            HARD -> 1024
+            else -> 256
+        }
         private const val MATE_SCORE = 100000
 
         const val EASY = "easy"

@@ -93,6 +93,10 @@ fun LifeProfileSection(profile: LifeProfile?, modifier: Modifier = Modifier) {
                 Text("${career.score} 分")
             }
             Text(career.reasons.take(2).joinToString("；"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("典型任务：${career.typicalTasks.joinToString("；")}\n环境：${career.workEnvironment}\n技能：${career.skills.joinToString("、")}\n体验：${career.trialActivity}", style = MaterialTheme.typography.bodySmall)
+        }
+        profile.colorPalette.forEach { color ->
+            Text("${color.label} · ${color.applications.entries.joinToString("；") { "${it.key}：${it.value}" }}", style = MaterialTheme.typography.bodySmall)
         }
         Spacer(Modifier.height(8.dp))
         Text("色彩灵感", style = MaterialTheme.typography.titleMedium)
@@ -109,6 +113,7 @@ fun LifeProfileSection(profile: LifeProfile?, modifier: Modifier = Modifier) {
         Text(profile.environmentProfile.rhythm, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(Modifier.height(8.dp))
         Text("地区匹配示例", style = MaterialTheme.typography.titleMedium)
+        RegionPreferenceComparisonSection(profile.profileKey)
         model.regions.forEach { region ->
             Column(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
                 Text(region.title)

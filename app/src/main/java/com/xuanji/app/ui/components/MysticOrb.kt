@@ -62,8 +62,8 @@ internal fun MysticOrb(
     color: Color,
     trimColor: Color,
     onClick: () -> Unit,
-    scrollValue: Int = 0,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    scrollValue: Int = 0
 ) {
     val reducedMotion = rememberReducedMotion()
     val drift = rememberInfiniteTransition(label = "mysticDrift")

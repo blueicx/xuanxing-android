@@ -14,6 +14,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
@@ -39,7 +40,7 @@ fun MysticConversationInput(
         OutlinedTextField(
             value = inputState.text,
             onValueChange = { inputState = inputState.update(it) },
-            modifier = Modifier.weight(1f),
+            modifier = Modifier.weight(1f).testTag("mystic-conversation-input"),
             singleLine = true,
             enabled = !busy,
             placeholder = { Text(placeholder) },

@@ -11,7 +11,7 @@ import com.google.gson.JsonParser
  * network/provider operation that no longer owns the session token.
  */
 object MysticSessionSnapshotCodec {
-    const val VERSION = 1
+    const val VERSION = 2
     private const val MAX_MESSAGES = 40
     private const val MAX_TURNS = 20
     private const val MAX_NOTES = 12
@@ -35,7 +35,7 @@ object MysticSessionSnapshotCodec {
         if (json.isNullOrBlank()) return null
         val root = runCatching { JsonParser.parseString(json) }.getOrNull()?.takeIf { it.isJsonObject }?.asJsonObject
             ?: return null
-        if (root.int("version", VERSION) > VERSION) return null
+        if (root.int("version", 0) !in 1..VERSION) return null
         val active = MysticCharacterId.entries.firstOrNull { it.key == root.string("activeCharacterId") }
             ?: MysticCharacterId.ShenYanzhou
         val sessions = MysticCharacterId.entries.associateWith { MysticSessionState() }.toMutableMap()
@@ -60,6 +60,7 @@ object MysticSessionSnapshotCodec {
         addProperty("styleKey", value.styleKey.take(80))
         addProperty("skinId", value.skinId.take(80))
         addProperty("nextTurnId", value.nextTurnId.coerceAtLeast(0))
+        add("interaction", com.google.gson.Gson().toJsonTree(value.interaction.takeIf { it.valid() } ?: MysticInteractionState()))
         add("recentTurns", JsonArray().also { array ->
             value.recentTurns.takeLast(MAX_TURNS).forEach { turn ->
                 array.add(JsonObject().apply {
@@ -95,7 +96,9 @@ object MysticSessionSnapshotCodec {
         memoryNotes = decodeNotes(obj.array("memoryNotes")).takeLast(MAX_NOTES),
         messages = decodeMessages(obj.array("messages")).takeLast(MAX_MESSAGES),
         nextTurnId = obj.long("nextTurnId").coerceAtLeast(0),
-        requestState = MysticRequestState.Idle
+        requestState = MysticRequestState.Idle,
+        interaction = runCatching { com.google.gson.Gson().fromJson(obj.get("interaction"), MysticInteractionState::class.java) }
+            .getOrNull()?.takeIf { it.valid() } ?: MysticInteractionState()
     )
 
     private fun notes(values: List<MysticMemoryNote>): JsonArray = JsonArray().also { array ->

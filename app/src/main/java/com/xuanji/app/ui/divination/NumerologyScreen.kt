@@ -66,6 +66,7 @@ fun NumerologyScreen() {
 
             FortuneCard {
                 SectionTitle("个人周期（可复核）")
+                Text("规则版本：${com.xuanji.app.domain.divination.NumerologyReduction.VERSION}。本项目逐组件保留 11/22/33；不同流派规则可能不同，不是科学测量。", style = MaterialTheme.typography.bodySmall)
                 Spacer(Modifier.height(8.dp))
                 NumerologyCycles.calculate(p, LocalDate.now()).forEach { cycle ->
                     InfoRow(cycle.label, cycle.number.toString())

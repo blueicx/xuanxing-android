@@ -27,7 +27,12 @@ data class MealSuggestion(
     val evidence: List<ActionEvidence>,
     val estimatedPriceCents: Int? = null,
     val prepMinutes: Int? = null,
-    val candidateKey: String = ""
+    val candidateKey: String = "",
+    val steps: List<String> = emptyList(),
+    val substituteCandidateKey: String? = null,
+    val requiredEquipment: Set<KitchenEquipment> = emptySet(),
+    val difficulty: CookingDifficulty = CookingDifficulty.Easy,
+    val lunchboxSuitable: Boolean = false
 )
 
 data class ActivitySuggestion(
@@ -37,7 +42,8 @@ data class ActivitySuggestion(
     val avoid: String?,
     val score: Int,
     val evidence: List<ActionEvidence>,
-    val candidateKey: String = ""
+    val candidateKey: String = "",
+    val indoor: Boolean = true
 )
 
 data class OutingSuggestion(
@@ -69,16 +75,40 @@ data class FoodPreference(
     val excludedIngredients: Set<String> = emptySet(),
     val allergens: Set<String> = emptySet(),
     val maxMealBudgetCents: Int? = null,
-    val maxPrepMinutes: Int? = null
+    val maxPrepMinutes: Int? = null,
+    /** null means unrestricted; empty means no heating equipment, not missing data. */
+    val availableEquipment: Set<KitchenEquipment>? = null,
+    val maxCookingDifficulty: CookingDifficulty? = null,
+    val lunchboxOnly: Boolean = false,
+    val prioritizePantry: Boolean = false
 )
+
+enum class KitchenEquipment(val label: String) { Stove("灶具"), Steamer("蒸锅"), Oven("烤箱"), RiceCooker("电饭锅") }
+enum class CookingDifficulty(val label: String) { Easy("简单"), Moderate("进阶") }
+
+/** Explicitly selected activity preferences; no field is inferred from app behavior. */
+data class ActivityPreference(
+    val energy: EnergyLevel = EnergyLevel.Any,
+    val indoorOnly: Boolean = false,
+    val maxDurationMinutes: Int? = null
+) {
+    fun toConstraints(): ActionConstraints = ActionConstraints(
+        energy = energy,
+        indoorOnly = indoorOnly,
+        maxActivityMinutes = maxDurationMinutes?.coerceIn(5, 480)
+    )
+}
 
 data class ActionConstraints(
     val maxMealBudgetCents: Int? = null,
     val maxPrepMinutes: Int? = null,
     val energy: EnergyLevel = EnergyLevel.Any,
     val indoorOnly: Boolean = false,
-    val maxActivityMinutes: Int? = null
+    val maxActivityMinutes: Int? = null,
+    val scenario: ActionScenario = ActionScenario.Any
 )
+
+enum class ActionScenario { Any, Home, Work, Weekend, ShortOnTime }
 
 enum class EnergyLevel { Any, Low, Medium, High }
 
@@ -108,14 +138,19 @@ data class CareerCluster(
     val key: String,
     val label: String,
     val score: Int,
-    val reasons: List<String>
+    val reasons: List<String>,
+    val typicalTasks: List<String> = emptyList(),
+    val workEnvironment: String = "",
+    val skills: List<String> = emptyList(),
+    val trialActivity: String = ""
 )
 
 data class ColorCluster(
     val key: String,
     val label: String,
     val hex: String,
-    val reasons: List<String>
+    val reasons: List<String>,
+    val applications: Map<String, String> = emptyMap()
 )
 
 data class EnvironmentProfile(
@@ -129,5 +164,8 @@ data class RegionCandidate(
     val city: String,
     val matchedTags: List<String>,
     val unmatchedFactors: List<String>,
-    val score: Int
+    val score: Int,
+    val preferenceExplanation: String = ""
 )
+
+data class RegionPreference(val climate: String = "未选择", val rhythm: String = "未选择", val budget: String = "未选择")

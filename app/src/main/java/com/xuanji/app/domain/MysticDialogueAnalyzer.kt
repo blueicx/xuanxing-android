@@ -90,15 +90,8 @@ class DefaultMysticDialogueAnalyzer : MysticDialogueAnalyzer {
 
     private fun isGame(q: String): Boolean = MysticIntentClassifier.classify(q) == MysticIntent.Game
 
-    private fun casualIntent(q: String): MysticIntent? = when {
-        q in setOf("hi", "hello", "yo", "嗨", "哈喽", "哈罗", "你好", "您好", "在吗", "在么", "在不在") ||
-            q.length <= 5 && setOf("你好", "您好", "哈喽", "哈罗", "嗨").any(q::startsWith) ||
-            setOf("你好呀", "您好呀", "早上好", "早安", "午安", "下午好", "晚上好", "晚安", "最近怎么样", "最近如何").any(q::contains) -> MysticIntent.Greeting
-        q == "走了" || setOf("拜拜", "再见", "回见", "睡了", "去忙").any(q::contains) -> MysticIntent.Farewell
-        setOf("谢谢", "多谢", "感谢", "辛苦了", "thanks", "thank you").any(q::contains) -> MysticIntent.Thanks
-        setOf("你是谁", "你叫什么", "叫什么名字", "什么名字", "介绍一下自己", "你是什么人", "你是神仙吗").any(q::contains) -> MysticIntent.Identity
-        setOf("吃了吗", "干嘛呢", "在干嘛", "在忙吗", "无聊", "陪我聊", "陪我说话", "今天心情").any(q::contains) -> MysticIntent.Smalltalk
-        else -> null
+    private fun casualIntent(q: String): MysticIntent? = MysticIntentClassifier.classify(q).takeIf {
+        it in setOf(MysticIntent.Greeting, MysticIntent.Farewell, MysticIntent.Thanks, MysticIntent.Identity, MysticIntent.Smalltalk)
     }
 
     private fun topicMatches(q: String): List<TopicMatch> = TOPICS.mapNotNull { topic ->
@@ -106,18 +99,23 @@ class DefaultMysticDialogueAnalyzer : MysticDialogueAnalyzer {
         positions.minOrNull()?.let { TopicMatch(topic.key, topic.intent, topic.label, it) }
     }.sortedWith(compareBy<TopicMatch> { it.position }.thenBy { it.key })
 
-    private fun actionIntent(q: String): Pair<MysticIntent, String>? = when {
-        setOf("早餐吃什么", "午餐吃什么", "午饭吃什么", "晚餐吃什么", "晚饭吃什么", "今天吃什么", "外卖吃什么").any(q::contains) -> MysticIntent.TodayMeal to "daily_meal"
-        setOf("今天做什么", "今天适合做什么", "现在做什么").any(q::contains) -> MysticIntent.TodayActivity to "daily_activity"
-        setOf("去哪玩", "去哪里玩", "今天去哪", "今天去哪里").any(q::contains) -> MysticIntent.TodayOuting to "daily_outing"
-        setOf("适合什么工作", "适合做什么工作", "什么工作适合我", "什么颜色适合我", "适合什么颜色", "哪个城市适合我", "适合哪个城市", "适合什么地区").any(q::contains) -> MysticIntent.LifeProfile to "life_profile"
-        setOf("抽塔罗", "塔罗牌", "塔罗怎么抽", "三张塔罗", "五张塔罗").any(q::contains) -> MysticIntent.Tarot to "tarot"
-        setOf("抽符文", "北欧符文", "卢恩", "卢恩怎么抽", "三符文").any(q::contains) -> MysticIntent.Rune to "rune"
-        setOf("数字命理", "生命数字", "个人年", "个人月", "个人日").any(q::contains) -> MysticIntent.Numerology to "numerology"
-        setOf("实时天气", "天气预报", "降雨概率", "当前气温", "温度多少").any(q::contains) -> MysticIntent.Weather to "weather"
-        setOf("附近哪里", "附近去哪", "附近游玩", "地图上去哪").any(q::contains) -> MysticIntent.Place to "place"
-        setOf("做个性格测验", "性格测验", "人格测试结果", "我的人格").any(q::contains) -> MysticIntent.Personality to "personality"
-        else -> null
+    private fun actionIntent(q: String): Pair<MysticIntent, String>? {
+        val intent = MysticIntentClassifier.classify(q)
+        val topic = when (intent) {
+            MysticIntent.Health -> "health"
+            MysticIntent.TodayMeal -> "daily_meal"
+            MysticIntent.TodayActivity -> "daily_activity"
+            MysticIntent.TodayOuting -> "daily_outing"
+            MysticIntent.LifeProfile -> "life_profile"
+            MysticIntent.Tarot -> "tarot"
+            MysticIntent.Rune -> "rune"
+            MysticIntent.Numerology -> "numerology"
+            MysticIntent.Weather -> "weather"
+            MysticIntent.Place -> "place"
+            MysticIntent.Personality -> "personality"
+            else -> null
+        }
+        return topic?.let { intent to it }
     }
 
     private fun previousTopic(recentTurns: List<MysticTurn>): Triple<MysticIntent, String, String>? {
@@ -185,8 +183,8 @@ class DefaultMysticDialogueAnalyzer : MysticDialogueAnalyzer {
             TopicDefinition("love", MysticIntent.Love, "感情", setOf("感情", "恋爱", "对象", "复合", "暗恋", "表白", "桃花", "分手", "他", "她")),
             TopicDefinition("wealth", MysticIntent.Wealth, "财富", setOf("财", "钱", "赚钱", "投资", "生意", "消费", "钱包")),
             TopicDefinition("career", MysticIntent.Career, "工作", setOf("工作", "上班", "事业", "老板", "同事", "面试", "升职", "跳槽")),
-            TopicDefinition("study", MysticIntent.Study, "学习", setOf("学习", "考试", "复习", "作业", "论文", "背", "题")),
-            TopicDefinition("health", MysticIntent.Health, "健康", setOf("健康", "身体", "睡觉", "睡眠", "失眠", "生病", "累")),
+            TopicDefinition("study", MysticIntent.Study, "学习", setOf("学习", "考试", "复习", "作业", "论文", "背单词", "背诵", "做题", "题目", "错题", "习题", "考题")),
+            TopicDefinition("health", MysticIntent.Health, "健康", setOf("健康", "身体", "睡觉", "睡眠", "睡不好", "睡不着", "失眠", "生病", "累")),
             TopicDefinition("why", MysticIntent.Why, "依据", setOf("为什么", "怎么来", "怎么算", "依据", "来源", "多少分")),
             TopicDefinition("care", MysticIntent.Care, "注意事项", setOf("留意", "注意", "风险", "小心", "避免", "坑")),
             TopicDefinition("outcome", MysticIntent.Outcome, "结果", setOf("能不能", "会不会", "可不可以", "行不行", "成不成", "该不该")),

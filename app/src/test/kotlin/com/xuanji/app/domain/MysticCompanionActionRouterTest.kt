@@ -8,6 +8,13 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class MysticCompanionActionRouterTest {
+    @Test fun explicit_add_to_agenda_routes_the_actual_referenced_activity_without_writing_anything() {
+        val action = MysticCompanionActionRouter.route("把刚才那项加入今日安排", plan, null, false, "activity", null)
+        assertTrue(action is MysticCompanionAction.ShowTodayActivity)
+        assertEquals(plan.activities.first().title, (action as MysticCompanionAction.ShowTodayActivity).plan.activities.first().title)
+        assertNull(MysticCompanionActionRouter.route("加入今日安排", null, null, false, "meal", null))
+        assertNull(MysticCompanionActionRouter.route("加入今日安排", plan, null, false))
+    }
     private val evidence = listOf(ActionEvidence(ActionSource.FiveElements, "wood", "喜用五行：木", 40))
     private val plan = DailyActionPlan(
         dateKey = "2026-09-22", profileKey = "p", cityKey = null,

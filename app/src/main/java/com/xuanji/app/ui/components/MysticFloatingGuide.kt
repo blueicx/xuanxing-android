@@ -48,6 +48,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.coroutines.isActive
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -159,8 +161,10 @@ fun MysticFloatingGuide(
     val guideAvailable = bazi != null && fortune != null
     val favoriteStore = AppModule.readingFavoriteStore
     val readingProfileKey = remember(bazi) { bazi?.let { "bazi|${it.chart.display}" } }
-    val companionKey = remember(bazi, fortune) {
-        if (bazi == null || fortune == null) "unavailable" else "${bazi.hashCode()}|${fortune.hashCode()}"
+    val activeProfile by AppModule.repository.userProfileFlow.collectAsStateWithLifecycle(initialValue = null)
+    val checkpointProfileKey = activeProfile?.let(AppModule.actionRepository::profileKey) ?: readingProfileKey.orEmpty()
+    val companionKey = remember(bazi, fortune, checkpointProfileKey) {
+        if (bazi == null || fortune == null) "unavailable" else "$checkpointProfileKey|${fortune.dateKey}"
     }
     val suggestedCharacter = if (guideAvailable) {
         remember(companionKey) {
@@ -186,6 +190,37 @@ fun MysticFloatingGuide(
             ?: MysticGuideGenerator.defaultMysticSkin(stageMode, fortune!!)
     } else null
     var detailOpen by rememberSaveable(companionKey) { mutableStateOf(false) }
+    var savedDrawers by rememberSaveable(companionKey) { mutableStateOf<Map<String, String>>(emptyMap()) }
+    var checkpointLoaded by rememberSaveable(companionKey) { mutableStateOf(false) }
+    val checkpointContext = androidx.compose.ui.platform.LocalContext.current
+    val checkpointStore = remember(checkpointContext) {
+        com.xuanji.app.data.local.MysticStageCheckpointStore(com.xuanji.app.data.local.DataStorePreferenceBridge(checkpointContext))
+    }
+    LaunchedEffect(checkpointProfileKey, fortune?.dateKey, guideAvailable) {
+        if (checkpointLoaded || !guideAvailable || checkpointProfileKey.isBlank()) return@LaunchedEffect
+        val saved = runCatching { checkpointStore.load(checkpointProfileKey, fortune!!.dateKey) }.getOrNull()
+        if (!kotlinx.coroutines.currentCoroutineContext().isActive) return@LaunchedEffect
+        if (saved != null) {
+            val profile = MysticCharacterCatalog.byId(saved.characterId)
+            stageCharacterKey = profile.id.key
+            stageMode = profile.dialogueMode
+            stageSkinId = profile.legacySkinId
+            detailOpen = saved.stageOpen
+            savedDrawers = saved.drawers.entries.associate { it.key.key to it.value.name }
+            stageActionRequest = null // Never replay an unfinished game/start request.
+        }
+        checkpointLoaded = true
+    }
+    LaunchedEffect(checkpointProfileKey, fortune?.dateKey, stageCharacterKey, detailOpen, savedDrawers, checkpointLoaded) {
+        if (!checkpointLoaded || !guideAvailable || checkpointProfileKey.isBlank()) return@LaunchedEffect
+        val drawers = savedDrawers.mapNotNull { (key, value) ->
+            val id = MysticCharacterId.entries.firstOrNull { it.key == key }
+            val state = com.xuanji.app.domain.MysticDrawerState.entries.firstOrNull { it.name == value }
+            if (id != null && state != null) id to state else null
+        }.toMap()
+        runCatching { checkpointStore.save(checkpointProfileKey, com.xuanji.app.domain.MysticStageCheckpoint(
+            fortune!!.dateKey, stageCharacter.id, detailOpen, drawers)) }
+    }
     val guideVisible = LocalMysticGuideVisible.current
     val pageScroll = rememberScrollState()
     val stageOpenState = LocalImmersiveStageOpen.current
@@ -272,17 +307,28 @@ fun MysticFloatingGuide(
                     },
                     onClose = {
                         detailOpen = false
+                        savedDrawers = savedDrawers + (stageCharacter.id.key to com.xuanji.app.domain.MysticDrawerState.Peek.name)
                         val returnToDetail = stageDetailReturn
                         stageDetailReturn = null
                         stageDetailContext = null
                         returnToDetail?.invoke()
                     },
+                    drawerState = savedDrawers[stageCharacter.id.key]?.let { com.xuanji.app.domain.MysticDrawerState.valueOf(it) }
+                        ?: com.xuanji.app.domain.MysticDrawerState.Peek,
+                    onDrawerStateChanged = { value -> savedDrawers = savedDrawers + (stageCharacter.id.key to value.name) },
                 ) {
                     MysticGuideCard(
                         bazi,
                         fortune,
                         immersive = true,
                         characterId = stageCharacter.id,
+                        onRequestCharacterHandoff = { target, detail ->
+                            selectCharacter(target)
+                            // A handoff is a conversation action, not merely gallery selection.
+                            savedDrawers = savedDrawers + (target.key to com.xuanji.app.domain.MysticDrawerState.Expanded.name)
+                            stageDetailContext = detail
+                            stageActionRequest = MYSTIC_DETAIL_QUESTION_ACTION
+                        },
                         onStageModeChange = { stageMode = it },
                         onStageSkinChange = { stageSkinId = it },
                         stageActionRequest = stageActionRequest,
@@ -309,6 +355,8 @@ private fun MysticImmersiveStage(
     onConversation: () -> Unit,
     onStartGame: () -> Unit,
     onClose: () -> Unit,
+    drawerState: com.xuanji.app.domain.MysticDrawerState,
+    onDrawerStateChanged: (com.xuanji.app.domain.MysticDrawerState) -> Unit,
     content: @Composable () -> Unit
 ) {
     val view = LocalView.current
@@ -343,6 +391,8 @@ private fun MysticImmersiveStage(
         onConversation = onConversation,
         onStartGame = onStartGame,
         onClose = onClose,
+        drawerStateOverride = drawerState,
+        onDrawerStateChanged = onDrawerStateChanged,
         content = content
     )
 }

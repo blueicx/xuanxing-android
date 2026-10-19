@@ -165,6 +165,7 @@ private fun CompositeContent(
                             if (shouldShowDailyAction(period)) {
                                 DailyActionSection(
                                     plan = dailyAction,
+                                    onScenarioChange = { actionViewModel.selectScenario(it) },
                                     onFeedback = { category, candidateKey, kind ->
                                         dailyAction?.let { plan ->
                                             scope.launch {

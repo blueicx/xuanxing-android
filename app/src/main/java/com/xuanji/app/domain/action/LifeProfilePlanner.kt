@@ -11,7 +11,8 @@ data class LifeProfileInput(
     val zodiacKey: String,
     val zodiacElement: Element,
     val tests: List<TestRecord>,
-    val preferredCityKey: String?
+    val preferredCityKey: String?,
+    val regionPreference: RegionPreference = RegionPreference()
 )
 
 class LifeProfilePlanner {
@@ -39,7 +40,7 @@ class LifeProfilePlanner {
         }.sortedWith(compareByDescending<Pair<CareerCluster, CareerCandidate>> { it.first.score }
             .thenBy { StableScore.tieBreak(input.profileKey, "life", it.first.key) })
             .take(4)
-            .map { it.first }
+            .map { LifeProfileDetails.career(it.first) }
 
         val colors = ActionCatalog.colors.map { candidate ->
             val elementFit = elementFit(favorable, candidate.elementTags)
@@ -59,7 +60,7 @@ class LifeProfilePlanner {
         }.sortedWith(compareByDescending<Pair<ColorCluster, Int>> { it.second }
             .thenBy { StableScore.tieBreak(input.profileKey, "colors", it.first.key) })
             .take(5)
-            .map { it.first }
+            .map { LifeProfileDetails.color(it.first) }
 
         val topCareer = ActionCatalog.careers.firstOrNull { it.key == careers.firstOrNull()?.key }
         val environmentTags = (topCareer?.environmentTags.orEmpty() + favorable.map { environmentFor(it) })
@@ -84,7 +85,7 @@ class LifeProfilePlanner {
             val expectedTags = (topCareer?.environmentTags.orEmpty() + environmentTags).distinct()
             val matched = expectedTags.intersect(city.tags).toList()
             val unmatched = expectedTags.filterNot { it in city.tags }.take(3)
-            RegionCandidate(city.country, city.city, matched, unmatched, score) to city
+            RegionCandidate(city.country, city.city, matched, unmatched, score, LifeProfileDetails.regionExplanation(input.regionPreference)) to city
         }.sortedWith(compareByDescending<Pair<RegionCandidate, CityProfile>> { it.first.score }
             .thenBy { StableScore.tieBreak(input.profileKey, "regions", it.second.key) })
             .take(3)
@@ -100,8 +101,8 @@ class LifeProfilePlanner {
             else -> ConfidenceLevel.Medium
         }
         val evidence = listOf(
-            ActionEvidence(ActionSource.FiveElements, "favorable", "喜用五行：${favorable.joinToString { elementName(it) }}", 45),
-            ActionEvidence(ActionSource.Zodiac, input.zodiacKey, "星座元素：${elementName(input.zodiacElement)}", 25)
+            ActionEvidence(ActionSource.FiveElements, "favorable", "职业匹配权重：喜用五行${favorable.joinToString { elementName(it) }}", if (hasTests) 45 else 60),
+            ActionEvidence(ActionSource.Zodiac, input.zodiacKey, "职业匹配权重：星座元素${elementName(input.zodiacElement)}", if (hasTests) 25 else 40)
         ) + if (hasTests) listOf(
             ActionEvidence(ActionSource.DailyFortune, "tests", "读取已保存测试结果：${testLabel(input.tests)}", 30)
         ) else emptyList()

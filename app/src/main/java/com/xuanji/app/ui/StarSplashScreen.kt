@@ -1,4 +1,5 @@
 package com.xuanji.app.ui
+import androidx.compose.runtime.mutableIntStateOf
 
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
@@ -86,7 +87,7 @@ fun StarSplashScreen(onDone: () -> Unit) {
     )
 
     // 分阶段：标题先单独淡出（宇宙色渐变：白 → 星空蓝紫 → 透明），再整体淡出
-    var phase by remember { mutableStateOf(0) }
+    var phase by remember { mutableIntStateOf(0) }
     val titleFadeOut by animateFloatAsState(
         targetValue = if (phase >= 1) 0f else 1f,
         animationSpec = tween(800, easing = FastOutSlowInEasing),

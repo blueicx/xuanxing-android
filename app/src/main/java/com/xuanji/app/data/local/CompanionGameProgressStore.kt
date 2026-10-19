@@ -10,15 +10,24 @@ class CompanionGameProgressStore(
     private val bridge: PreferenceBridge,
     private val now: () -> Long = { System.currentTimeMillis() }
 ) {
-    suspend fun save(profileKey: String, characterId: MysticCharacterId, state: CompanionGameProgressState) {
+    suspend fun save(profileKey: String, characterId: MysticCharacterId, state: CompanionGameProgressState, updatedAt: Long? = null) {
         val fingerprint = fingerprint(profileKey)
-        val envelope = CompanionGameProgressCodec.envelope(fingerprint, characterId, state, now())
+        val envelope = CompanionGameProgressCodec.envelope(fingerprint, characterId, state, updatedAt ?: now())
         bridge.write(key(profileKey, characterId, state.gameId), CompanionGameProgressCodec.encode(envelope))
     }
 
-    suspend fun load(profileKey: String, characterId: MysticCharacterId, gameId: String): CompanionGameProgressState? {
+    suspend fun loadEnvelope(profileKey: String, characterId: MysticCharacterId, gameId: String): CompanionGameProgressEnvelope? {
         val envelope = CompanionGameProgressCodec.decode(bridge.read(key(profileKey, characterId, gameId))) ?: return null
         if (envelope.profileKey != fingerprint(profileKey) || envelope.characterId != characterId.key || envelope.gameId != gameId) return null
+        return envelope.takeIf { CompanionGameProgressCodec.decodeState(it) != null }
+    }
+
+    /** Counts even unreadable local content as an overwrite conflict until the user confirms. */
+    suspend fun hasStoredValue(profileKey: String, characterId: MysticCharacterId, gameId: String): Boolean =
+        bridge.read(key(profileKey, characterId, gameId)) != null
+
+    suspend fun load(profileKey: String, characterId: MysticCharacterId, gameId: String): CompanionGameProgressState? {
+        val envelope = loadEnvelope(profileKey, characterId, gameId) ?: return null
         return CompanionGameProgressCodec.decodeState(envelope)
     }
 

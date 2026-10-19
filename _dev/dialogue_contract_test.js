@@ -303,7 +303,7 @@ assert(analyzerSource.includes('Normalizer.Form.NFKC'), 'input normalization mus
 assert(actionRouterSource.includes('ShowTodayMeal') && actionRouterSource.includes('ShowTodayActivity') && actionRouterSource.includes('ShowTodayOuting'), 'dialogue action router lost grounded daily actions');
 assert(actionRouterSource.includes('ShowLifeProfile') && actionRouterSource.includes('ShowEvidence'), 'dialogue action router lost life profile/evidence actions');
 assert(mysticCardSource.includes('dailyActionPlan = dailyActionPlan') && mysticCardSource.includes('lifeProfile = lifeProfile'), 'dialogue context must receive grounded action/profile data');
-assert(progressSource.includes('CompanionGameProgressEnvelope') && progressSource.includes('VERSION = 1'), 'companion game progress needs a versioned envelope');
+assert(progressSource.includes('CompanionGameProgressEnvelope') && progressSource.includes('const val VERSION = 5') && progressSource.includes('version !in 1..VERSION') && progressSource.includes('levelCountAtStart') && progressSource.includes('missionId') && progressSource.includes('plannedPath'), 'companion game progress needs v5 with legacy level/mission/route migration');
 assert(progressStoreSource.includes('KEY_PREFIX = "companion_game_progress_"') && progressStoreSource.includes('clear('), 'companion game progress must be profile-scoped and clearable');
 
 const soft = contract.soft_memory;
@@ -428,6 +428,8 @@ const storeSource = fs.readFileSync(path.join(APP_SRC, 'data', 'local', 'MysticC
 assert(codecSource.includes(`const val VERSION = ${persistence.codec_version}`), 'session codec version drifted');
 assert(storeSource.includes(`KEY_PREFIX = "${persistence.key_prefix}"`), 'session store key namespace drifted');
 assert(codecSource.includes('requestState = MysticRequestState.Idle'), 'pending work must be dropped on restore');
+assert(codecSource.includes('!in 1..VERSION'), 'legacy v1 snapshots must remain supported');
+assert(codecSource.includes('interaction = runCatching'), 'explicit interaction choices must be restored with validation');
 requireVerify(persistence.verify, `session_persistence ${persistence.verify}`);
 requireVerify(persistence.store_verify, `session_persistence ${persistence.store_verify}`);
 

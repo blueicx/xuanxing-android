@@ -40,7 +40,7 @@ class GameDialogueBridge(
         activeGame(state) && state.position.sideToMove != state.playerColor &&
             !state.outcome.isTerminal()
 
-    fun handle(state: GameSessionState, raw: String): Result {
+    fun handle(state: GameSessionState, raw: String, cancellationContext: kotlin.coroutines.CoroutineContext = kotlin.coroutines.EmptyCoroutineContext): Result {
         val input = normalize(raw)
         if (input.isEmpty()) {
             return Result(null, "想下棋的话，可以说「来一盘象棋」。", state, grounded = false)
@@ -70,7 +70,7 @@ class GameDialogueBridge(
         return when (classifyInGame(trimmed)) {
             InGameCommand.UNDO -> undo(state)
             InGameCommand.REDO -> redo(state)
-            InGameCommand.HINT -> hint(state)
+            InGameCommand.HINT -> hint(state, cancellationContext)
             InGameCommand.REVIEW -> review(state)
             InGameCommand.WHY -> why(state)
             InGameCommand.SAFER -> safer(state)
@@ -357,9 +357,9 @@ class GameDialogueBridge(
         )
     }
 
-    private fun hint(state: GameSessionState): Result {
+    private fun hint(state: GameSessionState, cancellationContext: kotlin.coroutines.CoroutineContext): Result {
         val color = state.position.sideToMove
-        val result = kotlinx.coroutines.runBlocking {
+        val result = kotlinx.coroutines.runBlocking(cancellationContext + kotlinx.coroutines.Dispatchers.Default) {
             engineFor(state.difficulty).bestMove(state.position, color, state.sessionToken)
         }
         return when (result) {
@@ -374,8 +374,8 @@ class GameDialogueBridge(
                 val cost = probe?.let { safetyNote(it.position, color) } ?: ""
                 Result(
                     null,
-                    "建议「$notation」（本地离线搜索 ${SmartBoardEngine.depthOf(state.difficulty)} 层，基于当前局面，非强度评级）。" +
-                        cost,
+                    "建议「$notation」（本地离线搜索深度上限 ${SmartBoardEngine.depthOf(state.difficulty)} 层、节点上限 ${SmartBoardEngine.nodeLimitOf(state.difficulty)}，基于当前局面，非强度评级）。" +
+                        cost + " " + BoardStepExplanation.describe(state.position, move, state.history.size + 1),
                     state,
                     grounded = true
                 )
@@ -395,7 +395,8 @@ class GameDialogueBridge(
         val notation = last.notation.ifEmpty { XiangqiNotation.format(last, state.position) }
         val mover = if (last.player == PlayerColor.RED) "红方" else "黑方"
         val capture = last.captured?.let { "，吃掉$it" } ?: ""
-        return Result(null, "复盘：最后一手是$mover「$notation」$capture。基于当前局面。", state, grounded = true)
+        return Result(null, "复盘：最后一手是$mover「$notation」$capture。基于当前局面。 " +
+            BoardStepExplanation.describe(state.positionAt(state.history.lastIndex), last, state.history.size), state, grounded = true)
     }
 
     /** Threat report reads the real attack map and says out loud which pieces are actually free. */

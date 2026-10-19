@@ -1,13 +1,16 @@
 package com.xuanji.app.ui.components
 
-import android.graphics.BitmapFactory
+import android.graphics.Bitmap
 import androidx.compose.foundation.Image
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import com.xuanji.app.R
@@ -28,7 +31,7 @@ internal fun figureAssetId(styleId: String): MysticFigureAssetId = when (styleId
     else -> MysticFigureAssetId.Jiangnan
 }
 
-private fun resourceId(assetId: MysticFigureAssetId): Int = when (assetId) {
+internal fun resourceId(assetId: MysticFigureAssetId): Int = when (assetId) {
     MysticFigureAssetId.Jiangnan -> R.drawable.mystic_figure_ink
     MysticFigureAssetId.Elder -> R.drawable.mystic_figure_elder
     MysticFigureAssetId.Academy -> R.drawable.mystic_figure_cel
@@ -48,17 +51,18 @@ internal fun MysticFigureAsset(
     fallback: @Composable () -> Unit
 ) {
     val resources = LocalContext.current.resources
-    val bitmap = remember(styleId, resources) {
-        runCatching { BitmapFactory.decodeResource(resources, resourceId(figureAssetId(styleId))) }.getOrNull()
+    val bitmap by produceState<Bitmap?>(null, styleId, resources) {
+        value = null
+        value = MysticFigureBitmapCache.load(resources, resourceId(figureAssetId(styleId)))
     }
     if (bitmap == null) {
         fallback()
     } else {
         Image(
-            bitmap = bitmap.asImageBitmap(),
+            bitmap = remember(bitmap) { bitmap!!.asImageBitmap() },
             contentDescription = contentDescription,
             contentScale = contentScale,
-            modifier = modifier.semantics { this.contentDescription = contentDescription }
+            modifier = modifier.testTag("mystic-artwork-${figureAssetId(styleId).name}").semantics { this.contentDescription = contentDescription }
         )
     }
 }

@@ -20,8 +20,8 @@ class CompanionGameProgressStoreTest {
     @Test
     fun codec_round_trips_all_three_local_game_states_and_rejects_damage() {
         val states = listOf<CompanionGameProgressState>(
-            CompanionGameProgressState.Poetry(PoetryChainState(2, "山色入衣宽", 2, false, "好")),
-            CompanionGameProgressState.StarMap(StarMapState(1, "天津", listOf("织女", "天津"), false, "继续")),
+            CompanionGameProgressState.Poetry(PoetryChainState(2, "半窗听雨声", 2, false, "好")),
+            CompanionGameProgressState.StarMap(StarMapState(0, "天津", listOf("织女", "天津"), false, "继续")),
             CompanionGameProgressState.SilkRoad(SilkRoadState("敦煌", daysLeft = 6, budgetLeft = 9, path = listOf("长安", "敦煌")))
         )
         states.forEach { state ->
@@ -36,10 +36,24 @@ class CompanionGameProgressStoreTest {
     }
 
     @Test
+    fun version_one_progress_migrates_and_preserves_existing_position_and_answers() {
+        val legacy = """{"version":1,"profileKey":"alice-hash","characterId":"shen_yanzhou","gameId":"poetry_chain","stateJson":"{\"promptIndex\":2,\"selected\":\"半窗听雨声\",\"score\":2,\"completed\":false,\"feedback\":\"继续\"}","updatedAt":123}"""
+
+        val envelope = CompanionGameProgressCodec.decode(legacy)
+        val state = envelope?.let(CompanionGameProgressCodec::decodeState) as? CompanionGameProgressState.Poetry
+
+        assertEquals(CompanionGameProgressCodec.VERSION, envelope?.version)
+        assertEquals(2, state?.value?.promptIndex)
+        assertEquals("半窗听雨声", state?.value?.selected)
+        assertTrue(state?.value?.undoHistory.orEmpty().isEmpty())
+        assertTrue(state?.let { PoetryChainEngine.isValidState(it.value) } == true)
+    }
+
+    @Test
     fun store_isolates_profile_character_and_game_and_clear_is_local() = runTest {
         val bridge = MemoryBridge()
         val store = CompanionGameProgressStore(bridge) { 456L }
-        val state = CompanionGameProgressState.Poetry(PoetryChainState(score = 1))
+        val state = CompanionGameProgressState.Poetry(PoetryChainState(promptIndex = 1, selected = "灯影落江中", score = 1))
         store.save("alice", MysticCharacterId.ShenYanzhou, state)
 
         assertEquals(state, store.load("alice", MysticCharacterId.ShenYanzhou, "poetry_chain"))

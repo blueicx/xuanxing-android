@@ -40,14 +40,15 @@ object MysticIntentClassifier {
     }
 
     private fun action(q: String): MysticIntent? = when {
-        containsAny(q, "早餐吃什么", "午餐吃什么", "午饭吃什么", "晚餐吃什么", "晚饭吃什么", "今天吃什么", "外卖吃什么") -> MysticIntent.TodayMeal
-        containsAny(q, "今天做什么", "今天适合做什么", "现在做什么") -> MysticIntent.TodayActivity
-        containsAny(q, "去哪玩", "去哪里玩", "今天去哪", "今天去哪里") -> MysticIntent.TodayOuting
+        containsAny(q, "我该吃什么药", "怎么用药", "服什么药", "药量", "药物") -> MysticIntent.Health
+        containsAny(q, "早餐吃什么", "午餐吃什么", "午饭吃什么", "晚餐吃什么", "晚饭吃什么", "今天吃什么", "外卖吃什么", "吃什么", "吃啥", "吃点什么", "吃点啥", "什么菜", "菜名") -> MysticIntent.TodayMeal
+        containsAny(q, "今天做什么", "今天适合做什么", "现在做什么", "我现在能做点什么", "今天安排什么活动", "今天能做什么", "今天做点什么") -> MysticIntent.TodayActivity
+        containsAny(q, "去哪玩", "去哪里玩", "今天去哪", "今天去哪里", "适合去哪里玩", "周末去哪玩", "去哪里散步", "去哪散步") -> MysticIntent.TodayOuting
         containsAny(q, "适合什么工作", "适合做什么工作", "什么工作适合我", "什么颜色适合我", "适合什么颜色", "哪个城市适合我", "适合哪个城市", "适合什么地区") -> MysticIntent.LifeProfile
         containsAny(q, "抽塔罗", "塔罗牌", "塔罗怎么抽", "三张塔罗", "五张塔罗") -> MysticIntent.Tarot
         containsAny(q, "抽符文", "北欧符文", "卢恩", "卢恩怎么抽", "三符文") -> MysticIntent.Rune
         containsAny(q, "数字命理", "生命数字", "个人年", "个人月", "个人日") -> MysticIntent.Numerology
-        containsAny(q, "实时天气", "天气预报", "降雨概率", "当前气温", "温度多少") -> MysticIntent.Weather
+        containsAny(q, "天气", "降雨概率", "当前气温", "温度多少", "下雨") -> MysticIntent.Weather
         containsAny(q, "附近哪里", "附近去哪", "附近游玩", "地图上去哪") -> MysticIntent.Place
         containsAny(q, "做个性格测验", "性格测验", "人格测试结果", "我的人格") -> MysticIntent.Personality
         else -> null
@@ -55,11 +56,13 @@ object MysticIntentClassifier {
 
     private fun casual(q: String): MysticIntent? = when {
         q in setOf("hi", "hello", "yo", "嗨", "哈喽", "哈罗", "你好", "您好", "在吗", "在么", "在不在") ||
-            q.length <= 5 && setOf("你好", "您好", "哈喽", "哈罗", "嗨").any(q::startsWith) ||
-            setOf("你好呀", "您好呀", "早上好", "早安", "午安", "下午好", "晚上好", "晚安", "最近怎么样", "最近如何").any(q::contains) -> MysticIntent.Greeting
-        q == "走了" || setOf("拜拜", "再见", "回见", "睡了", "去忙").any(q::contains) -> MysticIntent.Farewell
+            q.length <= 5 && setOf("你好", "您好", "哈喽", "哈罗", "嗨").any(q::startsWith) -> MysticIntent.Greeting
+        q == "走了" || setOf("拜拜", "再见", "回见", "回头见", "下次聊", "睡了", "去忙", "先走了", "我先走").any(q::contains) -> MysticIntent.Farewell
+        setOf("你好呀", "您好呀", "早上好", "早安", "午安", "下午好", "晚上好", "晚安").any(q::contains) ||
+            q.startsWith("最近怎么样") || q.startsWith("最近如何") ||
+            q.startsWith("你最近怎么样") || q.startsWith("你最近如何") -> MysticIntent.Greeting
         setOf("谢谢", "多谢", "感谢", "辛苦了", "thanks", "thank you").any(q::contains) -> MysticIntent.Thanks
-        setOf("你是谁", "你叫什么", "叫什么名字", "什么名字", "介绍一下自己", "你是什么人", "你是神仙吗").any(q::contains) -> MysticIntent.Identity
+        setOf("你是谁", "你叫什么", "怎么称呼你", "叫什么名字", "什么名字", "介绍一下自己", "介绍一下你自己", "你是什么人", "你是神仙吗", "人工智能吗", "你是ai吗").any(q::contains) -> MysticIntent.Identity
         setOf("吃了吗", "干嘛呢", "在干嘛", "在忙吗", "无聊", "陪我聊", "陪我聊聊", "会说吗", "随便聊聊", "陪我说话", "今天心情").any(q::contains) -> MysticIntent.Smalltalk
         else -> null
     }
@@ -68,10 +71,10 @@ object MysticIntentClassifier {
         containsAny(q, "运势", "运气", "占卜", "算命", "算一卦", "起卦", "盘面", "综合分", "今天运") -> MysticIntent.Fortune
         containsAny(q, "焦虑", "压力", "害怕", "担心", "难过", "崩溃", "很累", "内耗") -> MysticIntent.Mood
         containsAny(q, "感情", "恋爱", "对象", "复合", "暗恋", "表白", "桃花", "分手", "他", "她") -> MysticIntent.Love
-        containsAny(q, "财", "钱", "赚钱", "投资", "生意", "消费", "钱包") -> MysticIntent.Wealth
+        containsAny(q, "财", "钱", "赚钱", "投资", "生意", "消费", "钱包", "股票", "基金", "理财") -> MysticIntent.Wealth
         containsAny(q, "工作", "上班", "事业", "老板", "同事", "面试", "升职", "跳槽") -> MysticIntent.Career
-        containsAny(q, "学习", "考试", "复习", "作业", "论文", "背", "题") -> MysticIntent.Study
-        containsAny(q, "健康", "身体", "睡觉", "睡眠", "失眠", "生病", "累") -> MysticIntent.Health
+        containsAny(q, "学习", "考试", "复习", "作业", "论文", "背单词", "背诵", "做题", "题目", "错题", "习题", "考题") -> MysticIntent.Study
+        containsAny(q, "健康", "身体", "睡觉", "睡眠", "睡不好", "睡不着", "失眠", "生病", "累") -> MysticIntent.Health
         containsAny(q, "为什么", "怎么来", "怎么算", "依据", "来源", "多少分") -> MysticIntent.Why
         containsAny(q, "留意", "注意", "风险", "小心", "避免", "坑") -> MysticIntent.Care
         containsAny(q, "能不能", "会不会", "可不可以", "行不行", "成不成", "该不该") -> MysticIntent.Outcome
