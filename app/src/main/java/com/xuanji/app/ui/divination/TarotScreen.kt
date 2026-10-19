@@ -29,6 +29,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -57,8 +58,17 @@ fun TarotScreen() {
     val spread by viewModel.spread.collectAsStateWithLifecycle()
     val stableSeed by viewModel.stableSeed.collectAsStateWithLifecycle()
     val stableExplanation by viewModel.stableExplanation.collectAsStateWithLifecycle()
-    val profile by AppModule.repository.userProfileFlow.collectAsStateWithLifecycle(initialValue = null)
+    val profile by AppModule.repository.userProfileState.collectAsStateWithLifecycle()
     var question by remember { mutableStateOf("") }
+    var readingDate by rememberSaveable { mutableStateOf(LocalDate.now().toString()) }
+    val ownerKey = profile?.let(AppModule.actionRepository::profileKey).orEmpty()
+    var readingOwner by rememberSaveable { mutableStateOf(ownerKey) }
+    LaunchedEffect(ownerKey) {
+        if (readingOwner != ownerKey) {
+            viewModel.setSpread(spread)
+            readingOwner = ownerKey
+        }
+    }
 
     // 翻牌动画：flipProgress 由 LaunchedEffect(drawKey) 驱动，0→1 翻面
     var flipProgress by remember { mutableFloatStateOf(0f) }
@@ -117,19 +127,21 @@ fun TarotScreen() {
         )
 
         Button(onClick = {
+            readingDate = LocalDate.now().toString()
             viewModel.draw()
             drawKey++
         }, modifier = Modifier.fillMaxWidth()) {
             Text("随机抽牌")
         }
         OutlinedButton(onClick = {
+            readingDate = LocalDate.now().toString()
             val p = profile
             val profileKey = p?.let { "${it.birthYear}-${it.birthMonth}-${it.birthDay}-${it.birthHour}-${it.locationCode.orEmpty()}" } ?: "anonymous"
             viewModel.drawDeterministic(
                 DivinationQuery(
                     system = "tarot",
                     profileKey = profileKey,
-                    dateKey = LocalDate.now().toString(),
+                    dateKey = readingDate,
                     question = question,
                     spread = spread
                 )
@@ -167,6 +179,9 @@ fun TarotScreen() {
             }
         }
 
+        if (drawn.isNotEmpty() && flipProgress >= 0.999f) {
+            TarotLearningPanel(drawn, readingDate, stableSeed)
+        }
         if (drawn.isEmpty()) {
             Text(
                 "静心凝神，选择牌阵后点「抽牌」。78 张牌（22 大阿尔卡纳 + 56 小阿尔卡纳）随机不重复抽取。仅供娱乐参考。",

@@ -1,5 +1,7 @@
 # 玄星 · XuanXing（Android）
 
+2026-10-19 继续：塔罗增加牌阵关系与主动保存，卢恩补齐三符显示和 24 符学习，姓名/基础日期数字展示实际计算链并拒绝未映射文字。CI 已修复废弃 Android `tools` 包的初始化错误。当前源码 Debug 版本为 1.1.1（3）；本轮交付与验证见[占卜学习交接](docs/superpowers/handoffs/2026-10-19-divination-learning-handoff.md)，早前 1.1.0 状态保留作历史记录。
+
 2026-10-19 续补：饮食偏好增加设备、简单做法、便当形式与库存优先，现实条件不改变文化分数。安排日历增加主动日记、心情与实际执行，以及周/月描述回顾；日记默认不导出，需显式勾选备注分区。DailyLife v6 / 备份 v8 兼容旧版。数字周期统一大师数归约并显示中间步骤；Debug 版本 1.1.0（2）已保留数据安装 XZ2。验证、产物与交付范围见[本轮交接](docs/superpowers/handoffs/2026-10-19-practical-journal-delivery-handoff.md)。12 包仍有剩余项，见[实施清单](docs/superpowers/plans/2026-10-18-daily-companion-deepening.md)。
 
 2026-10-19：购物清单支持独立已买记录、手填数量/单位、明确入库；库存支持分类、手填期限、临期/超期筛选与默认关闭的期限提醒。七日餐单可显式保存草稿，恢复后重新核对当前偏好，锁定菜品已被排除时不会绕过过滤。DailyLife v5、备份 v6 兼容旧版且不擦除旧备份没有的新增本机字段。验证与剩余范围见[库存与草稿交接](docs/superpowers/handoffs/2026-10-19-pantry-and-weekly-drafts-handoff.md)。

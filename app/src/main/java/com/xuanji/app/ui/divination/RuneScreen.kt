@@ -15,6 +15,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -41,6 +42,7 @@ fun RuneScreen() {
     val spread = remember { mutableStateOf("single") }
     val question = remember { mutableStateOf("") }
     val profile by AppModule.repository.userProfileFlow.collectAsStateWithLifecycle(initialValue = null)
+    LaunchedEffect(profile) { stable.value = null; drawn.value = null }
     val shown = stable.value?.draws?.firstOrNull()?.result ?: drawn.value ?: daily
 
     Column(
@@ -98,7 +100,14 @@ fun RuneScreen() {
             )
         }
 
-        Button(onClick = { drawn.value = Rune.random() }, modifier = Modifier.fillMaxWidth()) {
+        stable.value?.draws?.drop(1)?.forEach { draw -> FortuneCard {
+            SectionTitle("${draw.position} · ${draw.result.rune.symbol} ${draw.result.rune.name}")
+            Text(if (draw.result.reversed) "逆位（项目现代解释规则）" else "正位（项目现代解释规则）")
+            Text(if (draw.result.reversed) draw.result.rune.reversed else draw.result.rune.upright)
+            Spacer(Modifier.height(8.dp))
+            Text(draw.result.verdict)
+        } }
+        Button(onClick = { stable.value = null; drawn.value = Rune.random() }, modifier = Modifier.fillMaxWidth()) {
             Text("随机抽签")
         }
         OutlinedButton(onClick = {
@@ -112,9 +121,11 @@ fun RuneScreen() {
         stable.value?.let { reading ->
             Text("算法种子：${reading.seed.take(12)}…", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Text(reading.explanation, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            RuneLearningPanel(reading)
         }
-        if (drawn.value != null) {
-            Button(onClick = { drawn.value = null }, modifier = Modifier.fillMaxWidth()) {
+        if (stable.value == null) RuneLearningPanel(null)
+        if (drawn.value != null || stable.value != null) {
+            Button(onClick = { drawn.value = null; stable.value = null }, modifier = Modifier.fillMaxWidth()) {
                 Text("恢复今日符文")
             }
         }

@@ -8,7 +8,7 @@ import com.xuanji.app.data.model.UserProfile
  */
 object Numerology {
 
-    data class NumberItem(val label: String, val number: Int, val isMaster: Boolean, val trait: String, val verdict: String)
+    data class NumberItem(val label: String, val number: Int, val isMaster: Boolean, val trait: String, val verdict: String, val calculation: String = "")
 
     /** 各数字六维解读（总评/事业/财运/感情/健康/建议） */
     private val NUMBER_VERDICTS = mapOf(
@@ -52,10 +52,13 @@ object Numerology {
         val birthday = reduce(d)                    // 生日数
 
         return listOf(
-            NumberItem("生命数字", lifePath, lifePath >= 11, TRAITS[lifePath] ?: "", NUMBER_VERDICTS[lifePath] ?: ""),
-            NumberItem("天赋数字", talent, talent >= 11, TRAITS[talent] ?: "", NUMBER_VERDICTS[talent] ?: ""),
-            NumberItem("实现数字", expression, expression >= 11, TRAITS[expression] ?: "", NUMBER_VERDICTS[expression] ?: ""),
-            NumberItem("生日数字", birthday, birthday >= 11, TRAITS[birthday] ?: "", NUMBER_VERDICTS[birthday] ?: "")
+            NumberItem("生命数字", lifePath, lifePath >= 11, TRAITS[lifePath] ?: "", NUMBER_VERDICTS[lifePath] ?: "",
+                "日期各数位 ${"$y$m$d".toList().joinToString("+")}=${NumerologyReduction.explain(digitSum(y) + digitSum(m) + digitSum(d))}"),
+            NumberItem("天赋数字", talent, talent >= 11, TRAITS[talent] ?: "", NUMBER_VERDICTS[talent] ?: "",
+                "出生年数位 ${y.toString().toList().joinToString("+")}=${NumerologyReduction.explain(digitSum(y))}"),
+            NumberItem("实现数字", expression, expression >= 11, TRAITS[expression] ?: "", NUMBER_VERDICTS[expression] ?: "",
+                "月日数位 ${"$m$d".toList().joinToString("+")}=${NumerologyReduction.explain(digitSum(m) + digitSum(d))}"),
+            NumberItem("生日数字", birthday, birthday >= 11, TRAITS[birthday] ?: "", NUMBER_VERDICTS[birthday] ?: "", NumerologyReduction.explain(d))
         )
     }
 
@@ -130,21 +133,37 @@ object Numerology {
         33 to "成熟后将无私奉献，成为爱的典范。"
     )
 
-    private fun letterValue(ch: Char): Int = ch.uppercaseChar().code - 64
+    private fun letterValue(ch: Char): Int = ch.code - 64
+
+    fun fullCalculationSteps(profile: UserProfile, fullName: String): List<NumerologyCalculationStep> {
+        if (fullName.any { it !in 'a'..'z' && it !in 'A'..'Z' && !it.isWhitespace() && it !in "-'" }) return emptyList()
+        val name = fullName.trim().uppercase(java.util.Locale.ROOT)
+        if (name.length > 120 || name.none { it in 'A'..'Z' } || name.any { it !in 'A'..'Z' && !it.isWhitespace() && it !in "-'" }) return emptyList()
+        val letters = name.filter { it in 'A'..'Z' }
+        val vowels = letters.filter { it in "AEIOU" }
+        val consonants = letters.filter { it !in "AEIOU" }
+        val month = reduce(profile.birthMonth)
+        val day = reduce(profile.birthDay)
+        val year = reduce(profile.birthYear)
+        val lp = reduce(month + day + year)
+        val dn = reduce(letters.sumOf(::letterValue))
+        fun nameStep(label: String, chars: String): NumerologyCalculationStep {
+            val total = chars.sumOf(::letterValue)
+            return NumerologyCalculationStep(label, reduce(total),
+                "${chars.map { "$it=${letterValue(it)}" }.joinToString("；").ifBlank { "该类字母为空" }}；合计 ${NumerologyReduction.explain(total)}")
+        }
+        return listOf(
+            NumerologyCalculationStep("生命路径数", lp, "出生月 ${NumerologyReduction.explain(profile.birthMonth)}；出生日 ${NumerologyReduction.explain(profile.birthDay)}；出生年 ${NumerologyReduction.explain(profile.birthYear)}；$month+$day+$year=${NumerologyReduction.explain(month + day + year)}"),
+            nameStep("命运数", letters), nameStep("灵魂渴望数", vowels), nameStep("人格数", consonants),
+            NumerologyCalculationStep("成熟数", reduce(lp + dn), "$lp+$dn=${NumerologyReduction.explain(lp + dn)}")
+        )
+    }
 
     /** 完整五数：生命路径 / 命运 / 灵魂渴望 / 人格 / 成熟 */
     fun calculateFull(profile: UserProfile, fullName: String): List<FullNumber> {
-        val name = fullName.trim().uppercase()
-        val lp = reduce(
-            reduce(profile.birthMonth) + reduce(profile.birthDay) + reduce(profile.birthYear)
-        )
-        val nameTotal = name.sumOf { if (it.isLetter()) letterValue(it) else 0 }
-        val dn = reduce(nameTotal)
-        val vowels = name.sumOf { if (it in "AEIOU") letterValue(it) else 0 }
-        val sn = reduce(vowels)
-        val consonants = name.sumOf { if (it.isLetter() && it !in "AEIOU") letterValue(it) else 0 }
-        val pn = reduce(consonants)
-        val mn = reduce(lp + dn)
+        val steps = fullCalculationSteps(profile, fullName)
+        if (steps.isEmpty()) return emptyList()
+        val (lp, dn, sn, pn, mn) = steps.map { it.number }
 
         return listOf(
             FullNumber("生命路径数", lp, LIFE_PATH_TEXT[lp] ?: "未知特质", NUMBER_VERDICTS[lp] ?: ""),

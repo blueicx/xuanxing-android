@@ -54,9 +54,11 @@ fun NumerologyScreen() {
             val items = Numerology.calculate(p)
             FortuneCard {
                 SectionTitle("基础数字（出生日期）")
+                Text("基础生命数字沿用日期所有数位相加；下方完整生命路径采用年月日各自归约后相加。两者是项目保留的不同约定，含大师数时可能不同，不混作同一分数。", style = MaterialTheme.typography.bodySmall)
                 Spacer(Modifier.height(8.dp))
                 items.forEach { it ->
                     InfoRow(if (it.isMaster) "${it.label}（大师数）" else it.label, "${it.number}")
+                    Text("计算：${it.calculation}", style = MaterialTheme.typography.bodySmall)
                     Text(it.trait, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Spacer(Modifier.height(4.dp))
                     Text(it.verdict, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -88,8 +90,12 @@ fun NumerologyScreen() {
                 )
                 Spacer(Modifier.height(8.dp))
                 if (name.trim().isNotEmpty()) {
+                    val steps = Numerology.fullCalculationSteps(p, name)
+                    if (steps.isEmpty()) Text("姓名只支持 A–Z 英文或拼音字母、空格、连字符与撇号，最多 120 字符；不自动猜测汉字读音。")
+                    Text("姓名规则采用 A=1…Z=26；元音为 AEIOU，Y 在本规则中按辅音。零表示没有该类字母，不作为人格结论。", style = MaterialTheme.typography.bodySmall)
                     Numerology.calculateFull(p, name).forEach { f ->
                         InfoRow(f.label, "${f.number}")
+                        Text("计算：${steps.single { it.label == f.label }.calculation}", style = MaterialTheme.typography.bodySmall)
                         Text(f.text, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Spacer(Modifier.height(4.dp))
                         Text(f.verdict, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)

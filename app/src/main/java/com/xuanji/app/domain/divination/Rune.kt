@@ -8,6 +8,8 @@ import kotlin.random.Random
  * 仅供文化娱乐参考。
  */
 object Rune {
+    /** Read-only names/glyphs and the project's existing modern commentary, not historical source verses. */
+    fun learningCatalog(): List<RuneItem> = RUNES.toList()
 
     data class RuneItem(
         val name: String,
